@@ -1,4 +1,5 @@
 pub mod session;
+pub mod hid;
 
 pub fn run() {
     tauri::Builder::default()

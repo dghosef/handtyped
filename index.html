@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HumanProof</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f9fafb; }
+    #app { max-width: 800px; margin: 0 auto; padding: 2rem; }
+    #toolbar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    #toolbar button { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; font-size: 0.85rem; }
+    #toolbar button:hover { background: #f3f4f6; }
+    #stats { margin-left: auto; font-size: 0.8rem; color: #6b7280; display: flex; gap: 1rem; }
+    #editor { min-height: 60vh; border: 1px solid #d1d5db; padding: 2rem; font-size: 1.1rem; line-height: 1.8; background: white; border-radius: 4px; cursor: text; outline: none; }
+    #editor:focus-within { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+    .ProseMirror { outline: none; min-height: 100%; }
+    .ProseMirror p { margin-bottom: 0.75em; }
+    .ProseMirror h1 { font-size: 1.8em; font-weight: 700; margin-bottom: 0.5em; }
+    .ProseMirror h2 { font-size: 1.4em; font-weight: 600; margin-bottom: 0.5em; }
+    body.dark { background: #111827; color: #f9fafb; }
+    body.dark #editor { background: #1f2937; border-color: #374151; color: #f9fafb; }
+    body.dark #toolbar button { background: #374151; border-color: #4b5563; color: #f9fafb; }
+    body.dark #toolbar button:hover { background: #4b5563; }
+    #status-bar { margin-top: 0.5rem; font-size: 0.75rem; color: #9ca3af; display: flex; gap: 1rem; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <button id="btn-bold"><b>B</b></button>
+      <button id="btn-italic"><i>I</i></button>
+      <button id="btn-h1">H1</button>
+      <button id="btn-h2">H2</button>
+      <button id="btn-undo">↩ Undo</button>
+      <button id="btn-redo">↪ Redo</button>
+      <div id="stats">
+        <span id="word-count">0 words</span>
+        <span id="timer">00:00</span>
+        <button id="btn-dark">🌙</button>
+        <button id="btn-export">Export Bundle</button>
+      </div>
+    </div>
+    <div id="editor"></div>
+    <div id="status-bar">
+      <span id="save-status">Not saved</span>
+      <span id="keystroke-count">0 keystrokes</span>
+    </div>
+  </div>
+  <script type="module" src="/src/editor.js"></script>
+</body>
+</html>

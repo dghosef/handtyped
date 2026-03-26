@@ -1,0 +1,25 @@
+{
+  "name": "humanproof",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "prosemirror-commands": "^1.5.2",
+    "prosemirror-history": "^1.3.2",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-model": "^1.22.3",
+    "prosemirror-schema-basic": "^1.2.3",
+    "prosemirror-schema-list": "^1.3.0",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.33.8"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "vite": "^5.3.1"
+  }
+}

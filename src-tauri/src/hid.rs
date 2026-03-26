@@ -106,6 +106,131 @@ pub fn mach_to_wall_ns(
     start_wall_ns.saturating_add(delta_ns)
 }
 
+use core_foundation::dictionary::CFMutableDictionary;
+use core_foundation::number::CFNumber;
+use core_foundation::string::CFString;
+use core_foundation::base::TCFType;
+use core_foundation::array::CFArray;
+use core_foundation_sys::runloop::{CFRunLoopRun, CFRunLoopGetCurrent};
+use std::sync::Arc;
+use crate::session::{AppState, KeyEvent};
+
+// HID usage page for keyboard/keypad
+const K_HID_PAGE_KEYBOARD: u32 = 0x07;
+
+// Device matching dictionary keys
+const K_USAGE_PAGE_KEY: &str = "DeviceUsagePage";
+const K_USAGE_KEY: &str = "DeviceUsage";
+// Generic Desktop page = 0x01, Keyboard usage = 0x06
+const K_HID_USAGE_GD_KEYBOARD: i32 = 0x06;
+const K_HID_PAGE_GENERIC_DESKTOP: i32 = 0x01;
+
+const K_OPTIONS_NONE: IOOptionBits = 0;
+
+struct CallbackContext {
+    state: Arc<AppState>,
+    start_mach: u64,
+    start_wall_ns: u64,
+    tb: TimebaseInfo,
+}
+
+unsafe extern "C" fn hid_input_callback(
+    context: *mut c_void,
+    _result: IOReturn,
+    _sender: *mut c_void,
+    value: IOHIDValueRef,
+) {
+    if context.is_null() || value.is_null() { return; }
+
+    let ctx = &*(context as *const CallbackContext);
+
+    let element = IOHIDValueGetElement(value);
+    if element.is_null() { return; }
+
+    // Only process keyboard/keypad usage page events
+    let usage_page = IOHIDElementGetUsagePage(element);
+    if usage_page != K_HID_PAGE_KEYBOARD { return; }
+
+    let usage = IOHIDElementGetUsage(element);
+    if usage == 0 { return; }
+
+    let int_val = IOHIDValueGetIntegerValue(value);
+    let kind = if int_val != 0 { "down" } else { "up" };
+
+    let mach_ts = IOHIDValueGetTimeStamp(value);
+    let wall_ns = mach_to_wall_ns(mach_ts, ctx.start_mach, ctx.start_wall_ns, &ctx.tb);
+
+    let event = KeyEvent { t: wall_ns, kind: kind.into(), key: usage, flags: 0 };
+
+    if let Ok(mut s) = ctx.state.session.lock() {
+        s.append_key(event);
+    }
+}
+
+/// Spawns a dedicated thread that runs an IOHIDManager on its own CFRunLoop.
+/// Returns immediately. The thread runs for the process lifetime.
+pub fn start_hid_capture(state: Arc<AppState>) {
+    std::thread::Builder::new()
+        .name("hid-capture".into())
+        .spawn(move || {
+            unsafe {
+                let start_mach = mach_absolute_time();
+                let start_wall_ns = state.session.lock().unwrap().start_wall_ns;
+                let tb = TimebaseInfo::get();
+
+                // Build device matching dictionary: GenericDesktop / Keyboard
+                let usage_page_key = CFString::new(K_USAGE_PAGE_KEY);
+                let usage_key = CFString::new(K_USAGE_KEY);
+                let page_val = CFNumber::from(K_HID_PAGE_GENERIC_DESKTOP);
+                let usage_val = CFNumber::from(K_HID_USAGE_GD_KEYBOARD);
+
+                let matching: CFMutableDictionary<CFString, CFNumber> =
+                    CFMutableDictionary::from_CFType_pairs(&[
+                        (usage_page_key.clone(), page_val.clone()),
+                        (usage_key.clone(), usage_val.clone()),
+                    ]);
+
+                let matching_array = CFArray::from_CFTypes(&[matching.to_immutable()]);
+
+                let manager = IOHIDManagerCreate(
+                    core_foundation_sys::base::kCFAllocatorDefault as *const c_void,
+                    K_OPTIONS_NONE,
+                );
+                if manager.is_null() {
+                    eprintln!("[hid] IOHIDManagerCreate failed");
+                    return;
+                }
+
+                IOHIDManagerSetDeviceMatchingMultiple(manager, matching_array.as_concrete_TypeRef());
+
+                let ctx = Box::new(CallbackContext {
+                    state,
+                    start_mach,
+                    start_wall_ns,
+                    tb,
+                });
+                let ctx_ptr = Box::into_raw(ctx) as *mut c_void;
+
+                IOHIDManagerRegisterInputValueCallback(manager, hid_input_callback, ctx_ptr);
+
+                let run_loop = CFRunLoopGetCurrent();
+                let mode = core_foundation_sys::runloop::kCFRunLoopDefaultMode;
+                IOHIDManagerScheduleWithRunLoop(manager, run_loop, mode);
+
+                let ret = IOHIDManagerOpen(manager, K_OPTIONS_NONE);
+                if ret != 0 {
+                    eprintln!("[hid] IOHIDManagerOpen failed: {}", ret);
+                    // Reclaim context to avoid leak on failure
+                    drop(Box::from_raw(ctx_ptr as *mut CallbackContext));
+                    return;
+                }
+
+                CFRunLoopRun();
+            }
+        })
+        .expect("failed to spawn hid-capture thread");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

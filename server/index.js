@@ -15,9 +15,5 @@ app.use('/api/llm-tiebreak', llmRoute)
 
 const PORT = process.env.PORT || 3001
 
-async function start() {
-  await initDb()
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
-}
-
-start().catch(err => { console.error(err); process.exit(1) })
+initDb()
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`))

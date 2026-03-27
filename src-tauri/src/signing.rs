@@ -15,7 +15,10 @@ pub fn load_or_create_key() -> Result<SigningKey, String> {
                 .as_slice()
                 .try_into()
                 .map_err(|_| "Keychain key has wrong length".to_string())?;
-            Ok(SigningKey::from_bytes(&arr))
+            let key = SigningKey::from_bytes(&arr);
+            // Restore pubkey.hex if it was deleted
+            let _ = write_public_key(key.verifying_key());
+            Ok(key)
         }
         Err(_) => {
             let key = SigningKey::generate(&mut OsRng);

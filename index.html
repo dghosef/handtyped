@@ -579,6 +579,28 @@
     .shortcut-desc { color: #444; }
     #shortcut-close { margin-top: 16px; padding: 6px 20px; border: 1px solid #ccc; border-radius: 5px; background: #f5f5f5; cursor: pointer; font-size: 13px; display: block; }
 
+    /* ── Help panel ─────────────────────────────────────────────────────── */
+    #help-panel {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+      z-index: 9998; align-items: center; justify-content: center;
+    }
+    #help-panel.visible { display: flex; }
+    .help-box {
+      background: white; border-radius: 10px; padding: 24px 28px;
+      max-width: 760px; width: 95%; max-height: 82vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .help-box h2 { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: #111; }
+    .help-box p { font-size: 13px; line-height: 1.6; color: #444; margin-bottom: 10px; }
+    .help-box ul, .help-box ol { margin: 8px 0 14px 20px; color: #444; font-size: 13px; line-height: 1.6; }
+    .help-box li { margin-bottom: 6px; }
+    .help-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .help-actions button {
+      padding: 8px 14px; border-radius: 6px; border: 1px solid #c8c8c8;
+      background: #f5f5f5; cursor: pointer; font-size: 13px;
+    }
+    .help-actions button.primary { background: #2b5797; color: white; border-color: #1e3d72; }
+
     /* ── Markdown split pane ────────────────────────────────────────────── */
     #md-split-pane { display: none; flex: 1; overflow: hidden; }
     #md-split-pane.visible { display: flex; }
@@ -595,18 +617,15 @@
     #md-source-input {
       position: absolute; inset: 0; z-index: 2;
       padding: 20px; font-family: 'Menlo','Courier New',monospace; font-size: 13px;
-      white-space: pre-wrap; word-break: break-word; overflow: auto;
-      background: transparent; color: transparent; caret-color: #fff;
+      overflow: auto; resize: none; border: 0;
+      background: transparent; color: rgba(255,255,255,0.12); caret-color: #fff;
       outline: none; line-height: 1.6;
+      width: 100%; height: 100%;
     }
     #md-preview {
-      flex: 1; overflow-y: auto; padding: 20px 32px;
-      background: white; font-family: -apple-system, sans-serif; font-size: 14px; line-height: 1.7;
+      flex: 1; display: block; width: 100%; height: 100%;
+      border: 0; background: white;
     }
-    #md-preview h1,#md-preview h2,#md-preview h3 { margin-top: 1em; }
-    #md-preview code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
-    #md-preview pre { background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; overflow-x: auto; }
-    #md-preview blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 16px; color: #666; }
     /* md highlight spans */
     .md-h1,.md-h2,.md-h3,.md-h4,.md-h5,.md-h6 { color: #569cd6; }
     .md-strong { color: #ce9178; }
@@ -763,8 +782,6 @@
       <button class="tb-btn" id="btn-outline" title="Document Outline">&#8801; Outline</button>
       <span class="tb-sep"></span>
       <button class="tb-btn" id="btn-fullscreen" title="Fullscreen">&#9974;</button>
-      <span class="tb-sep"></span>
-      <button class="tb-btn" id="btn-vim" title="Vim Mode">Vim</button>
       <button class="tb-btn" id="btn-markdown" title="Markdown Mode">MD</button>
     </div>
 
@@ -845,9 +862,9 @@
       <div id="md-split-pane">
         <div id="md-source-wrapper">
           <div id="md-highlight" aria-hidden="true"></div>
-          <div id="md-source-input" contenteditable="true" spellcheck="false"></div>
+          <textarea id="md-source-input" spellcheck="false"></textarea>
         </div>
-        <div id="md-preview"></div>
+        <iframe id="md-preview"></iframe>
       </div>
       <div id="page">
         <div id="editor"></div>
@@ -868,7 +885,6 @@
     <span id="word-count-detail"></span>
     <span id="readability-score"></span>
     <span id="smart-typo-indicator"></span>
-    <span id="vim-mode-indicator" style="display:none;font-weight:600;color:#7c83ff;"></span>
     <span id="save-status">Not saved</span>
   </div>
 
@@ -878,6 +894,17 @@
       <h2>Keyboard Shortcuts</h2>
       <div id="shortcut-content"></div>
       <button id="shortcut-close">Close</button>
+    </div>
+  </div>
+
+  <div id="help-panel">
+    <div class="help-box">
+      <h2 id="help-title">Help</h2>
+      <div id="help-content"></div>
+      <div class="help-actions">
+        <button id="help-primary" class="primary" style="display:none"></button>
+        <button id="help-close">Close</button>
+      </div>
     </div>
   </div>
 

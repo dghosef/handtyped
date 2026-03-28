@@ -6,6 +6,7 @@ use std::io::Write;
 use chrono::Utc;
 use serde_json::json;
 use crate::signing::{load_or_create_key, sign};
+use crate::integrity::IntegrityReport;
 use base64::Engine;
 
 pub struct BundleInput {
@@ -14,6 +15,15 @@ pub struct BundleInput {
     pub start_wall_ns: u64,
     pub log_jsonl: String,
     pub keystroke_count: usize,
+    /// Rolling SHA-256 chain hash over all log entries.
+    /// Verifier can replay keystroke-log.jsonl seeded with session_nonce to confirm.
+    pub log_chain_hash: String,
+    /// Integrity checks captured at startup.
+    pub integrity: IntegrityReport,
+    /// Apple vendor ID of the matched keyboard (0x05AC for Apple Inc.).
+    pub keyboard_vendor_id: Option<u32>,
+    /// Transport string reported by IOHIDManager (e.g. "SPI", "USB", "Bluetooth").
+    pub keyboard_transport: Option<String>,
 }
 
 /// Compute hex-encoded SHA-256 of `data`.
@@ -48,7 +58,7 @@ pub fn compute_digest(rtf: &[u8], txt: &[u8], log: &[u8], meta: &[u8]) -> Vec<u8
     h.finalize().to_vec()
 }
 
-/// Build the session-meta.json bytes.
+/// Build the session-meta.json bytes, including all integrity and attestation fields.
 pub fn make_meta(input: &BundleInput, doc_hash: &str) -> Vec<u8> {
     let start_secs = input.start_wall_ns / 1_000_000_000;
     let start_dt = chrono::DateTime::from_timestamp(start_secs as i64, 0)
@@ -57,14 +67,36 @@ pub fn make_meta(input: &BundleInput, doc_hash: &str) -> Vec<u8> {
         .to_string();
     let end_dt = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
+    let vendor_str = input.keyboard_vendor_id.map(|v| format!("0x{:04x}", v));
+
     serde_json::to_vec_pretty(&json!({
+        // Session identity
         "session_id": input.session_id,
         "session_nonce": input.session_nonce,
         "app_version": env!("CARGO_PKG_VERSION"),
+        // Binary integrity
+        "app_binary_hash": input.integrity.app_binary_hash,
+        "code_signing_valid": input.integrity.code_signing_valid,
+        // OS / hardware
+        "os_version": input.integrity.os_version,
+        "hardware_model": input.integrity.hardware_model,
+        "hardware_uuid": input.integrity.hardware_uuid,
+        // Security posture
+        "sip_enabled": input.integrity.sip_enabled,
+        "vm_detected": input.integrity.vm_detected,
+        "frida_detected": input.integrity.frida_detected,
+        "dylib_injection_detected": input.integrity.dylib_injection_detected,
+        "dyld_env_injection": input.integrity.dyld_env_injection,
+        // Input device
+        "keyboard_vendor_id": vendor_str,
+        "keyboard_transport": input.keyboard_transport,
+        // Session timing
         "session_start": start_dt,
         "session_end": end_dt,
+        // Attestation
         "total_keystrokes": input.keystroke_count,
         "document_content_hash": doc_hash,
+        "log_chain_hash": input.log_chain_hash,
     }))
     .unwrap()
 }
@@ -117,6 +149,22 @@ pub fn build_and_sign(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::integrity::IntegrityReport;
+
+    fn test_integrity() -> IntegrityReport {
+        IntegrityReport {
+            sip_enabled: true,
+            vm_detected: false,
+            hardware_model: "MacBookPro18,1".into(),
+            os_version: "15.3".into(),
+            hardware_uuid: "AABBCCDD-1234-5678-ABCD-EF0123456789".into(),
+            app_binary_hash: "deadbeef".into(),
+            code_signing_valid: true,
+            frida_detected: false,
+            dylib_injection_detected: false,
+            dyld_env_injection: false,
+        }
+    }
 
     #[test]
     fn test_sha256_hex_known() {
@@ -158,12 +206,25 @@ mod tests {
             start_wall_ns: 0,
             log_jsonl: String::new(),
             keystroke_count: 42,
+            log_chain_hash: "cafecafe".into(),
+            integrity: test_integrity(),
+            keyboard_vendor_id: Some(0x05AC),
+            keyboard_transport: Some("SPI".into()),
         };
         let meta = make_meta(&input, "abc123");
         let v: serde_json::Value = serde_json::from_slice(&meta).unwrap();
         assert_eq!(v["session_id"], "test-id");
         assert_eq!(v["total_keystrokes"], 42);
         assert_eq!(v["document_content_hash"], "abc123");
+        assert_eq!(v["sip_enabled"], true);
+        assert_eq!(v["vm_detected"], false);
+        assert_eq!(v["hardware_model"], "MacBookPro18,1");
+        assert_eq!(v["hardware_uuid"], "AABBCCDD-1234-5678-ABCD-EF0123456789");
+        assert_eq!(v["keyboard_vendor_id"], "0x05ac");
+        assert_eq!(v["keyboard_transport"], "SPI");
+        assert_eq!(v["code_signing_valid"], true);
+        assert_eq!(v["frida_detected"], false);
+        assert_eq!(v["log_chain_hash"], "cafecafe");
     }
 
     #[test]
@@ -174,6 +235,10 @@ mod tests {
             start_wall_ns: 1_000_000_000,
             log_jsonl: "{\"t\":1,\"type\":\"down\",\"key\":4,\"flags\":0}".into(),
             keystroke_count: 1,
+            log_chain_hash: "aabbccdd".into(),
+            integrity: test_integrity(),
+            keyboard_vendor_id: None,
+            keyboard_transport: None,
         };
         let result = build_and_sign(input, "Hello world".into(), String::new());
         assert!(result.is_ok(), "export failed: {:?}", result.err());

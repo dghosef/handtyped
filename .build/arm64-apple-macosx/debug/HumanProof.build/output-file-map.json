@@ -1,0 +1,59 @@
+{
+  "": {
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/master.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/AppDelegate.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppDelegate.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppDelegate.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppDelegate~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppDelegate.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/AppMenu.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppMenu.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppMenu.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppMenu~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/AppMenu.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/BridgeHandler.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BridgeHandler.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BridgeHandler.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BridgeHandler~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BridgeHandler.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/BundleExport.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BundleExport.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BundleExport.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BundleExport~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/BundleExport.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/HIDCapture.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/HIDCapture.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/HIDCapture.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/HIDCapture~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/HIDCapture.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/Session.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Session.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Session.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Session~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Session.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/Signing.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Signing.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Signing.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Signing~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/Signing.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/WindowController.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/WindowController.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/WindowController.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/WindowController~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/WindowController.swiftdeps"
+  },
+  "/Users/dghosef/editor/Sources/HumanProof/main.swift": {
+    "dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/main.d",
+    "object": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/main.swift.o",
+    "swiftmodule": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/dghosef/editor/.build/arm64-apple-macosx/debug/HumanProof.build/main.swiftdeps"
+  }
+}

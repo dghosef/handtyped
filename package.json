@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:app": "./tauri-dev.sh",
     "build": "vite build",
     "tauri": "tauri",
     "test": "vitest run"

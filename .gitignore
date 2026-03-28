@@ -2,6 +2,8 @@ node_modules/
 client/node_modules/
 server/node_modules/
 client/dist/
+dist/
 .env
 server/.env
 server/humanproof.db
+.build/

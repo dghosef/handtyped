@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  test: {
+    exclude: ['tests/**', 'node_modules/**'],
+  },
   clearScreen: false,
   server: {
     port: 5173,

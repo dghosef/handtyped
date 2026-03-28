@@ -467,12 +467,110 @@
 
     /* ── Print ─────────────────────────────────────────────────────────── */
     @media print {
-      #title-bar, #toolbar-wrapper, #find-bar, #replace-bar, #status-bar, #table-toolbar, #outline-panel { display: none !important; }
-      body { background: white !important; overflow: visible !important; height: auto !important; }
-      #page-area { overflow: visible !important; padding: 0 !important; background: white !important; }
-      #page { box-shadow: none !important; margin: 0 !important; width: 100% !important; }
-      .page-break { page-break-after: always; border: none; }
-      .page-break hr, .page-break::after { display: none; }
+      /* Hide all UI chrome */
+      #title-bar, #toolbar-wrapper, #find-bar, #replace-bar, #status-bar,
+      #table-toolbar, #outline-panel, #shortcut-panel, #help-panel,
+      #hid-blocked, #proof-url-overlay { display: none !important; }
+
+      /* Body / layout reset */
+      body {
+        background: white !important;
+        overflow: visible !important;
+        height: auto !important;
+        font-family: Georgia, "Times New Roman", serif !important;
+        font-size: 12pt !important;
+        color: #000 !important;
+      }
+
+      /* Page area */
+      #page-area {
+        overflow: visible !important;
+        padding: 0 !important;
+        background: white !important;
+        display: block !important;
+      }
+      #md-split-pane { display: none !important; }
+
+      /* White sheet — let the OS apply margins via @page */
+      #page {
+        box-shadow: none !important;
+        margin: 0 auto !important;
+        width: auto !important;
+        min-height: auto !important;
+        padding: 0 !important;
+      }
+
+      /* OS-level page margins */
+      @page { margin: 1in; }
+
+      /* Editor content */
+      .ProseMirror {
+        font-family: Georgia, "Times New Roman", serif !important;
+        font-size: 12pt !important;
+        color: #000 !important;
+        line-height: 1.6 !important;
+      }
+
+      /* Headings */
+      .ProseMirror h1 { font-size: 24pt !important; page-break-after: avoid; }
+      .ProseMirror h2 { font-size: 18pt !important; page-break-after: avoid; }
+      .ProseMirror h3 { font-size: 14pt !important; page-break-after: avoid; }
+      .ProseMirror h4 { font-size: 12pt !important; page-break-after: avoid; }
+
+      /* Lists */
+      .ProseMirror ul, .ProseMirror ol { padding-left: 1.8em; }
+
+      /* Blockquote */
+      .ProseMirror blockquote {
+        border-left: 3px solid #888 !important;
+        color: #333 !important;
+        padding-left: 1em;
+        margin: 0.5em 0;
+        font-style: italic;
+      }
+
+      /* Tables */
+      .ProseMirror table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+      .ProseMirror td, .ProseMirror th { border: 1px solid #999 !important; padding: 4px 8px; }
+      .ProseMirror th { background: #eee !important; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+
+      /* Code blocks */
+      .ProseMirror pre {
+        background: #f5f5f5 !important;
+        color: #111 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 0 !important;
+        padding: 8px 12px !important;
+        font-family: 'Menlo', 'Courier New', monospace !important;
+        font-size: 10pt !important;
+        white-space: pre-wrap !important;
+        page-break-inside: avoid;
+      }
+
+      /* Images */
+      img { max-width: 100% !important; page-break-inside: avoid; }
+
+      /* Links — show href after link text */
+      a[href]:after { content: " (" attr(href) ")"; font-size: 10pt; color: #444; }
+      /* suppress for anchor-only links and empty hrefs */
+      a[href^="#"]:after, a[href=""]:after { content: ""; }
+
+      /* Page break node */
+      .page-break {
+        page-break-after: always !important;
+        border: none !important;
+        margin: 0 !important;
+        display: block !important;
+      }
+      .page-break hr, .page-break::after { display: none !important; }
+
+      /* 2-column layout */
+      .column-block { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+      /* Task list */
+      ul[data-task] { list-style: none; padding-left: 0; }
+      ul[data-task] li[data-task-item][data-checked] > span { text-decoration: line-through; opacity: 0.6; }
     }
 
     /* ── Proof URL overlay ─────────────────────────────────────────────── */
@@ -636,11 +734,213 @@
     .md-quote { color: #6a9955; }
     .md-list { color: #c586c0; }
 
+    /* ── Inline images ──────────────────────────────────────────────────── */
+    .ProseMirror img {
+      max-width: 100%;
+      vertical-align: middle;
+      cursor: default;
+    }
+    .ProseMirror img.ProseMirror-selectednode {
+      outline: 2px solid #66a7d4;
+      border-radius: 2px;
+    }
+
     /* ── Smart typography indicator ─────────────────────────────────────── */
     #smart-typo-indicator { font-size: 10px; color: #4ec9b0; }
 
     /* ── Readability in status bar ──────────────────────────────────────── */
     #readability-score { font-size: 11px; }
+
+    /* ── Word goal in status bar ────────────────────────────────────────── */
+    #word-goal-area {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    #word-goal-set-btn {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.75);
+      padding: 1px 5px;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+    #word-goal-set-btn:hover { background: rgba(255,255,255,0.25); }
+    #word-goal-progress { display: none; align-items: center; gap: 4px; }
+    #word-goal-progress.visible { display: flex; }
+    #word-goal-label { font-size: 11px; }
+    #word-goal-label.goal-done  { color: #5dde7a; font-weight: 600; }
+    #word-goal-label.goal-close { color: #f5a623; }
+    #word-goal-bar-wrap {
+      width: 48px; height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #word-goal-bar {
+      height: 100%;
+      background: #66a7d4;
+      border-radius: 2px;
+      transition: width 0.2s, background 0.2s;
+    }
+    #word-goal-bar.goal-done  { background: #5dde7a; }
+    #word-goal-bar.goal-close { background: #f5a623; }
+    #word-goal-clear {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0 1px;
+      line-height: 1;
+    }
+    #word-goal-clear:hover { color: rgba(255,255,255,0.9); }
+    #word-goal-input-wrap {
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+    #word-goal-input-wrap.visible { display: flex; }
+    #word-goal-input {
+      width: 64px;
+      height: 17px;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 2px;
+      background: rgba(0,0,0,0.25);
+      color: white;
+      font-size: 11px;
+      padding: 0 4px;
+      outline: none;
+    }
+    #word-goal-input::placeholder { color: rgba(255,255,255,0.4); }
+    #word-goal-ok {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 2px;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+    #word-goal-ok:hover { background: rgba(255,255,255,0.3); }
+    #word-goal-cancel {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      line-height: 1;
+    }
+    #word-goal-cancel:hover { color: rgba(255,255,255,0.9); }
+
+    /* ── Link dialog ────────────────────────────────────────────────────── */
+    #link-dialog {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 9999; align-items: center; justify-content: center;
+    }
+    #link-dialog.visible { display: flex; }
+    .link-dialog-box {
+      background: white; border-radius: 8px; padding: 20px 24px;
+      min-width: 340px; max-width: 480px; width: 90%;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    }
+    .link-dialog-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .link-dialog-header h3 { font-size: 15px; font-weight: 700; color: #111; margin: 0; }
+    #link-dialog-close {
+      background: none; border: none; cursor: pointer; font-size: 18px;
+      color: #888; line-height: 1; padding: 0 2px;
+    }
+    #link-dialog-close:hover { color: #111; }
+    .link-dialog-field { margin-bottom: 12px; }
+    .link-dialog-field label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 600; }
+    .link-dialog-field input {
+      width: 100%; height: 28px; border: 1px solid #c8c8c8; border-radius: 4px;
+      padding: 0 8px; font-size: 13px; box-sizing: border-box;
+    }
+    .link-dialog-field input:focus { outline: none; border-color: #66a7d4; }
+    .link-dialog-actions { display: flex; gap: 8px; margin-top: 16px; }
+    #link-dialog-insert {
+      flex: 1; padding: 6px 14px; background: #2b5797; color: white;
+      border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600;
+    }
+    #link-dialog-insert:hover { background: #1e3d72; }
+    #link-dialog-remove {
+      padding: 6px 14px; background: #dc3545; color: white;
+      border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600;
+    }
+    #link-dialog-remove:hover { background: #b02a37; }
+    #link-dialog-cancel {
+      padding: 6px 14px; background: #f0f0f0; color: #333;
+      border: 1px solid #c8c8c8; border-radius: 5px; cursor: pointer; font-size: 13px;
+    }
+    #link-dialog-cancel:hover { background: #e0e0e0; }
+    body.dark .link-dialog-box { background: #2d2d2d; }
+    body.dark .link-dialog-header h3 { color: #e0e0e0; }
+    body.dark #link-dialog-close { color: #999; }
+    body.dark #link-dialog-close:hover { color: #ddd; }
+    body.dark .link-dialog-field label { color: #aaa; }
+    body.dark .link-dialog-field input { background: #3a3a3a; border-color: #555; color: #ddd; }
+    body.dark .link-dialog-field input:focus { border-color: #66a7d4; }
+    body.dark #link-dialog-cancel { background: #3a3a3a; border-color: #555; color: #ddd; }
+    body.dark #link-dialog-cancel:hover { background: #444; }
+
+    /* ── Special chars dialog ───────────────────────────────────────────── */
+    #special-chars-dialog {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 9998; align-items: center; justify-content: center;
+    }
+    #special-chars-dialog.visible { display: flex; }
+    .sc-box {
+      background: white; border-radius: 10px; padding: 20px 22px;
+      max-width: 520px; width: 95%; max-height: 82vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    body.dark .sc-box { background: #2d2d2d; color: #ddd; }
+    .sc-box h2 { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: #111; }
+    body.dark .sc-box h2 { color: #eee; }
+    #sc-search {
+      width: 100%; height: 26px; border: 1px solid #c8c8c8; border-radius: 4px;
+      padding: 0 8px; font-size: 12px; margin-bottom: 10px; flex-shrink: 0;
+    }
+    body.dark #sc-search { background: #3a3a3a; border-color: #555; color: #ddd; }
+    #sc-search:focus { outline: none; border-color: #66a7d4; }
+    #sc-recent { flex-shrink: 0; margin-bottom: 8px; }
+    #sc-recent-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #888; margin-bottom: 4px;
+    }
+    #sc-body { overflow-y: auto; flex: 1; }
+    .sc-category { margin-bottom: 10px; }
+    .sc-cat-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #888; margin-bottom: 4px;
+    }
+    .sc-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, 28px); gap: 2px;
+    }
+    .sc-char {
+      width: 28px; height: 28px; display: flex; align-items: center;
+      justify-content: center; font-size: 15px; border: 1px solid transparent;
+      border-radius: 3px; cursor: pointer; background: transparent;
+      color: inherit; padding: 0; line-height: 1;
+    }
+    .sc-char:hover { background: #e5e5e5; border-color: #c8c8c8; }
+    body.dark .sc-char:hover { background: #3a3a3a; border-color: #555; }
+    #sc-close {
+      margin-top: 12px; padding: 5px 18px; border: 1px solid #ccc;
+      border-radius: 5px; background: #f5f5f5; cursor: pointer; font-size: 13px;
+      flex-shrink: 0; align-self: flex-start;
+    }
+    body.dark #sc-close { background: #3a3a3a; border-color: #555; color: #ddd; }
   </style>
 </head>
 <body>
@@ -783,6 +1083,8 @@
       <span class="tb-sep"></span>
       <button class="tb-btn" id="btn-fullscreen" title="Fullscreen">&#9974;</button>
       <button class="tb-btn" id="btn-markdown" title="Markdown Mode">MD</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="btn-print" title="Print / Save as PDF (&#8984;P)">&#128424;</button>
     </div>
 
     <!-- Row 4: Code block | Task list | Para spacing | Footnote | Columns | Shortcuts -->
@@ -814,7 +1116,15 @@
       <button class="tb-btn" id="btn-2col" title="2-Column Layout (⌘⇧2)">&#10095;&#10094; 2-Col</button>
       <button class="tb-btn" id="btn-1col" title="1-Column Layout (⌘⇧1)">&#9646; 1-Col</button>
       <span class="tb-sep"></span>
+      <button class="tb-btn" id="btn-insert-image" title="Insert Image">&#128444;</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="btn-toc" title="Insert / Update Table of Contents (⌘⇧O)">&#8801; TOC</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="btn-link" title="Insert/Edit Link (⌘K)">&#128279;</button>
+      <span class="tb-sep"></span>
       <button class="tb-btn" id="btn-shortcuts" title="Keyboard Shortcuts (⌘/)">?</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="btn-special-chars" title="Insert Special Character (⌘⇧\)">&#937;</button>
     </div>
 
   </div><!-- /toolbar-wrapper -->
@@ -885,6 +1195,20 @@
     <span id="word-count-detail"></span>
     <span id="readability-score"></span>
     <span id="smart-typo-indicator"></span>
+    <!-- Word goal area -->
+    <span id="word-goal-area">
+      <button id="word-goal-set-btn" title="Set word count goal">Goal</button>
+      <span id="word-goal-input-wrap">
+        <input id="word-goal-input" type="number" min="1" placeholder="e.g. 500" />
+        <button id="word-goal-ok">OK</button>
+        <button id="word-goal-cancel">&#x2715;</button>
+      </span>
+      <span id="word-goal-progress">
+        <span id="word-goal-label"></span>
+        <span id="word-goal-bar-wrap"><span id="word-goal-bar"></span></span>
+        <button id="word-goal-clear" title="Clear goal">&#x2715;</button>
+      </span>
+    </span>
     <span id="save-status">Not saved</span>
   </div>
 
@@ -905,6 +1229,43 @@
         <button id="help-primary" class="primary" style="display:none"></button>
         <button id="help-close">Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Link Dialog ──────────────────────────────────────────────────── -->
+  <div id="link-dialog">
+    <div class="link-dialog-box">
+      <div class="link-dialog-header">
+        <h3 id="link-dialog-title">Insert Link</h3>
+        <button id="link-dialog-close" title="Close">&times;</button>
+      </div>
+      <div class="link-dialog-field">
+        <label for="link-url">URL</label>
+        <input type="url" id="link-url" placeholder="https://example.com" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="link-dialog-field">
+        <label for="link-text">Display text</label>
+        <input type="text" id="link-text" placeholder="Link text" autocomplete="off" />
+      </div>
+      <div class="link-dialog-actions">
+        <button id="link-dialog-insert">Insert</button>
+        <button id="link-dialog-remove" style="display:none">Remove link</button>
+        <button id="link-dialog-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Special Characters Dialog ────────────────────────────────────── -->
+  <div id="special-chars-dialog">
+    <div class="sc-box">
+      <h2>Insert Special Character</h2>
+      <input type="text" id="sc-search" placeholder="Search characters…" autocomplete="off" spellcheck="false" />
+      <div id="sc-recent" style="display:none">
+        <div id="sc-recent-label">Recently Used</div>
+        <div class="sc-grid" id="sc-recent-grid"></div>
+      </div>
+      <div id="sc-body"></div>
+      <button id="sc-close">Close</button>
     </div>
   </div>
 

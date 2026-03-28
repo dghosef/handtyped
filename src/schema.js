@@ -136,6 +136,44 @@ const columnSpec = {
   toDOM() { return ['div', { class: 'column' }, 0] }
 }
 
+// ── Image (inline) ────────────────────────────────────────────────────────────
+const imageSpec = {
+  inline: true,
+  atom: true,
+  attrs: {
+    src:   { default: '' },
+    alt:   { default: null },
+    title: { default: null },
+    width: { default: null },
+  },
+  group: 'inline',
+  draggable: true,
+  selectable: true,
+  parseDOM: [{
+    tag: 'img[src]',
+    getAttrs(dom) {
+      return {
+        src:   dom.getAttribute('src'),
+        alt:   dom.getAttribute('alt') || null,
+        title: dom.getAttribute('title') || null,
+        width: dom.getAttribute('width') || null,
+      }
+    }
+  }],
+  toDOM(node) {
+    const { src, alt, title, width } = node.attrs
+    const attrs = {
+      src,
+      style: 'max-width:100%;vertical-align:middle;',
+      contenteditable: 'false',
+    }
+    if (alt)   attrs.alt   = alt
+    if (title) attrs.title = title
+    if (width) attrs.width = width
+    return ['img', attrs]
+  }
+}
+
 // ── Page break ───────────────────────────────────────────────────────────────
 const pageBreakSpec = {
   group: 'block',
@@ -164,6 +202,7 @@ const tableNodeSpecs = tableNodes({
 })
 nodes = nodes.append(tableNodeSpecs)
 nodes = nodes.append({
+  image: imageSpec,
   page_break: pageBreakSpec,
   code_block: codeBlockSpec,
   task_list: taskListSpec,

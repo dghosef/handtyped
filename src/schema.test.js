@@ -51,4 +51,24 @@ describe('schema additions', () => {
     expect(pageBreak.isAtom).toBe(true)
     expect(schema.nodes.page_break.spec.toDOM(pageBreak)[1].class).toBe('page-break')
   })
+
+  it('supports image nodes as inline atoms with src/alt/title/width attrs', () => {
+    const img = schema.nodes.image.create({
+      src: 'data:image/png;base64,abc',
+      alt: 'A test image',
+      title: 'Test',
+      width: '200',
+    })
+
+    expect(img.type).toBe(schema.nodes.image)
+    expect(img.isAtom).toBe(true)
+    expect(img.attrs.src).toBe('data:image/png;base64,abc')
+    expect(img.attrs.alt).toBe('A test image')
+
+    const dom = schema.nodes.image.spec.toDOM(img)
+    expect(dom[0]).toBe('img')
+    expect(dom[1].src).toBe('data:image/png;base64,abc')
+    expect(dom[1].alt).toBe('A test image')
+    expect(dom[1].style).toContain('max-width:100%')
+  })
 })

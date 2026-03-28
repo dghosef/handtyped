@@ -337,10 +337,197 @@ function insertPageBreak() {
   view.focus()
 }
 
+// ── Image ─────────────────────────────────────────────────────────────────────
+
+function insertImageNode(src, alt) {
+  if (!view || !schema.nodes.image) return
+  const node = schema.nodes.image.create({ src, alt: alt || null })
+  const { $from } = view.state.selection
+  view.dispatch(view.state.tr.replaceSelectionWith(node))
+  view.focus()
+}
+
+function openImageFilePicker() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.style.display = 'none'
+  document.body.appendChild(input)
+  input.addEventListener('change', () => {
+    const file = input.files?.[0]
+    if (!file) { input.remove(); return }
+    const reader = new FileReader()
+    reader.onload = e => {
+      insertImageNode(e.target.result, file.name)
+      input.remove()
+    }
+    reader.readAsDataURL(file)
+  })
+  input.click()
+}
+
 // ── Focus mode ───────────────────────────────────────────────────────────────
 
 function toggleFocusMode() {
   document.body.classList.toggle('focus-mode')
+}
+
+// ── Special Characters ────────────────────────────────────────────────────────
+
+const SC_CATEGORIES = [
+  { label: 'Symbols', chars: [
+    { ch: '\u00A9', name: 'copyright' }, { ch: '\u00AE', name: 'registered' }, { ch: '\u2122', name: 'trademark' },
+    { ch: '\u00B0', name: 'degree' }, { ch: '\u00A7', name: 'section' }, { ch: '\u00B6', name: 'pilcrow paragraph' },
+    { ch: '\u2020', name: 'dagger' }, { ch: '\u2021', name: 'double dagger' }, { ch: '\u2022', name: 'bullet' },
+    { ch: '\u203B', name: 'reference mark' }, { ch: '\u2605', name: 'black star' }, { ch: '\u2606', name: 'white star' },
+    { ch: '\u2713', name: 'check mark' }, { ch: '\u2717', name: 'ballot x cross' }, { ch: '\u2726', name: 'star' },
+    { ch: '\u27A4', name: 'arrowhead' }, { ch: '\u2756', name: 'diamond' },
+  ] },
+  { label: 'Currency', chars: [
+    { ch: '\u20AC', name: 'euro' }, { ch: '\u00A3', name: 'pound sterling' }, { ch: '\u00A5', name: 'yen yuan' },
+    { ch: '\u00A2', name: 'cent' }, { ch: '\u20B9', name: 'rupee indian' }, { ch: '\u20A9', name: 'won korean' },
+    { ch: '\u20BF', name: 'bitcoin' }, { ch: '\u20AA', name: 'shekel' }, { ch: '\u20AB', name: 'dong vietnamese' },
+    { ch: '\u20AD', name: 'kip lao' },
+  ] },
+  { label: 'Math', chars: [
+    { ch: '\u00B1', name: 'plus minus' }, { ch: '\u00D7', name: 'multiply times' }, { ch: '\u00F7', name: 'divide division' },
+    { ch: '\u2260', name: 'not equal' }, { ch: '\u2264', name: 'less than or equal' }, { ch: '\u2265', name: 'greater than or equal' },
+    { ch: '\u221E', name: 'infinity' }, { ch: '\u221A', name: 'square root radical' }, { ch: '\u2211', name: 'sum sigma' },
+    { ch: '\u220F', name: 'product pi' }, { ch: '\u2202', name: 'partial derivative' }, { ch: '\u222B', name: 'integral' },
+    { ch: '\u03C0', name: 'pi' }, { ch: '\u03B1', name: 'alpha' }, { ch: '\u03B2', name: 'beta' },
+    { ch: '\u03B3', name: 'gamma' }, { ch: '\u03B4', name: 'delta' }, { ch: '\u03BB', name: 'lambda' },
+    { ch: '\u03BC', name: 'mu micro' }, { ch: '\u03C3', name: 'sigma' }, { ch: '\u03C6', name: 'phi' }, { ch: '\u03C9', name: 'omega' },
+  ] },
+  { label: 'Arrows', chars: [
+    { ch: '\u2190', name: 'arrow left' }, { ch: '\u2192', name: 'arrow right' }, { ch: '\u2191', name: 'arrow up' },
+    { ch: '\u2193', name: 'arrow down' }, { ch: '\u2194', name: 'arrow left right' }, { ch: '\u2195', name: 'arrow up down' },
+    { ch: '\u21D0', name: 'double arrow left' }, { ch: '\u21D2', name: 'double arrow right' },
+    { ch: '\u21D1', name: 'double arrow up' }, { ch: '\u21D3', name: 'double arrow down' },
+    { ch: '\u21D4', name: 'double arrow left right' }, { ch: '\u2794', name: 'arrow pointing right' },
+    { ch: '\u279C', name: 'arrow curved right' },
+  ] },
+  { label: 'Punctuation', chars: [
+    { ch: '\u00AB', name: 'left guillemet angle quote' }, { ch: '\u00BB', name: 'right guillemet angle quote' },
+    { ch: '\u201E', name: 'low double quotation mark' }, { ch: '\u201C', name: 'left double quote' },
+    { ch: '\u201D', name: 'right double quote' }, { ch: '\u2018', name: 'left single quote' },
+    { ch: '\u2019', name: 'right single quote apostrophe' }, { ch: '\u2039', name: 'left single guillemet' },
+    { ch: '\u203A', name: 'right single guillemet' }, { ch: '\u2014', name: 'em dash' }, { ch: '\u2013', name: 'en dash' },
+    { ch: '\u2026', name: 'ellipsis' }, { ch: '\u203C', name: 'double exclamation' }, { ch: '\u203D', name: 'interrobang' },
+  ] },
+  { label: 'Latin Extended', chars: [
+    { ch: '\u00E0', name: 'a grave' }, { ch: '\u00E1', name: 'a acute' }, { ch: '\u00E2', name: 'a circumflex' },
+    { ch: '\u00E3', name: 'a tilde' }, { ch: '\u00E4', name: 'a umlaut' }, { ch: '\u00E5', name: 'a ring' },
+    { ch: '\u00E6', name: 'ae ligature' }, { ch: '\u00E7', name: 'c cedilla' }, { ch: '\u00E8', name: 'e grave' },
+    { ch: '\u00E9', name: 'e acute' }, { ch: '\u00EA', name: 'e circumflex' }, { ch: '\u00EB', name: 'e umlaut' },
+    { ch: '\u00EC', name: 'i grave' }, { ch: '\u00ED', name: 'i acute' }, { ch: '\u00EE', name: 'i circumflex' },
+    { ch: '\u00EF', name: 'i umlaut' }, { ch: '\u00F1', name: 'n tilde' }, { ch: '\u00F2', name: 'o grave' },
+    { ch: '\u00F3', name: 'o acute' }, { ch: '\u00F4', name: 'o circumflex' }, { ch: '\u00F6', name: 'o umlaut' },
+    { ch: '\u00F9', name: 'u grave' }, { ch: '\u00FA', name: 'u acute' }, { ch: '\u00FB', name: 'u circumflex' },
+    { ch: '\u00FC', name: 'u umlaut' }, { ch: '\u00FD', name: 'y acute' }, { ch: '\u00FF', name: 'y umlaut' },
+  ] },
+]
+
+const SC_ALL = SC_CATEGORIES.flatMap(cat => cat.chars)
+
+const SC_RECENT_KEY = 'humanproof_recent_chars'
+const SC_RECENT_MAX = 8
+
+function scGetRecent() {
+  try { return JSON.parse(localStorage.getItem(SC_RECENT_KEY) || '[]') } catch { return [] }
+}
+
+function scAddRecent(ch) {
+  let recent = scGetRecent().filter(c => c !== ch)
+  recent.unshift(ch)
+  if (recent.length > SC_RECENT_MAX) recent = recent.slice(0, SC_RECENT_MAX)
+  try { localStorage.setItem(SC_RECENT_KEY, JSON.stringify(recent)) } catch {}
+}
+
+function insertSpecialChar(ch) {
+  if (!view) return
+  const { from, to } = view.state.selection
+  view.dispatch(view.state.tr.replaceWith(from, to, schema.text(ch)))
+  view.focus()
+}
+
+function _scMakeBtn(charObj) {
+  const btn = document.createElement('button')
+  btn.className = 'sc-char'
+  btn.textContent = charObj.ch
+  btn.title = charObj.name
+  btn.type = 'button'
+  btn.addEventListener('click', () => {
+    scAddRecent(charObj.ch)
+    insertSpecialChar(charObj.ch)
+    closeSpecialCharsDialog()
+  })
+  return btn
+}
+
+function _scRenderRecent() {
+  const wrapper = document.getElementById('sc-recent')
+  const grid = document.getElementById('sc-recent-grid')
+  if (!wrapper || !grid) return
+  const recent = scGetRecent()
+  if (!recent.length) { wrapper.style.display = 'none'; return }
+  wrapper.style.display = ''
+  grid.innerHTML = ''
+  recent.forEach(ch => {
+    const charObj = SC_ALL.find(c => c.ch === ch) || { ch, name: ch }
+    grid.appendChild(_scMakeBtn(charObj))
+  })
+}
+
+function _scRenderBody(filter) {
+  const body = document.getElementById('sc-body')
+  if (!body) return
+  body.innerHTML = ''
+  const q = (filter || '').toLowerCase().trim()
+
+  if (q) {
+    const matches = SC_ALL.filter(c => c.ch === q || c.name.includes(q))
+    if (!matches.length) {
+      const msg = document.createElement('div')
+      msg.style.cssText = 'font-size:12px;color:#888;padding:8px 0'
+      msg.textContent = 'No characters found.'
+      body.appendChild(msg)
+      return
+    }
+    const grid = document.createElement('div')
+    grid.className = 'sc-grid'
+    matches.forEach(c => grid.appendChild(_scMakeBtn(c)))
+    body.appendChild(grid)
+    return
+  }
+
+  SC_CATEGORIES.forEach(cat => {
+    const section = document.createElement('div')
+    section.className = 'sc-category'
+    const label = document.createElement('div')
+    label.className = 'sc-cat-label'
+    label.textContent = cat.label
+    section.appendChild(label)
+    const grid = document.createElement('div')
+    grid.className = 'sc-grid'
+    cat.chars.forEach(c => grid.appendChild(_scMakeBtn(c)))
+    section.appendChild(grid)
+    body.appendChild(section)
+  })
+}
+
+function openSpecialCharsDialog() {
+  const dlg = document.getElementById('special-chars-dialog')
+  if (!dlg) return
+  const searchEl = document.getElementById('sc-search')
+  if (searchEl) searchEl.value = ''
+  _scRenderRecent()
+  _scRenderBody('')
+  dlg.classList.add('visible')
+  if (searchEl) setTimeout(() => searchEl.focus(), 50)
+}
+
+function closeSpecialCharsDialog() {
+  document.getElementById('special-chars-dialog')?.classList.remove('visible')
 }
 
 // ── Outline ──────────────────────────────────────────────────────────────────
@@ -392,6 +579,108 @@ function setupOutlinePanel() {
       }
     })
   }
+}
+
+// ── Table of Contents ────────────────────────────────────────────────────────
+
+const TOC_HEADING_TEXT = 'Table of Contents'
+
+function buildTocNodes(headings) {
+  // Build a flat bullet list where each item is indented by heading level.
+  // H1 → 0 indent, H2 → 1 level (nested list), H3 → 2 levels, H4 → 3 levels.
+  // We use nested bullet_list nodes to achieve indentation in ProseMirror.
+  function makeItem(text, level) {
+    const para = schema.nodes.paragraph.create(null, schema.text(text))
+    const item = schema.nodes.list_item.create(null, para)
+    if (level <= 1) return item
+    // Wrap in nested lists for deeper levels
+    let node = item
+    for (let d = 1; d < level; d++) {
+      node = schema.nodes.list_item.create(null, [
+        schema.nodes.paragraph.create(null, schema.text('')),
+        schema.nodes.bullet_list.create(null, node),
+      ])
+    }
+    return node
+  }
+
+  const items = headings.map(h => makeItem(h.text || '(empty)', h.level))
+  if (!items.length) {
+    // Empty list fallback
+    items.push(schema.nodes.list_item.create(null, schema.nodes.paragraph.create(null, schema.text('(no headings)'))))
+  }
+  const list = schema.nodes.bullet_list.create(null, items)
+  const tocHeading = schema.nodes.heading.create({ level: 2 }, schema.text(TOC_HEADING_TEXT))
+  const hr = schema.nodes.horizontal_rule.create()
+  return [tocHeading, list, hr]
+}
+
+function insertTableOfContents() {
+  if (!view) return
+  const headings = buildOutline().filter(h => h.text !== TOC_HEADING_TEXT)
+  const nodes = buildTocNodes(headings)
+  const { $from } = view.state.selection
+  const insertPos = $from.after($from.depth)
+  let tr = view.state.tr
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    tr = tr.insert(insertPos, nodes[i])
+  }
+  view.dispatch(tr)
+  view.focus()
+}
+
+function updateTableOfContents() {
+  if (!view) return
+  const doc = view.state.doc
+  // Find the TOC heading node
+  let tocStart = -1
+  let tocEnd = -1
+  doc.forEach((node, offset) => {
+    if (node.type === schema.nodes.heading && node.textContent === TOC_HEADING_TEXT) {
+      tocStart = offset
+    }
+  })
+  if (tocStart === -1) {
+    // No existing TOC — insert one instead
+    insertTableOfContents()
+    return
+  }
+  // The TOC block is: [heading, bullet_list, horizontal_rule] at top level.
+  // Find the end: heading + next list + next hr (if they follow immediately).
+  tocEnd = tocStart
+  let foundHeading = false
+  let afterHeadingCount = 0
+  doc.forEach((node, offset) => {
+    if (offset === tocStart) { foundHeading = true; tocEnd = offset + node.nodeSize; return }
+    if (foundHeading && afterHeadingCount < 2) {
+      const isList = node.type === schema.nodes.bullet_list || node.type === schema.nodes.ordered_list
+      const isHr = node.type === schema.nodes.horizontal_rule
+      if (isList || isHr) {
+        tocEnd = offset + node.nodeSize
+        afterHeadingCount++
+      } else {
+        afterHeadingCount = 2 // stop
+      }
+    }
+  })
+
+  const headings = buildOutline().filter(h => h.text !== TOC_HEADING_TEXT)
+  const nodes = buildTocNodes(headings)
+  let tr = view.state.tr
+  tr = tr.replaceWith(tocStart, tocEnd, nodes)
+  view.dispatch(tr)
+  view.focus()
+}
+
+function insertOrUpdateTableOfContents() {
+  if (!view) return
+  const doc = view.state.doc
+  let hasToc = false
+  doc.forEach(node => {
+    if (node.type === schema.nodes.heading && node.textContent === TOC_HEADING_TEXT) hasToc = true
+  })
+  if (hasToc) updateTableOfContents()
+  else insertTableOfContents()
 }
 
 // ── Typing speed tracker ─────────────────────────────────────────────────────
@@ -513,17 +802,9 @@ const wordKeymap = keymap({
     applyFontSize(next)
     return true
   },
-  'Mod-k': () => {
-    const url = prompt('Insert link URL:')
-    if (url) {
-      const { from, to } = view.state.selection
-      if (from !== to) {
-        view.dispatch(view.state.tr.addMark(from, to, schema.marks.link.create({ href: url, title: null })))
-      }
-    }
-    return true
-  },
+  'Mod-k': () => { openLinkDialog(); return true },
   'Mod-\\': clearAllMarks,
+  'Mod-Shift-\\': () => { openSpecialCharsDialog(); return true },
   'Mod-Shift-k': (state, dispatch) => {
     const { $from } = state.selection
     const node = $from.node($from.depth)
@@ -543,6 +824,7 @@ const wordKeymap = keymap({
     }
     return false
   },
+  'Mod-Shift-o': () => { insertOrUpdateTableOfContents(); return true },
   'Mod-Shift-9': (state, dispatch) => {
     const { $from } = state.selection
     const inTaskList = $from.depth > 1 && $from.node($from.depth - 1).type === schema.nodes.task_item
@@ -558,7 +840,14 @@ const wordKeymap = keymap({
     }
     return true
   },
+  'Mod-p': () => { printDocument(); return true },
 })
+
+// ── Print ────────────────────────────────────────────────────────────────────
+
+function printDocument() {
+  window.print()
+}
 
 // ── Focus-loss tracking ──────────────────────────────────────────────────────
 
@@ -643,6 +932,21 @@ function buildEditor(editable = true) {
       // Allow paste but log a SHA-256 hash of the clipboard content so verifiers
       // can detect if pasted material appears in the final document.
       paste(_view, event) {
+        // Check for image items first
+        const items = event.clipboardData?.items
+        if (items) {
+          for (const item of items) {
+            if (item.type.startsWith('image/')) {
+              event.preventDefault()
+              const file = item.getAsFile()
+              if (!file) break
+              const reader = new FileReader()
+              reader.onload = e => insertImageNode(e.target.result, 'pasted-image')
+              reader.readAsDataURL(file)
+              return true
+            }
+          }
+        }
         const text = event.clipboardData?.getData('text/plain') || ''
         if (text.length > 0) {
           const encoded = new TextEncoder().encode(text)
@@ -786,6 +1090,7 @@ const SHORTCUTS = [
     ['⌘Enter', 'Page Break'], ['⌘⇧T', 'Insert Table (3×3)'],
     ['⌘⇧F', 'Insert Footnote'], ['⌘⇧2', '2-Column Layout'],
     ['⌘⇧1', '1-Column Layout'], ['Tab / ⇧Tab', 'Indent / Outdent'],
+    ['⌘⇧O', 'Insert/Update TOC'],
   ] },
   { category: 'Editing', items: [
     ['⌘Z / ⌘Y', 'Undo / Redo'], ['⌘A', 'Select All'], ['⌘K', 'Insert Link'],
@@ -795,6 +1100,7 @@ const SHORTCUTS = [
   { category: 'View', items: [
     ['⌘⇧Space', 'Focus Mode'], ['⌘/', 'Keyboard Shortcuts'],
     ['Btn: MD', 'Cycle Markdown Mode'],
+    ['⌘P', 'Print / Save as PDF'],
   ] },
 ]
 
@@ -1022,6 +1328,9 @@ function wireToolbar() {
     cycleMarkdownMode()
   })
 
+  // Print
+  on('btn-print', printDocument)
+
   // Upload proof
   on('btn-upload-proof', handleUploadProof)
 
@@ -1036,6 +1345,9 @@ function wireToolbar() {
     }
     view.focus()
   })
+
+  // Image
+  on('btn-insert-image', () => openImageFilePicker())
 
   // Task list
   on('btn-task-list', () => {
@@ -1055,6 +1367,25 @@ function wireToolbar() {
     typoIndicator.addEventListener('click', toggleTypography)
   }
 
+  on('btn-toc', () => insertOrUpdateTableOfContents())
+
+  on('btn-link', openLinkDialog)
+  on('link-dialog-insert', applyLinkDialog)
+  on('link-dialog-remove', removeLinkDialog)
+  on('link-dialog-cancel', closeLinkDialog)
+  on('link-dialog-close', closeLinkDialog)
+  el('link-dialog')?.addEventListener('click', e => {
+    if (e.target.id === 'link-dialog') closeLinkDialog()
+  })
+  el('link-url')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyLinkDialog()
+    if (e.key === 'Escape') closeLinkDialog()
+  })
+  el('link-text')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyLinkDialog()
+    if (e.key === 'Escape') closeLinkDialog()
+  })
+
   on('btn-shortcuts', openShortcutPanel)
   on('shortcut-close', closeShortcutPanel)
   document.getElementById('shortcut-panel')?.addEventListener('click', e => {
@@ -1065,12 +1396,25 @@ function wireToolbar() {
     if (e.target.id === 'help-panel') closeHelpPanel()
   })
   window.__openHelpTopic = openHelpTopic
+
+  // Special chars dialog
+  on('btn-special-chars', openSpecialCharsDialog)
+  on('sc-close', closeSpecialCharsDialog)
+  document.getElementById('special-chars-dialog')?.addEventListener('click', e => {
+    if (e.target.id === 'special-chars-dialog') closeSpecialCharsDialog()
+  })
+  document.getElementById('sc-search')?.addEventListener('input', e => {
+    _scRenderBody(e.target.value)
+  })
+
   if (!_shortcutEscBound) {
     _shortcutEscBound = true
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         closeShortcutPanel()
         closeHelpPanel()
+        closeLinkDialog()
+        closeSpecialCharsDialog()
       }
     })
   }
@@ -1098,6 +1442,133 @@ function updateFindCount() {
   c.textContent = s.matches.length
     ? `${s.index + 1} of ${s.matches.length}`
     : s.query ? 'Not found' : ''
+}
+
+// ── Link dialog ─────────────────────────────────────────────────────────────
+
+// Stores the selection range that was active when the dialog opened, so we can
+// apply the mark after focus returns to the editor.
+let _linkDialogRange = null
+
+function openLinkDialog() {
+  if (!view) return
+  const state = view.state
+  const { from, to, $from } = state.selection
+
+  // Check if cursor is inside an existing link mark
+  let existingHref = null
+  let existingRange = { from, to }
+
+  // Walk up to find a link mark at cursor
+  const linkMark = schema.marks.link
+  if (linkMark) {
+    // If cursor is collapsed, find the link mark extent around cursor
+    const marks = $from.marks()
+    const lm = marks.find(m => m.type === linkMark)
+    if (lm) {
+      existingHref = lm.attrs.href
+      // Expand range to cover the full link mark span
+      let start = from
+      let end = from
+      state.doc.nodesBetween(0, state.doc.content.size, (node, pos) => {
+        if (node.isInline && node.marks.some(m => m.type === linkMark && m.attrs.href === existingHref)) {
+          if (pos < start || start === from) start = Math.min(start, pos)
+          end = Math.max(end, pos + node.nodeSize)
+        }
+      })
+      existingRange = { from: start, to: end }
+    } else if (from !== to) {
+      // Selection: check if a link mark is present in selection
+      state.doc.nodesBetween(from, to, node => {
+        if (!existingHref && node.isInline) {
+          const m = node.marks.find(mk => mk.type === linkMark)
+          if (m) existingHref = m.attrs.href
+        }
+      })
+    }
+  }
+
+  // Pre-fill display text from selection
+  const selText = from !== to ? state.doc.textBetween(from, to, ' ') : ''
+
+  _linkDialogRange = existingRange.from !== existingRange.to ? existingRange : (from !== to ? { from, to } : null)
+
+  // Populate dialog fields
+  const urlInput = el('link-url')
+  const textInput = el('link-text')
+  const removeBtn = el('link-dialog-remove')
+  const insertBtn = el('link-dialog-insert')
+  const titleEl = el('link-dialog-title')
+
+  if (urlInput) urlInput.value = existingHref || ''
+  if (textInput) textInput.value = selText
+  if (removeBtn) removeBtn.style.display = existingHref ? '' : 'none'
+  if (insertBtn) insertBtn.textContent = existingHref ? 'Update' : 'Insert'
+  if (titleEl) titleEl.textContent = existingHref ? 'Edit Link' : 'Insert Link'
+
+  el('link-dialog')?.classList.add('visible')
+  // Focus URL field (small delay so dialog is visible first)
+  setTimeout(() => urlInput?.focus(), 30)
+}
+
+function closeLinkDialog() {
+  el('link-dialog')?.classList.remove('visible')
+  _linkDialogRange = null
+  view?.focus()
+}
+
+function applyLinkDialog() {
+  const href = el('link-url')?.value?.trim()
+  const text = el('link-text')?.value
+
+  if (!href) { closeLinkDialog(); return }
+
+  const linkMark = schema.marks.link
+  if (!linkMark || !view) { closeLinkDialog(); return }
+
+  const state = view.state
+  let tr = state.tr
+
+  if (_linkDialogRange) {
+    // Apply mark to existing range
+    tr = tr.addMark(_linkDialogRange.from, _linkDialogRange.to, linkMark.create({ href, title: null }))
+  } else {
+    // No selection: insert linked text at cursor
+    if (!text) { closeLinkDialog(); return }
+    const { from } = state.selection
+    const node = schema.text(text, [linkMark.create({ href, title: null })])
+    tr = tr.insert(from, node)
+  }
+
+  view.dispatch(tr)
+  closeLinkDialog()
+}
+
+function removeLinkDialog() {
+  if (!view) { closeLinkDialog(); return }
+  const linkMark = schema.marks.link
+  if (!linkMark) { closeLinkDialog(); return }
+
+  const state = view.state
+  const { from, to, $from } = state.selection
+  let removeFrom = from
+  let removeTo = to
+
+  // If cursor is collapsed, find the link extent
+  if (from === to) {
+    state.doc.nodesBetween(0, state.doc.content.size, (node, pos) => {
+      if (node.isInline && node.marks.some(m => m.type === linkMark)) {
+        const lm = node.marks.find(m => m.type === linkMark)
+        if (lm) {
+          removeFrom = Math.min(removeFrom, pos)
+          removeTo = Math.max(removeTo, pos + node.nodeSize)
+        }
+      }
+    })
+  }
+
+  view.dispatch(state.tr.removeMark(removeFrom, removeTo, linkMark))
+  closeLinkDialog()
 }
 
 // ── Auto-save + poller ───────────────────────────────────────────────────────

@@ -18,11 +18,11 @@ import { invoke } from './bridge.js'
 import { schema, tableEditing as schemaTableEditing } from './schema.js'
 import { findPlugin, findKey, findSearch, findNext, findPrev, findClear, getFindState, replaceNext, replaceAll } from './find.js'
 import { initUI, updateDocStats, updateKeystrokeCount, setSaveStatus } from './ui.js'
-import { vim } from './vim.js'
-import { initMarkdown, toggleMarkdownMode, serializeToMarkdown, parseFromMarkdown, isMarkdownMode } from './markdown.js'
+import { initMarkdown, cycleMarkdownMode } from './markdown.js'
 import { inputRules, InputRule } from 'prosemirror-inputrules'
 import { makeTypographyPlugin } from './typography.js'
 import { fleschKincaid } from './readability.js'
+import { loadDocumentSnapshot, restoreDocumentSnapshot, saveDocumentSnapshot } from './storage.js'
 
 // ── Shared editor view reference ────────────────────────────────────────────
 let view
@@ -34,6 +34,75 @@ let _lastHistoryText = ''
 // ── Typography enabled flag ───────────────────────────────────────────────
 let _typographyEnabled = true
 let _currentTypoPlugin = null
+let _toolbarWired = false
+let _shortcutEscBound = false
+
+const HELP_TOPICS = {
+  getting_started: {
+    title: 'Getting Started',
+    html: `
+      <p>HumanProof accepts input only through its secure hardware capture layer, so the first step is making sure Input Monitoring is approved for the signed app bundle.</p>
+      <ol>
+        <li>Launch the app normally. In development, use <code>npm run dev:app</code>.</li>
+        <li>Grant Input Monitoring when macOS asks.</li>
+        <li>Write in the editor as usual. Autosave is stored encrypted on disk.</li>
+        <li>Use <b>Export Bundle</b> when you want a proof package you can share or verify.</li>
+      </ol>
+    `,
+  },
+  input_monitoring: {
+    title: 'Input Monitoring',
+    html: `
+      <p>HumanProof uses macOS Input Monitoring to read built-in keyboard events through IOHIDManager.</p>
+      <ul>
+        <li>Approve the signed <code>HumanProof.app</code> bundle, not an older transient dev binary.</li>
+        <li>If approval seems stuck, remove stale HumanProof entries in <b>Privacy &amp; Security &gt; Input Monitoring</b>, then relaunch and grant access again.</li>
+        <li>If you use Karabiner-Elements, add HumanProof to Karabiner's excluded applications list.</li>
+      </ul>
+    `,
+    primaryLabel: 'Open Privacy Settings',
+    primaryAction() {
+      invoke('open_input_monitoring_settings').catch(console.error)
+    },
+  },
+  markdown: {
+    title: 'Markdown Mode',
+    html: `
+      <p><b>MD</b> cycles between rich text, split markdown, and source-only markdown editing.</p>
+      <ul>
+        <li>Split mode shows markdown source on the left and rendered preview on the right.</li>
+        <li>Source mode hides the preview so you can focus on raw markdown.</li>
+        <li>The preview follows strict markdown paragraph rules: one newline stays in the same paragraph, and a blank line starts a new paragraph.</li>
+      </ul>
+      <p>Use fenced blocks like <code>\`\`\`js</code> for code and leave a blank line between paragraphs.</p>
+    `,
+  },
+}
+
+function buildPlugins() {
+  _currentTypoPlugin = _typographyEnabled ? makeTypographyPlugin() : inputRules({ rules: [] })
+  return [
+    history(),
+    wordKeymap,
+    keymap(baseKeymap),
+    findPlugin,
+    tableEditing(),
+    makeEditorInputRules(),
+    _currentTypoPlugin,
+  ]
+}
+
+function toggleTypography() {
+  _typographyEnabled = !_typographyEnabled
+  const ind = document.getElementById('smart-typo-indicator')
+  if (ind) ind.textContent = _typographyEnabled ? '✓ Smart' : ''
+  if (view) {
+    const newState = view.state.reconfigure({ plugins: buildPlugins() })
+    view.updateState(newState)
+    syncToolbar(newState)
+    view.focus()
+  }
+}
 
 // ── Task item NodeView ────────────────────────────────────────────────────
 class TaskItemView {
@@ -346,6 +415,24 @@ function updateTypingSpeed() {
   span.textContent = `${wpm} wpm`
 }
 
+// ── Readability ─────────────────────────────────────────────────────────────
+
+let _readabilityTimer = null
+
+function scheduleReadability(text) {
+  clearTimeout(_readabilityTimer)
+  _readabilityTimer = setTimeout(() => {
+    const scoreEl = document.getElementById('readability-score')
+    if (!scoreEl) return
+    if (!text.trim()) {
+      scoreEl.textContent = ''
+      return
+    }
+    const { score, level } = fleschKincaid(text)
+    scoreEl.textContent = `FK ${score} · ${level}`
+  }, 500)
+}
+
 // ── Word count detail ────────────────────────────────────────────────────────
 
 function updateWordCountDetail(docText) {
@@ -391,6 +478,7 @@ const wordKeymap = keymap({
   'Mod-f': () => { openFind(); return true },
   'Mod-g': () => { findNext(view); updateFindCount(); return true },
   'Mod-Shift-g': () => { findPrev(view); updateFindCount(); return true },
+  'Mod-/': () => { openShortcutPanel(); return true },
   'Mod-a': selectAll,
   'Mod-Shift-,': toggleMark(schema.marks.subscript),
   'Mod-Shift-.': toggleMark(schema.marks.superscript),
@@ -412,6 +500,7 @@ const wordKeymap = keymap({
   'Mod-Shift-t': () => { insertTable(3, 3); return true },
   'Mod-Shift-2': () => { wrapInColumns(); return true },
   'Mod-Shift-1': () => { unwrapColumns(); return true },
+  "Mod-Shift-'": () => { toggleTypography(); return true },
   'Mod-[': () => {
     const cur = currentFontSize()
     const prev = [...FONT_SIZES].reverse().find(n => n < cur) ?? FONT_SIZES[0]
@@ -496,10 +585,9 @@ window.addEventListener('focus', () => {
 // ── Editor init ──────────────────────────────────────────────────────────────
 
 function buildEditor(editable = true) {
-  _currentTypoPlugin = _typographyEnabled ? makeTypographyPlugin() : inputRules({ rules: [] })
   const state = EditorState.create({
     schema,
-    plugins: [history(), wordKeymap, keymap(baseKeymap), findPlugin, tableEditing(), makeEditorInputRules(), _currentTypoPlugin],
+    plugins: buildPlugins(),
   })
 
   view = new EditorView(document.getElementById('editor'), {
@@ -514,21 +602,39 @@ function buildEditor(editable = true) {
     dispatchTransaction(tr) {
       const next = view.state.apply(tr)
       view.updateState(next)
+      updateDocStats(next.doc.textContent)
+      updateWordCountDetail(next.doc.textContent)
+      applySelectionStats(next)
       if (tr.docChanged) {
-        updateDocStats(next.doc.textContent)
-        updateWordCountDetail(next.doc.textContent)
         updateOutline()
         const text = next.doc.textContent
         if (text !== _lastHistoryText) {
           _docHistory.push({ t: Date.now(), text })
           _lastHistoryText = text
         }
+        scheduleReadability(text)
       }
       syncToolbar(next)
     },
     handleDOMEvents: {
       keydown(editorView, event) {
-        if (vim.handleKeydown(editorView, event)) return true
+        if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'v') {
+          event.preventDefault()
+          navigator.clipboard.readText().then(text => {
+            if (!text || !view) return
+            const node = schema.text(text)
+            view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView())
+            const encoded = new TextEncoder().encode(text)
+            crypto.subtle.digest('SHA-256', encoded).then(buf => {
+              const hash = Array.from(new Uint8Array(buf))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('')
+              invoke('log_paste_event', { char_count: text.length, content_hash: hash }).catch(console.error)
+            })
+            view.focus()
+          }).catch(() => {})
+          return true
+        }
         // Keyboard gating: we can't synchronously block, but we track for session.
         // Actual filtering is done at the HID level via pending_builtin_keydowns.
         trackKeystroke()
@@ -578,6 +684,25 @@ function buildEditor(editable = true) {
   })
 
   return view
+}
+
+function applySelectionStats(state) {
+  const sel = state.selection
+  const wordEl = document.getElementById('word-count')
+  const charEl = document.getElementById('char-count')
+  if (!wordEl || !charEl) return
+  if (!sel.empty) {
+    const selText = state.doc.textBetween(sel.from, sel.to, ' ')
+    const selWords = selText.trim() ? selText.trim().split(/\s+/).length : 0
+    const selChars = sel.to - sel.from
+    wordEl.textContent = `${selWords} words selected`
+    charEl.textContent = `${selChars} chars selected`
+    return
+  }
+  const text = state.doc.textContent
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0
+  charEl.textContent = `${text.length.toLocaleString()} chars`
+  wordEl.textContent = `${words.toLocaleString()} word${words !== 1 ? 's' : ''}`
 }
 
 // ── Toolbar state sync ───────────────────────────────────────────────────────
@@ -649,9 +774,87 @@ function setActive(id, on) { el(id)?.classList.toggle('active', on) }
 function el(id) { return document.getElementById(id) }
 function on(id, fn) { el(id)?.addEventListener('click', fn) }
 
+const SHORTCUTS = [
+  { category: 'Formatting', items: [
+    ['⌘B', 'Bold'], ['⌘I', 'Italic'], ['⌘U', 'Underline'],
+    ['⌘⇧X', 'Strikethrough'], ['⌘⇧,', 'Subscript'], ['⌘⇧.', 'Superscript'],
+    ['⌘\\', 'Clear Formatting'], ['⌘]', 'Font Bigger'], ['⌘[', 'Font Smaller'],
+    ['⌘⇧K', 'Code Block'], ['⌘⇧9', 'Task List'],
+  ] },
+  { category: 'Structure', items: [
+    ['⌘L/E/R/J', 'Align Left/Center/Right/Justify'],
+    ['⌘Enter', 'Page Break'], ['⌘⇧T', 'Insert Table (3×3)'],
+    ['⌘⇧F', 'Insert Footnote'], ['⌘⇧2', '2-Column Layout'],
+    ['⌘⇧1', '1-Column Layout'], ['Tab / ⇧Tab', 'Indent / Outdent'],
+  ] },
+  { category: 'Editing', items: [
+    ['⌘Z / ⌘Y', 'Undo / Redo'], ['⌘A', 'Select All'], ['⌘K', 'Insert Link'],
+    ['⌘F', 'Find'], ['⌘G / ⌘⇧G', 'Find Next / Prev'],
+    ['⌘⇧V', 'Paste Plain Text'], ["⌘⇧'", 'Toggle Smart Typography'],
+  ] },
+  { category: 'View', items: [
+    ['⌘⇧Space', 'Focus Mode'], ['⌘/', 'Keyboard Shortcuts'],
+    ['Btn: MD', 'Cycle Markdown Mode'],
+  ] },
+]
+
+function buildShortcutPanel() {
+  const content = document.getElementById('shortcut-content')
+  if (!content) return
+  content.innerHTML = SHORTCUTS.map(({ category, items }) => `
+    <div class="shortcut-category">
+      <h3>${category}</h3>
+      <div class="shortcut-grid">
+        ${items.map(([key, desc]) => `
+          <div class="shortcut-row">
+            <span class="shortcut-key">${key}</span>
+            <span class="shortcut-desc">${desc}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('')
+}
+
+function openShortcutPanel() {
+  buildShortcutPanel()
+  document.getElementById('shortcut-panel')?.classList.add('visible')
+}
+
+function closeShortcutPanel() {
+  document.getElementById('shortcut-panel')?.classList.remove('visible')
+}
+
+function openHelpTopic(topic = 'getting_started') {
+  const panel = document.getElementById('help-panel')
+  const title = document.getElementById('help-title')
+  const content = document.getElementById('help-content')
+  const primary = document.getElementById('help-primary')
+  const cfg = HELP_TOPICS[topic] ?? HELP_TOPICS.getting_started
+  if (!panel || !title || !content || !primary) return
+
+  title.textContent = cfg.title
+  content.innerHTML = cfg.html
+  if (cfg.primaryLabel && cfg.primaryAction) {
+    primary.style.display = ''
+    primary.textContent = cfg.primaryLabel
+    primary.onclick = cfg.primaryAction
+  } else {
+    primary.style.display = 'none'
+    primary.onclick = null
+  }
+  panel.classList.add('visible')
+}
+
+function closeHelpPanel() {
+  document.getElementById('help-panel')?.classList.remove('visible')
+}
+
 // ── Toolbar wiring ───────────────────────────────────────────────────────────
 
 function wireToolbar() {
+  if (_toolbarWired) return
+  _toolbarWired = true
   on('btn-undo',  () => { undo(view.state, view.dispatch);  view.focus() })
   on('btn-redo',  () => { redo(view.state, view.dispatch);  view.focus() })
 
@@ -814,32 +1017,9 @@ function wireToolbar() {
   // Outline
   setupOutlinePanel()
 
-  // Vim mode
-  on('btn-vim', () => { if (vim.isEnabled()) vim.disable(); else vim.enable(view) })
-
   // Markdown mode
   on('btn-markdown', () => {
-    toggleMarkdownMode()
-    if (isMarkdownMode()) {
-      const md = serializeToMarkdown(view.state)
-      const ta = document.getElementById('markdown-source')
-      if (ta) { ta.value = md; ta.style.display = 'flex' }
-      document.getElementById('editor').style.display = 'none'
-      document.getElementById('page').style.padding = '0'
-    } else {
-      const ta = document.getElementById('markdown-source')
-      if (ta) {
-        const doc = parseFromMarkdown(ta.value, schema)
-        if (doc) {
-          const end = view.state.doc.content.size
-          view.dispatch(view.state.tr.replaceWith(0, end, doc.content))
-        }
-        ta.style.display = 'none'
-      }
-      document.getElementById('editor').style.display = ''
-      document.getElementById('page').style.padding = ''
-      view.focus()
-    }
+    cycleMarkdownMode()
   })
 
   // Upload proof
@@ -867,6 +1047,33 @@ function wireToolbar() {
     view.dispatch(state.tr.replaceWith(pos, pos + $from.parent.nodeSize, list))
     view.focus()
   })
+
+  const typoIndicator = document.getElementById('smart-typo-indicator')
+  if (typoIndicator) {
+    typoIndicator.textContent = '✓ Smart'
+    typoIndicator.style.cursor = 'pointer'
+    typoIndicator.addEventListener('click', toggleTypography)
+  }
+
+  on('btn-shortcuts', openShortcutPanel)
+  on('shortcut-close', closeShortcutPanel)
+  document.getElementById('shortcut-panel')?.addEventListener('click', e => {
+    if (e.target.id === 'shortcut-panel') closeShortcutPanel()
+  })
+  on('help-close', closeHelpPanel)
+  document.getElementById('help-panel')?.addEventListener('click', e => {
+    if (e.target.id === 'help-panel') closeHelpPanel()
+  })
+  window.__openHelpTopic = openHelpTopic
+  if (!_shortcutEscBound) {
+    _shortcutEscBound = true
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeShortcutPanel()
+        closeHelpPanel()
+      }
+    })
+  }
 }
 
 // ── Find ─────────────────────────────────────────────────────────────────────
@@ -898,7 +1105,7 @@ function updateFindCount() {
 function startAutosave() {
   setInterval(async () => {
     try {
-      await invoke('save_session')
+      await saveDocumentSnapshot(view.state)
       setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`)
     } catch {
       setSaveStatus('Save failed')
@@ -1032,9 +1239,32 @@ async function boot() {
   let hidOk = false
   try { hidOk = await invoke('get_hid_status') } catch {}
 
+  async function restoreSavedDocument() {
+    try {
+      const snapshot = await loadDocumentSnapshot()
+      if (snapshot) {
+        restoreDocumentSnapshot(view, snapshot)
+      }
+    } catch (err) {
+      console.error('Failed to restore encrypted document snapshot', err)
+    }
+  }
+
+  function initializeEditorUi() {
+    initMarkdown(view)
+    wireToolbar()
+    setupClickToPlace()
+    setupMenuCmd()
+    updateDocStats(view.state.doc.textContent)
+    updateWordCountDetail(view.state.doc.textContent)
+    applySelectionStats(view.state)
+    scheduleReadability(view.state.doc.textContent)
+  }
+
   if (!hidOk) {
     buildEditor(false)
-    wireToolbar()
+    await restoreSavedDocument()
+    initializeEditorUi()
     showHidBlocked()
 
     function unlockEditor() {
@@ -1069,9 +1299,8 @@ async function boot() {
   }
 
   buildEditor(true)
-  wireToolbar()
-  setupClickToPlace()
-  setupMenuCmd()
+  await restoreSavedDocument()
+  initializeEditorUi()
   startAutosave()
   startKeystrokePoller()
 }
@@ -1115,6 +1344,7 @@ function setupMenuCmd() {
       case 'clear-format':  clearAllMarks(s, d); break
       case 'selectAll':     selectAll(s, d); break
       case 'find':          openFind(); return
+      case 'shortcuts':     openShortcutPanel(); return
       case 'find-next':     findNext(view); updateFindCount(); return
       case 'find-prev':     findPrev(view); updateFindCount(); return
       case 'bullet-list':
@@ -1142,7 +1372,7 @@ function setupMenuCmd() {
       }
       case 'dark-mode':    document.body.classList.toggle('dark'); return
       case 'save':
-        invoke('save_session')
+        saveDocumentSnapshot(view.state)
           .then(() => setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`))
           .catch(() => setSaveStatus('Save failed'))
         return
@@ -1156,8 +1386,7 @@ function setupMenuCmd() {
       case 'insert-table':       insertTable(3, 3); break
       case 'insert-page-break':  insertPageBreak(); break
       case 'focus-mode':         toggleFocusMode(); return
-      case 'vim-mode':           if (vim.isEnabled()) vim.disable(); else vim.enable(view); return
-      case 'markdown':           toggleMarkdownMode(); return
+      case 'markdown':           cycleMarkdownMode(); return
       case 'upload-proof':       handleUploadProof(); return
       case 'table-add-row-after': addRowAfter(s, d); break
       case 'table-add-col-after': addColumnAfter(s, d); break

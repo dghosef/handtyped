@@ -19,7 +19,7 @@ export function countSyllables(word) {
  */
 export function fleschKincaid(text) {
   const sentences = (text.match(/[.!?]+/g) || []).length || 1
-  const wordList = text.trim().split(/\s+/).filter(w => w.replace(/[^a-z]/gi, ''))
+  const wordList = text.trim().split(/\s+/).filter(w => /[a-z]/i.test(w))
   const words = wordList.length || 1
   const syllables = wordList.reduce((n, w) => n + countSyllables(w), 0) || 1
 

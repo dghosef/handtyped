@@ -166,6 +166,74 @@ function setLineHeight(value) {
   }
 }
 
+// ── Paragraph spacing ────────────────────────────────────────────────────────
+
+function setParagraphSpacing(attr, value) {
+  const { from, to } = view.state.selection
+  let tr = view.state.tr
+  let changed = false
+  view.state.doc.nodesBetween(from, to, (node, pos) => {
+    if (node.type === schema.nodes.paragraph) {
+      const newVal = parseFloat(value) || 0
+      if (node.attrs[attr] !== newVal) {
+        tr = tr.setNodeMarkup(pos, null, { ...node.attrs, [attr]: newVal })
+        changed = true
+      }
+    }
+  })
+  if (changed) { view.dispatch(tr); view.focus() }
+}
+
+// ── Footnotes ─────────────────────────────────────────────────────────────────
+
+function insertFootnote() {
+  if (!schema.nodes.footnote_mark) return
+  const doc = view.state.doc
+  let n = 1
+  doc.descendants(node => { if (node.type === schema.nodes.footnote_mark) n++ })
+
+  const mark = schema.nodes.footnote_mark.create({ number: n })
+  const { from } = view.state.selection
+  const def = schema.nodes.footnote_def.createAndFill({ number: n })
+
+  let tr = view.state.tr.insert(from, mark)
+  // Insert def at end of doc (before closing doc node)
+  const defInsertPos = tr.doc.content.size
+  tr = tr.insert(defInsertPos, def)
+  // Move cursor inside the def
+  const defPos = defInsertPos + 1
+  tr = tr.setSelection(TextSelection.create(tr.doc, Math.min(defPos, tr.doc.content.size - 1)))
+  view.dispatch(tr)
+  view.focus()
+}
+
+// ── Column layout ─────────────────────────────────────────────────────────────
+
+function wrapInColumns() {
+  const { $from } = view.state.selection
+  const nodePos = $from.before($from.depth)
+  const node = $from.node($from.depth)
+  const para = schema.nodes.paragraph.createAndFill()
+  const col1 = schema.nodes.column.createAndFill(null, node.copy(node.content))
+  const col2 = schema.nodes.column.createAndFill(null, [para])
+  const block = schema.nodes.column_block.create(null, [col1, col2])
+  view.dispatch(view.state.tr.replaceWith(nodePos, nodePos + node.nodeSize, block))
+  view.focus()
+}
+
+function unwrapColumns() {
+  const { $from } = view.state.selection
+  let depth = $from.depth
+  while (depth > 0 && $from.node(depth).type !== schema.nodes.column_block) depth--
+  if (depth === 0) return
+  const blockPos = $from.before(depth)
+  const block = $from.node(depth)
+  const content = []
+  block.forEach(col => col.forEach(n => content.push(n)))
+  view.dispatch(view.state.tr.replaceWith(blockPos, blockPos + block.nodeSize, content))
+  view.focus()
+}
+
 // ── Table helpers ─────────────────────────────────────────────────────────────
 
 function insertTable(rows = 3, cols = 3) {
@@ -340,8 +408,10 @@ const wordKeymap = keymap({
     baseKeymap['Enter']
   ),
   'Mod-Enter': () => { insertPageBreak(); return true },
-  'Mod-Shift-f': () => { toggleFocusMode(); return true },
+  'Mod-Shift-f': () => { insertFootnote(); return true },
   'Mod-Shift-t': () => { insertTable(3, 3); return true },
+  'Mod-Shift-2': () => { wrapInColumns(); return true },
+  'Mod-Shift-1': () => { unwrapColumns(); return true },
   'Mod-[': () => {
     const cur = currentFontSize()
     const prev = [...FONT_SIZES].reverse().find(n => n < cur) ?? FONT_SIZES[0]
@@ -551,6 +621,13 @@ function syncToolbar(state) {
   const inCodeBlock = state.selection.$from.parent.type === schema.nodes.code_block
   setActive('btn-code-block', inCodeBlock)
 
+  // Paragraph spacing
+  const paraNode = state.selection.$from.node(state.selection.$from.depth)
+  if (paraNode && paraNode.type === schema.nodes.paragraph) {
+    const sb = el('space-before-select'); if (sb) sb.value = String(paraNode.attrs.spaceBefore || 0)
+    const sa = el('space-after-select'); if (sa) sa.value = String(paraNode.attrs.spaceAfter || 0)
+  }
+
   // Table toolbar visibility
   updateTableToolbar(state)
 }
@@ -710,6 +787,21 @@ function wireToolbar() {
   el('line-height-select')?.addEventListener('change', e => {
     setLineHeight(e.target.value)
   })
+
+  // Paragraph spacing
+  el('space-before-select')?.addEventListener('change', e => {
+    setParagraphSpacing('spaceBefore', e.target.value)
+  })
+  el('space-after-select')?.addEventListener('change', e => {
+    setParagraphSpacing('spaceAfter', e.target.value)
+  })
+
+  // Footnote
+  on('btn-footnote', () => insertFootnote())
+
+  // Columns
+  on('btn-2col', () => wrapInColumns())
+  on('btn-1col', () => unwrapColumns())
 
   // Table toolbar buttons
   on('btn-table-add-row', () => { addRowAfter(view.state, view.dispatch); view.focus() })

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, atomic::{AtomicBool, AtomicI32, AtomicU64}};
+use crate::editor::EditorDocumentState;
 use uuid::Uuid;
 use std::time::{SystemTime, UNIX_EPOCH};
 use sha2::{Sha256, Digest};
@@ -155,6 +156,8 @@ pub struct KeyboardInfo {
 /// Shared state across Tauri commands and HID thread.
 pub struct AppState {
     pub session: Mutex<SessionState>,
+    /// Persisted editor document state (markdown content, cursor, mode).
+    pub editor_state: Mutex<EditorDocumentState>,
     /// Set to true only after IOHIDManagerOpen succeeds.
     pub hid_active: AtomicBool,
     /// Counter incremented each time a built-in keyboard keydown event fires.

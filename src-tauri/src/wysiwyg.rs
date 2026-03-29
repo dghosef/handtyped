@@ -409,6 +409,331 @@ pub struct Block {
     pub raw: String,
 }
 
+// ── MarkdownEditor widget ─────────────────────────────────────────────────────
+
+pub struct MarkdownEditor {
+    blocks: Vec<Block>,
+    /// Index of the currently-focused (editing) block, if any
+    pub focused_block: Option<usize>,
+}
+
+impl MarkdownEditor {
+    pub fn new(markdown: &str) -> Self {
+        Self {
+            blocks: parse_blocks(markdown),
+            focused_block: None,
+        }
+    }
+
+    pub fn set_markdown(&mut self, markdown: &str) {
+        self.blocks = parse_blocks(markdown);
+        if let Some(idx) = self.focused_block {
+            if idx >= self.blocks.len() {
+                self.focused_block = None;
+            }
+        }
+    }
+
+    pub fn to_markdown(&self) -> String {
+        blocks_to_markdown(&self.blocks)
+    }
+
+    /// Render the editor. `hid_ok` must be true for any edit to be accepted.
+    /// Returns true if the document was modified.
+    pub fn show(&mut self, ui: &mut egui::Ui, hid_ok: bool) -> bool {
+        let mut changed = false;
+        let block_count = self.blocks.len();
+
+        egui::ScrollArea::vertical()
+            .id_salt("md_editor_scroll")
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                for idx in 0..block_count {
+                    let is_focused = self.focused_block == Some(idx);
+                    let block_changed = self.show_block(ui, idx, is_focused, hid_ok);
+                    if block_changed { changed = true; }
+                }
+            });
+
+        changed
+    }
+
+    fn show_block(&mut self, ui: &mut egui::Ui, idx: usize, is_focused: bool, hid_ok: bool) -> bool {
+        match self.blocks[idx].kind.clone() {
+            BlockKind::BlankLine => {
+                ui.add_space(8.0);
+                false
+            }
+            BlockKind::HorizontalRule => {
+                ui.add_space(4.0);
+                ui.separator();
+                ui.add_space(4.0);
+                false
+            }
+            _ if is_focused => self.show_block_edit(ui, idx, hid_ok),
+            _ => self.show_block_display(ui, idx),
+        }
+    }
+
+    fn show_block_display(&mut self, ui: &mut egui::Ui, idx: usize) -> bool {
+        let block = &self.blocks[idx];
+        let visuals = ui.visuals().clone();
+        let text_color = visuals.text_color();
+        let code_bg = visuals.code_bg_color;
+
+        let response = match block.kind.clone() {
+            BlockKind::Heading(level) => {
+                let content = strip_heading_markers(&block.raw).to_string();
+                let size = match level {
+                    1 => 32.0,
+                    2 => 26.0,
+                    3 => 22.0,
+                    4 => 19.0,
+                    5 => 17.0,
+                    _ => 15.0,
+                };
+                let job = build_inline_layout_job(
+                    &content,
+                    FontId::proportional(size),
+                    text_color,
+                    code_bg,
+                );
+                ui.add_space(8.0);
+                let r = ui.label(job);
+                ui.add_space(4.0);
+                r
+            }
+
+            BlockKind::Paragraph => {
+                let raw = block.raw.clone();
+                let job = build_inline_layout_job(
+                    &raw,
+                    FontId::proportional(15.0),
+                    text_color,
+                    code_bg,
+                );
+                ui.label(job)
+            }
+
+            BlockKind::BulletItem { depth } => {
+                let content = strip_bullet_markers(&block.raw).to_string();
+                ui.horizontal(|ui| {
+                    ui.add_space(depth as f32 * 20.0);
+                    ui.label("•");
+                    let job = build_inline_layout_job(
+                        &content,
+                        FontId::proportional(15.0),
+                        text_color,
+                        code_bg,
+                    );
+                    ui.label(job);
+                }).response
+            }
+
+            BlockKind::OrderedItem { depth, number } => {
+                let content = strip_ordered_markers(&block.raw).to_string();
+                ui.horizontal(|ui| {
+                    ui.add_space(depth as f32 * 20.0);
+                    ui.label(format!("{}.", number));
+                    let job = build_inline_layout_job(
+                        &content,
+                        FontId::proportional(15.0),
+                        text_color,
+                        code_bg,
+                    );
+                    ui.label(job);
+                }).response
+            }
+
+            BlockKind::TaskItem { checked } => {
+                let content = strip_task_markers(&block.raw).to_string();
+                let mut ch = checked;
+                let task_changed = {
+                    let r = ui.horizontal(|ui| {
+                        ui.checkbox(&mut ch, "");
+                        let job = build_inline_layout_job(
+                            &content,
+                            FontId::proportional(15.0),
+                            if ch { text_color.linear_multiply(0.5) } else { text_color },
+                            code_bg,
+                        );
+                        ui.label(job);
+                    }).response;
+                    r
+                };
+                if ch != checked {
+                    let new_raw = if ch {
+                        self.blocks[idx].raw.replacen("- [ ]", "- [x]", 1)
+                    } else {
+                        self.blocks[idx].raw.replacen("- [x]", "- [ ]", 1)
+                    };
+                    self.blocks[idx].raw = new_raw;
+                    self.blocks[idx].kind = BlockKind::TaskItem { checked: ch };
+                    return true;
+                }
+                task_changed
+            }
+
+            BlockKind::Blockquote => {
+                let content = strip_blockquote_markers(&block.raw).to_string();
+                ui.horizontal(|ui| {
+                    ui.add_space(4.0);
+                    // Left accent bar via colored label
+                    ui.colored_label(egui::Color32::GRAY, "▌");
+                    ui.add_space(4.0);
+                    let job = build_inline_layout_job(
+                        &content,
+                        FontId::proportional(15.0),
+                        text_color.linear_multiply(0.75),
+                        code_bg,
+                    );
+                    ui.label(job);
+                }).response
+            }
+
+            BlockKind::FencedCode { ref language } => {
+                let language = language.clone();
+                let content = strip_fence_markers(&block.raw).to_string();
+                ui.add_space(4.0);
+                let r = egui::Frame::new()
+                    .fill(code_bg)
+                    .inner_margin(egui::Margin::same(8))
+                    .show(ui, |ui| {
+                        if !language.is_empty() {
+                            ui.label(
+                                egui::RichText::new(&language)
+                                    .small()
+                                    .color(text_color.linear_multiply(0.5))
+                            );
+                        }
+                        ui.label(egui::RichText::new(&content).monospace().color(text_color));
+                    })
+                    .response;
+                ui.add_space(4.0);
+                r
+            }
+
+            BlockKind::Table => {
+                let raw = block.raw.clone();
+                let lines: Vec<&str> = raw.lines().collect();
+                egui::Grid::new(format!("table_{idx}"))
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for (row_idx, line) in lines.iter().enumerate() {
+                            let is_separator = line.replace('|', "").replace('-', "").replace(':', "").trim().is_empty();
+                            if is_separator { continue; }
+                            let cells: Vec<&str> = line.split('|')
+                                .map(|c| c.trim())
+                                .filter(|c| !c.is_empty())
+                                .collect();
+                            for cell in &cells {
+                                let size = if row_idx == 0 { 15.0 } else { 14.0 };
+                                let job = build_inline_layout_job(
+                                    cell,
+                                    FontId::proportional(size),
+                                    text_color,
+                                    code_bg,
+                                );
+                                ui.label(job);
+                            }
+                            ui.end_row();
+                        }
+                    })
+                    .response
+            }
+
+            BlockKind::BlankLine | BlockKind::HorizontalRule => unreachable!(),
+        };
+
+        if response.clicked() {
+            self.focused_block = Some(idx);
+        }
+
+        false
+    }
+
+    fn show_block_edit(&mut self, ui: &mut egui::Ui, idx: usize, hid_ok: bool) -> bool {
+        let block = &mut self.blocks[idx];
+        let before = block.raw.clone();
+
+        let output = egui::TextEdit::multiline(&mut block.raw)
+            .desired_width(f32::INFINITY)
+            .font(egui::TextStyle::Monospace)
+            .show(ui);
+
+        if output.response.changed() {
+            if !hid_ok {
+                block.raw = before;
+                return false;
+            }
+            // Reclassify block kind based on new raw content
+            if let Some(new_block) = parse_blocks(&block.raw.clone()).into_iter().next() {
+                block.kind = new_block.kind;
+            }
+            return true;
+        }
+
+        if output.response.lost_focus() {
+            self.focused_block = None;
+        }
+
+        false
+    }
+}
+
+// ── Display helpers ───────────────────────────────────────────────────────────
+
+fn strip_heading_markers(raw: &str) -> &str {
+    let t = raw.trim_start_matches('#');
+    t.strip_prefix(' ').unwrap_or(t)
+}
+
+fn strip_bullet_markers(raw: &str) -> &str {
+    let t = raw.trim_start_matches(' ');
+    t.strip_prefix("- ")
+        .or_else(|| t.strip_prefix("* "))
+        .or_else(|| t.strip_prefix("+ "))
+        .unwrap_or(t)
+}
+
+fn strip_ordered_markers(raw: &str) -> &str {
+    let t = raw.trim_start_matches(' ');
+    if let Some(dot) = t.find(". ") {
+        &t[dot + 2..]
+    } else {
+        t
+    }
+}
+
+fn strip_task_markers(raw: &str) -> &str {
+    let t = raw.trim_start_matches(' ');
+    t.strip_prefix("- [ ] ")
+        .or_else(|| t.strip_prefix("- [x] "))
+        .or_else(|| t.strip_prefix("- [X] "))
+        .or_else(|| t.strip_prefix("- [ ]"))
+        .or_else(|| t.strip_prefix("- [x]"))
+        .or_else(|| t.strip_prefix("- [X]"))
+        .unwrap_or(t)
+}
+
+fn strip_blockquote_markers(raw: &str) -> &str {
+    let t = raw.trim_start();
+    t.strip_prefix("> ")
+        .or_else(|| t.strip_prefix(">"))
+        .unwrap_or(t)
+}
+
+fn strip_fence_markers(raw: &str) -> &str {
+    // Drop first line (opening fence) and last line (closing fence)
+    let first_nl = raw.find('\n').unwrap_or(raw.len());
+    let content = &raw[first_nl.saturating_add(1)..];
+    if let Some(last_nl) = content.rfind('\n') {
+        &content[..last_nl]
+    } else {
+        content
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -579,5 +904,28 @@ mod tests {
     fn inline_segments_link() {
         let segs = parse_inline("see [rust](https://rust-lang.org) here");
         assert!(segs.iter().any(|s| matches!(s, InlineSpan::Link { text, .. } if text == "rust")));
+    }
+
+    #[test]
+    fn markdown_editor_new_and_roundtrip() {
+        let md = "# Hello\n\nWorld";
+        let ed = MarkdownEditor::new(md);
+        assert_eq!(ed.to_markdown(), md);
+    }
+
+    #[test]
+    fn markdown_editor_set_markdown() {
+        let mut ed = MarkdownEditor::new("# Old");
+        ed.set_markdown("# New\n\nContent");
+        assert_eq!(ed.to_markdown(), "# New\n\nContent");
+    }
+
+    #[test]
+    fn markdown_editor_focused_block_clamped_on_set_markdown() {
+        let mut ed = MarkdownEditor::new("# A\n\nB\n\nC");
+        ed.focused_block = Some(4);
+        ed.set_markdown("# Only");
+        // focused_block out of range should be cleared
+        assert!(ed.focused_block.is_none());
     }
 }

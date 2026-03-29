@@ -26,6 +26,13 @@ dirs-next = "2"
 base64 = "0.22"
 zeroize = { version = "1", features = ["derive"] }
 egui = "0.31"
+eframe = "0.31.1"
+pulldown-cmark = "0.13.3"
+image = "=0.25.5"
+
+[[bin]]
+name = "humanproof_native"
+path = "src/bin/humanproof_native.rs"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.9"

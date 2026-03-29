@@ -30,16 +30,16 @@ pub fn parse_blocks(markdown: &str) -> Vec<Block> {
 
         // Fenced code block
         if line.trim_start().starts_with("```") {
-            let fence_indent = line.len() - line.trim_start().len();
+            let fence_indent = line.bytes().take_while(|&b| b == b' ').count();
             let lang = line.trim_start().trim_start_matches('`').trim().to_string();
             let mut raw_lines = vec![line.to_string()];
             i += 1;
             while i < lines.len() {
                 let l = lines[i];
                 raw_lines.push(l.to_string());
-                if l.trim_start_matches(' ').len() >= fence_indent
-                    && l[fence_indent.min(l.len())..].starts_with("```")
-                {
+                // Closing fence: at most fence_indent leading spaces, then ```
+                let leading_spaces = l.bytes().take_while(|&b| b == b' ').count();
+                if leading_spaces <= fence_indent && l[leading_spaces..].starts_with("```") {
                     i += 1;
                     break;
                 }
@@ -131,7 +131,9 @@ fn heading_level(line: &str) -> Option<u8> {
     let trimmed = line.trim_start();
     let hashes = trimmed.chars().take_while(|&c| c == '#').count();
     if hashes >= 1 && hashes <= 6 {
-        let rest = &trimmed[hashes..];
+        // Safe: '#' is single-byte ASCII, so char count == byte count here
+        let byte_offset = hashes; // '#' is always 1 byte
+        let rest = &trimmed[byte_offset..];
         if rest.is_empty() || rest.starts_with(' ') {
             return Some(hashes as u8);
         }
@@ -142,13 +144,14 @@ fn heading_level(line: &str) -> Option<u8> {
 fn is_horizontal_rule(line: &str) -> bool {
     let t = line.trim();
     if t.len() < 3 { return false; }
-    let ch = t.chars().next().unwrap();
+    let ch = t.chars().next().expect("t has at least 3 chars");
     if !matches!(ch, '-' | '*' | '_') { return false; }
     t.chars().all(|c| c == ch || c == ' ') && t.chars().filter(|&c| c == ch).count() >= 3
 }
 
 fn bullet_depth(line: &str) -> Option<usize> {
-    let spaces = line.chars().take_while(|&c| c == ' ').count();
+    // Count leading spaces (ASCII, so byte offset == char count)
+    let spaces = line.bytes().take_while(|&b| b == b' ').count();
     let rest = &line[spaces..];
     if rest.starts_with("- ") || rest.starts_with("* ") || rest.starts_with("+ ") {
         Some(spaces / 2)
@@ -158,11 +161,13 @@ fn bullet_depth(line: &str) -> Option<usize> {
 }
 
 fn task_item(line: &str) -> Option<bool> {
-    let spaces = line.chars().take_while(|&c| c == ' ').count();
+    // Count leading spaces (ASCII, so byte offset == char count)
+    let spaces = line.bytes().take_while(|&b| b == b' ').count();
     let rest = &line[spaces..];
     if rest.starts_with("- [ ] ") || rest.starts_with("- [ ]") {
         Some(false)
-    } else if rest.starts_with("- [x] ") || rest.starts_with("- [x]") {
+    } else if rest.starts_with("- [x] ") || rest.starts_with("- [x]")
+           || rest.starts_with("- [X] ") || rest.starts_with("- [X]") {
         Some(true)
     } else {
         None
@@ -170,8 +175,10 @@ fn task_item(line: &str) -> Option<bool> {
 }
 
 fn ordered_item(line: &str) -> Option<(usize, usize)> {
-    let spaces = line.chars().take_while(|&c| c == ' ').count();
+    // Count leading spaces (ASCII, so byte offset == char count)
+    let spaces = line.bytes().take_while(|&b| b == b' ').count();
     let rest = &line[spaces..];
+    // find(". ") is safe because the digit-only guard below rejects non-numeric prefixes
     let dot = rest.find(". ")?;
     let num_str = &rest[..dot];
     if num_str.chars().all(|c| c.is_ascii_digit()) && !num_str.is_empty() {
@@ -257,6 +264,12 @@ mod tests {
     #[test]
     fn parse_task_checked() {
         let blocks = parse_blocks("- [x] done");
+        assert_eq!(blocks[0].kind, BlockKind::TaskItem { checked: true });
+    }
+
+    #[test]
+    fn parse_task_checked_uppercase() {
+        let blocks = parse_blocks("- [X] done");
         assert_eq!(blocks[0].kind, BlockKind::TaskItem { checked: true });
     }
 

@@ -7,3 +7,4 @@ dist/
 server/.env
 server/humanproof.db
 .build/
+.worktrees/

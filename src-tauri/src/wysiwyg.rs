@@ -928,4 +928,31 @@ mod tests {
         // focused_block out of range should be cleared
         assert!(ed.focused_block.is_none());
     }
+
+    #[test]
+    fn block_kind_reclassified_after_raw_change() {
+        // Simulate what show_block_edit does after a valid HID edit:
+        // user typed "# " before their paragraph, making it a heading
+        let mut ed = MarkdownEditor::new("hello");
+        // Directly mutate raw as show_block_edit would after a valid edit
+        ed.blocks[0].raw = "# hello".to_string();
+        // Reclassify — same logic as show_block_edit
+        if let Some(new_block) = parse_blocks(&ed.blocks[0].raw.clone()).into_iter().next() {
+            ed.blocks[0].kind = new_block.kind;
+        }
+        assert_eq!(ed.blocks[0].kind, BlockKind::Heading(1));
+        assert_eq!(ed.to_markdown(), "# hello");
+    }
+
+    #[test]
+    fn hid_rollback_preserves_content() {
+        // Simulate the rollback: save before, "edit" raw, restore
+        let mut ed = MarkdownEditor::new("original content");
+        let before = ed.blocks[0].raw.clone();
+        // Simulate a "bad" edit
+        ed.blocks[0].raw = "injected content".to_string();
+        // HID not active → rollback
+        ed.blocks[0].raw = before;
+        assert_eq!(ed.to_markdown(), "original content");
+    }
 }

@@ -3,6 +3,204 @@ use egui::text::{LayoutJob, TextFormat};
 #[allow(unused_imports)]
 use egui::{Color32, FontId};
 
+// ── Inline spans ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum InlineSpan {
+    Plain(String),
+    Bold(String),
+    Italic(String),
+    BoldItalic(String),
+    Code(String),
+    Strikethrough(String),
+    /// [text](url)
+    Link { text: String, url: String },
+}
+
+/// Parse a string into a flat list of inline spans.
+/// Handles: **bold**, *italic*, ***bold-italic***, `code`, ~~strikethrough~~, [text](url).
+/// Does not handle nested spans (intentional: keeps rendering simple).
+pub fn parse_inline(text: &str) -> Vec<InlineSpan> {
+    let mut spans = Vec::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+    let mut plain_start = 0;
+
+    macro_rules! flush_plain {
+        ($end:expr) => {
+            if plain_start < $end {
+                let s: String = chars[plain_start..$end].iter().collect();
+                if !s.is_empty() {
+                    spans.push(InlineSpan::Plain(s));
+                }
+            }
+        };
+    }
+
+    while i < chars.len() {
+        // Bold-italic: ***
+        if chars[i] == '*' && i + 2 < chars.len() && chars[i+1] == '*' && chars[i+2] == '*' {
+            if let Some(end) = find_closing(&chars, i + 3, "***") {
+                flush_plain!(i);
+                let inner: String = chars[i+3..end].iter().collect();
+                spans.push(InlineSpan::BoldItalic(inner));
+                i = end + 3;
+                plain_start = i;
+                continue;
+            }
+        }
+        // Bold: **
+        if chars[i] == '*' && i + 1 < chars.len() && chars[i+1] == '*' {
+            if let Some(end) = find_closing(&chars, i + 2, "**") {
+                flush_plain!(i);
+                let inner: String = chars[i+2..end].iter().collect();
+                spans.push(InlineSpan::Bold(inner));
+                i = end + 2;
+                plain_start = i;
+                continue;
+            }
+        }
+        // Italic: *
+        if chars[i] == '*' && (i == 0 || chars[i-1] != '*') {
+            if let Some(end) = find_closing(&chars, i + 1, "*") {
+                flush_plain!(i);
+                let inner: String = chars[i+1..end].iter().collect();
+                spans.push(InlineSpan::Italic(inner));
+                i = end + 1;
+                plain_start = i;
+                continue;
+            }
+        }
+        // Code: `
+        if chars[i] == '`' {
+            if let Some(end) = find_closing(&chars, i + 1, "`") {
+                flush_plain!(i);
+                let inner: String = chars[i+1..end].iter().collect();
+                spans.push(InlineSpan::Code(inner));
+                i = end + 1;
+                plain_start = i;
+                continue;
+            }
+        }
+        // Strikethrough: ~~
+        if chars[i] == '~' && i + 1 < chars.len() && chars[i+1] == '~' {
+            if let Some(end) = find_closing(&chars, i + 2, "~~") {
+                flush_plain!(i);
+                let inner: String = chars[i+2..end].iter().collect();
+                spans.push(InlineSpan::Strikethrough(inner));
+                i = end + 2;
+                plain_start = i;
+                continue;
+            }
+        }
+        // Link: [text](url)
+        if chars[i] == '[' {
+            if let Some(text_end) = find_closing(&chars, i + 1, "]") {
+                let after_bracket = text_end + 1;
+                if after_bracket < chars.len() && chars[after_bracket] == '(' {
+                    if let Some(url_end) = find_closing(&chars, after_bracket + 1, ")") {
+                        flush_plain!(i);
+                        let text: String = chars[i+1..text_end].iter().collect();
+                        let url: String = chars[after_bracket+1..url_end].iter().collect();
+                        spans.push(InlineSpan::Link { text, url });
+                        i = url_end + 1;
+                        plain_start = i;
+                        continue;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    flush_plain!(chars.len());
+    spans
+}
+
+fn find_closing(chars: &[char], start: usize, marker: &str) -> Option<usize> {
+    let mc: Vec<char> = marker.chars().collect();
+    let mlen = mc.len();
+    if mlen == 0 { return None; }
+    for i in start..chars.len().saturating_sub(mlen - 1) {
+        if chars[i..i+mlen] == mc[..] {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// Build an egui LayoutJob from inline spans for display-mode rendering.
+pub fn build_inline_layout_job(
+    text: &str,
+    base_font: FontId,
+    base_color: Color32,
+    code_bg: Color32,
+) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    for span in parse_inline(text) {
+        match span {
+            InlineSpan::Plain(s) => {
+                job.append(&s, 0.0, TextFormat {
+                    font_id: base_font.clone(),
+                    color: base_color,
+                    ..Default::default()
+                });
+            }
+            InlineSpan::Bold(s) => {
+                job.append(&s, 0.0, TextFormat {
+                    font_id: base_font.clone(),
+                    color: base_color,
+                    // egui doesn't have a built-in bold font variant in all setups;
+                    // use extra_letter_spacing as a visual indicator until custom fonts added
+                    extra_letter_spacing: 0.5,
+                    ..Default::default()
+                });
+            }
+            InlineSpan::Italic(s) => {
+                job.append(&s, 0.0, TextFormat {
+                    font_id: base_font.clone(),
+                    color: base_color,
+                    italics: true,
+                    ..Default::default()
+                });
+            }
+            InlineSpan::BoldItalic(s) => {
+                job.append(&s, 0.0, TextFormat {
+                    font_id: base_font.clone(),
+                    color: base_color,
+                    italics: true,
+                    extra_letter_spacing: 0.5,
+                    ..Default::default()
+                });
+            }
+            InlineSpan::Code(s) => {
+                job.append(&s, 0.0, TextFormat {
+                    font_id: FontId::monospace(base_font.size),
+                    color: Color32::from_rgb(200, 120, 80),
+                    background: code_bg,
+                    ..Default::default()
+                });
+            }
+            InlineSpan::Strikethrough(s) => {
+                job.append(&s, 0.0, TextFormat {
+                    font_id: base_font.clone(),
+                    color: base_color.linear_multiply(0.5),
+                    strikethrough: egui::Stroke::new(1.0, base_color.linear_multiply(0.5)),
+                    ..Default::default()
+                });
+            }
+            InlineSpan::Link { text, .. } => {
+                job.append(&text, 0.0, TextFormat {
+                    font_id: base_font.clone(),
+                    color: Color32::from_rgb(100, 160, 230),
+                    underline: egui::Stroke::new(1.0, Color32::from_rgb(100, 160, 230)),
+                    ..Default::default()
+                });
+            }
+        }
+    }
+    job
+}
+
 // ── Block types ──────────────────────────────────────────────────────────────
 
 /// Parse a markdown string into a sequence of blocks.
@@ -337,5 +535,49 @@ mod tests {
         let md = "| A | B |\n|---|---|\n| 1 | 2 |";
         let blocks = parse_blocks(md);
         assert_eq!(blocks_to_markdown(&blocks), md);
+    }
+
+    #[test]
+    fn inline_segments_plain() {
+        let segs = parse_inline("hello world");
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0], InlineSpan::Plain("hello world".into()));
+    }
+
+    #[test]
+    fn inline_segments_bold() {
+        let segs = parse_inline("hello **world** end");
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Bold(t) if t == "world")));
+    }
+
+    #[test]
+    fn inline_segments_italic() {
+        let segs = parse_inline("say *hi* now");
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Italic(t) if t == "hi")));
+    }
+
+    #[test]
+    fn inline_segments_code() {
+        let segs = parse_inline("use `foo()` here");
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Code(t) if t == "foo()")));
+    }
+
+    #[test]
+    fn inline_segments_strikethrough() {
+        let segs = parse_inline("~~old~~ new");
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Strikethrough(t) if t == "old")));
+    }
+
+    #[test]
+    fn inline_segments_mixed() {
+        let segs = parse_inline("**bold** and *italic*");
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Bold(_))));
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Italic(_))));
+    }
+
+    #[test]
+    fn inline_segments_link() {
+        let segs = parse_inline("see [rust](https://rust-lang.org) here");
+        assert!(segs.iter().any(|s| matches!(s, InlineSpan::Link { text, .. } if text == "rust")));
     }
 }

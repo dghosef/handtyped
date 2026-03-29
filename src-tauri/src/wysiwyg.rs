@@ -652,28 +652,94 @@ impl MarkdownEditor {
         false
     }
 
+    /// Split the block at `idx` at byte offset `pos` within its `raw` string.
+    /// The block at `idx` gets the text before `pos`;
+    /// a new Paragraph block with the text from `pos` onwards is inserted after.
+    /// `focused_block` is moved to the new block.
+    pub fn handle_enter_at(&mut self, idx: usize, pos: usize) {
+        let raw = self.blocks[idx].raw.clone();
+        let pos = pos.min(raw.len());
+        let (before, after) = raw.split_at(pos);
+        self.blocks[idx].raw = before.to_string();
+        // Reclassify the current block based on new content
+        if let Some(b) = parse_blocks(before).into_iter().next() {
+            self.blocks[idx].kind = b.kind;
+        } else {
+            self.blocks[idx].kind = BlockKind::Paragraph;
+        }
+        let new_block = Block {
+            kind: BlockKind::Paragraph,
+            raw: after.to_string(),
+        };
+        self.blocks.insert(idx + 1, new_block);
+        self.focused_block = Some(idx + 1);
+    }
+
+    /// Merge the block at `idx` into the previous block.
+    /// Does nothing if `idx == 0`.
+    /// `focused_block` is moved to the previous block.
+    pub fn handle_backspace_at_block_start(&mut self, idx: usize) {
+        if idx == 0 { return; }
+        let current_raw = self.blocks[idx].raw.clone();
+        self.blocks.remove(idx);
+        let prev = &mut self.blocks[idx - 1];
+        prev.raw.push_str(&current_raw);
+        // Reclassify
+        let raw_copy = prev.raw.clone();
+        if let Some(b) = parse_blocks(&raw_copy).into_iter().next() {
+            prev.kind = b.kind;
+        }
+        self.focused_block = Some(idx - 1);
+    }
+
     fn show_block_edit(&mut self, ui: &mut egui::Ui, idx: usize, hid_ok: bool) -> bool {
-        let block = &mut self.blocks[idx];
-        let before = block.raw.clone();
+        let before = self.blocks[idx].raw.clone();
 
-        let output = egui::TextEdit::multiline(&mut block.raw)
-            .desired_width(f32::INFINITY)
-            .font(egui::TextStyle::Monospace)
-            .show(ui);
+        let (output_changed, output_lost_focus) = {
+            let block = &mut self.blocks[idx];
+            let output = egui::TextEdit::multiline(&mut block.raw)
+                .desired_width(f32::INFINITY)
+                .font(egui::TextStyle::Monospace)
+                .show(ui);
+            (output.response.changed(), output.response.lost_focus())
+        };
 
-        if output.response.changed() {
+        // Keyboard navigation between blocks
+        let mut nav_action: Option<&str> = None;
+        ui.input(|input| {
+            if input.key_pressed(egui::Key::ArrowUp) {
+                nav_action = Some("up");
+            } else if input.key_pressed(egui::Key::ArrowDown) {
+                nav_action = Some("down");
+            } else if input.key_pressed(egui::Key::Escape) {
+                nav_action = Some("escape");
+            }
+        });
+        let block_count = self.blocks.len();
+        match nav_action {
+            Some("up") if idx > 0 => { self.focused_block = Some(idx - 1); }
+            Some("down") => {
+                let next = idx + 1;
+                if next < block_count { self.focused_block = Some(next); }
+            }
+            Some("escape") => { self.focused_block = None; }
+            _ => {}
+        }
+
+        if output_changed {
             if !hid_ok {
-                block.raw = before;
+                self.blocks[idx].raw = before;
                 return false;
             }
             // Reclassify block kind based on new raw content
-            if let Some(new_block) = parse_blocks(&block.raw.clone()).into_iter().next() {
-                block.kind = new_block.kind;
+            let raw_copy = self.blocks[idx].raw.clone();
+            if let Some(new_block) = parse_blocks(&raw_copy).into_iter().next() {
+                self.blocks[idx].kind = new_block.kind;
             }
             return true;
         }
 
-        if output.response.lost_focus() {
+        if output_lost_focus {
             self.focused_block = None;
         }
 
@@ -954,5 +1020,58 @@ mod tests {
         // HID not active → rollback
         ed.blocks[0].raw = before;
         assert_eq!(ed.to_markdown(), "original content");
+    }
+
+    #[test]
+    fn enter_at_end_splits_paragraph() {
+        let mut ed = MarkdownEditor::new("Hello world");
+        ed.focused_block = Some(0);
+        ed.handle_enter_at(0, 5);
+        let blocks: Vec<_> = ed.blocks.iter().filter(|b| b.kind != BlockKind::BlankLine).collect();
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].raw, "Hello");
+        assert_eq!(blocks[1].raw, " world");
+    }
+
+    #[test]
+    fn enter_at_start_creates_blank_before() {
+        let mut ed = MarkdownEditor::new("Hello");
+        ed.handle_enter_at(0, 0);
+        let non_blank: Vec<_> = ed.blocks.iter().filter(|b| b.kind != BlockKind::BlankLine).collect();
+        assert_eq!(non_blank.len(), 1);
+        assert_eq!(non_blank[0].raw, "Hello");
+    }
+
+    #[test]
+    fn backspace_at_start_merges_blocks() {
+        let mut ed = MarkdownEditor::new("First\nSecond");
+        // blocks: [Paragraph("First"), Paragraph("Second")]
+        ed.focused_block = Some(1);
+        ed.handle_backspace_at_block_start(1);
+        let blocks: Vec<_> = ed.blocks.iter().filter(|b| b.kind != BlockKind::BlankLine).collect();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].raw, "FirstSecond");
+    }
+
+    #[test]
+    fn backspace_at_first_block_does_nothing() {
+        let mut ed = MarkdownEditor::new("Only block");
+        ed.handle_backspace_at_block_start(0);
+        assert_eq!(ed.blocks.len(), 1);
+        assert_eq!(ed.blocks[0].raw, "Only block");
+    }
+
+    #[test]
+    fn handle_enter_moves_focus_to_new_block() {
+        let mut ed = MarkdownEditor::new("Hello world");
+        ed.handle_enter_at(0, 5);
+        assert_eq!(ed.focused_block, Some(1));
+    }
+
+    #[test]
+    fn handle_backspace_moves_focus_to_prev_block() {
+        let mut ed = MarkdownEditor::new("First\nSecond");
+        ed.handle_backspace_at_block_start(1);
+        assert_eq!(ed.focused_block, Some(0));
     }
 }

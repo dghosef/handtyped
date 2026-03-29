@@ -8,6 +8,7 @@ pub mod hid;
 pub mod commands;
 pub mod bundle;
 pub mod signing;
+pub mod wysiwyg;
 
 use session::{AppState, SessionState};
 

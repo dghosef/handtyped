@@ -471,11 +471,11 @@ impl MarkdownEditor {
                 false
             }
             _ if is_focused => self.show_block_edit(ui, idx, hid_ok),
-            _ => self.show_block_display(ui, idx),
+            _ => self.show_block_display(ui, idx, hid_ok),
         }
     }
 
-    fn show_block_display(&mut self, ui: &mut egui::Ui, idx: usize) -> bool {
+    fn show_block_display(&mut self, ui: &mut egui::Ui, idx: usize, hid_ok: bool) -> bool {
         let block = &self.blocks[idx];
         let visuals = ui.visuals().clone();
         let text_color = visuals.text_color();
@@ -561,7 +561,7 @@ impl MarkdownEditor {
                     }).response;
                     r
                 };
-                if ch != checked {
+                if ch != checked && hid_ok {
                     let new_raw = if ch {
                         self.blocks[idx].raw.replacen("- [ ]", "- [x]", 1)
                     } else {

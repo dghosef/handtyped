@@ -252,7 +252,7 @@ pub fn self_binary_hash() -> String {
 // Report
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct IntegrityReport {
     pub sip_enabled: bool,
     pub vm_detected: bool,

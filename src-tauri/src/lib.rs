@@ -10,6 +10,7 @@ pub mod bundle;
 pub mod signing;
 pub mod wysiwyg;
 pub mod editor;
+pub mod upload;
 
 use session::{AppState, SessionState};
 

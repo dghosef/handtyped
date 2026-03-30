@@ -62,6 +62,8 @@ struct NativeEditorApp {
     vim_enabled: bool,
     vim_mode: VimMode,
     status: String,
+    proof_url: Option<String>,
+    proof_status: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -85,6 +87,8 @@ impl NativeEditorApp {
             vim_enabled: false,
             vim_mode: VimMode::Insert,
             status: "Ready".into(),
+            proof_url: None,
+            proof_status: None,
         }
     }
 
@@ -198,6 +202,22 @@ impl NativeEditorApp {
 
                 if ui.button("Save").clicked() {
                     self.persist();
+                }
+
+                if ui.button("Publish Proof").clicked() {
+                    let doc_text = self.editor.to_markdown();
+                    match humanproof_lib::upload::upload_proof_native(&self.state, &doc_text) {
+                        Ok(url) => {
+                            self.proof_url = Some(url.clone());
+                            self.proof_status = Some(format!("Proof: {url}"));
+                        }
+                        Err(e) => {
+                            self.proof_status = Some(format!("Upload failed: {e}"));
+                        }
+                    }
+                }
+                if let Some(ref status) = self.proof_status {
+                    ui.label(status);
                 }
 
                 ui.separator();

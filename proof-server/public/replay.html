@@ -3,617 +3,584 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HumanProof — Typing Replay</title>
+  <title>HumanProof Replay</title>
   <style>
-    /* Full beautiful replay viewer styles */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #333;
+      background: #fff;
+      line-height: 1.45;
     }
 
-    header {
-      background: rgba(255,255,255,0.05);
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding: 12px 24px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px 18px 64px;
     }
-    .logo { font-size: 18px; font-weight: 700; color: #7c83ff; letter-spacing: -0.02em; }
-    .badge {
-      background: #16c784;
-      color: #000;
-      font-size: 11px;
+
+    .content {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 36px;
+      line-height: 1.12;
       font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 20px;
-      text-transform: uppercase;
+      color: #2f2f2f;
+      margin: 0 0 22px;
+      letter-spacing: -0.03em;
     }
-    .session-meta { margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.4); }
 
-    .main { display: flex; flex: 1; min-height: 0; gap: 0; }
+    .intro {
+      font-size: 18px;
+      line-height: 1.55;
+      color: #555;
+      margin: 0 0 16px;
+    }
 
-    /* Stats sidebar */
-    .sidebar {
-      width: 240px;
-      background: rgba(255,255,255,0.03);
-      border-right: 1px solid rgba(255,255,255,0.08);
-      padding: 20px 16px;
+    .share-row {
       display: flex;
-      flex-direction: column;
-      gap: 20px;
-      flex-shrink: 0;
+      gap: 12px;
+      margin: 26px 0 32px;
+      flex-wrap: wrap;
     }
-    .sidebar-title {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: rgba(255,255,255,0.3);
-      margin-bottom: 8px;
-    }
-    .stat-card {
-      background: rgba(255,255,255,0.05);
-      border-radius: 8px;
-      padding: 12px 14px;
-    }
-    .stat-value { font-size: 28px; font-weight: 700; color: #7c83ff; line-height: 1; }
-    .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px; }
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .stat-mini { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 8px 10px; }
-    .stat-mini .stat-value { font-size: 18px; }
 
-    /* Authenticity score */
-    .auth-score {
-      background: linear-gradient(135deg, rgba(124,131,255,0.15), rgba(22,199,132,0.15));
-      border: 1px solid rgba(124,131,255,0.3);
-      border-radius: 10px;
-      padding: 16px;
+    .share-btn {
+      appearance: none;
+      border: 0;
+      background: #cc564e;
+      color: #fff;
+      font-size: 16px;
+      line-height: 1;
+      padding: 11px 16px;
+      cursor: pointer;
       text-align: center;
-    }
-    .auth-score-value { font-size: 48px; font-weight: 800; color: #16c784; line-height: 1; }
-    .auth-score-label { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 4px; }
-    .auth-score-detail { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 6px; line-height: 1.4; }
-
-    /* Rhythm chart */
-    .rhythm-chart {
-      height: 40px;
-      display: flex;
-      align-items: flex-end;
-      gap: 1px;
-    }
-    .rhythm-bar {
-      flex: 1;
-      background: rgba(124,131,255,0.6);
-      border-radius: 1px 1px 0 0;
-      min-height: 2px;
-      transition: background 0.1s;
-    }
-    .rhythm-bar.active { background: #7c83ff; }
-
-    /* Document replay area */
-    .doc-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
     }
 
-    .controls {
-      background: rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      padding: 10px 20px;
+    .share-btn:hover {
+      background: #bb4942;
+    }
+
+    p {
+      font-size: 17px;
+      color: #444;
+      margin: 0 0 18px;
+      line-height: 1.6;
+    }
+
+    em {
+      font-style: italic;
+    }
+
+    .replay-shell {
+      background: #f1f1f1;
+      padding: 14px 14px 0;
+      margin: 20px 0 24px;
+    }
+
+    .replay-controls {
       display: flex;
       align-items: center;
       gap: 12px;
-    }
-    .play-btn {
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      background: #7c83ff;
-      border: none;
-      color: white;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
       font-size: 14px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: background 0.15s;
+      color: #555;
     }
-    .play-btn:hover { background: #9099ff; }
+
+    .play-btn {
+      appearance: none;
+      border: 1px solid #d2d2d2;
+      background: #fff;
+      color: #333;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 16px;
+      min-width: 48px;
+    }
+
+    .play-btn:hover,
+    .speed-select:hover {
+      background: #fafafa;
+    }
 
     .progress-wrap {
       flex: 1;
-      position: relative;
-      height: 20px;
-      display: flex;
-      align-items: center;
+      min-width: 240px;
     }
+
     .progress-track {
-      width: 100%;
-      height: 4px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 2px;
-      cursor: pointer;
+      height: 10px;
+      background: #ddd;
       position: relative;
+      cursor: pointer;
     }
+
     .progress-fill {
       height: 100%;
-      background: #7c83ff;
-      border-radius: 2px;
-      transition: width 0.05s linear;
+      width: 0%;
+      background: #666;
     }
+
     .progress-thumb {
       position: absolute;
       top: 50%;
+      left: 0%;
+      width: 12px;
+      height: 12px;
+      background: #444;
       transform: translate(-50%, -50%);
-      width: 12px; height: 12px;
-      background: white;
-      border-radius: 50%;
-      pointer-events: none;
     }
 
-    .time-display { font-size: 12px; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; min-width: 90px; }
+    .time-display {
+      white-space: nowrap;
+    }
 
     .speed-select {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      cursor: pointer;
+      appearance: none;
+      border: 1px solid #d2d2d2;
+      background: #fff;
+      color: #444;
+      padding: 8px 10px;
+      font-size: 14px;
     }
 
-    .doc-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 40px;
-      display: flex;
-      justify-content: center;
+    .replay-status {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 12px;
     }
+
+    .replay-stage {
+      background: #ececec;
+      padding: 18px;
+      min-height: 520px;
+      border-top: 1px solid #e0e0e0;
+    }
+
     .doc-page {
-      width: 100%;
-      max-width: 720px;
-      background: white;
-      color: #111;
-      border-radius: 4px;
-      padding: 72px 80px;
-      min-height: 400px;
-      box-shadow: 0 4px 40px rgba(0,0,0,0.4);
-      font-size: 12pt;
-      font-family: "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.6;
-      position: relative;
+      background: #fff;
+      border: 1px solid #dfdfdf;
+      min-height: 468px;
+      padding: 34px 36px;
+      font-size: 16px;
+      line-height: 1.65;
+      color: #333;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
     }
+
     .cursor-blink {
       display: inline-block;
       width: 2px;
       height: 1.1em;
-      background: #2563eb;
+      background: #444;
       margin-left: 1px;
       vertical-align: text-bottom;
       animation: blink 1s step-end infinite;
     }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-    /* Status */
-    #status-msg {
-      text-align: center;
-      padding: 8px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.3);
-      border-top: 1px solid rgba(255,255,255,0.06);
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
-    /* Verification badge */
-    .verified-banner {
-      background: rgba(22, 199, 132, 0.1);
-      border: 1px solid rgba(22, 199, 132, 0.3);
-      border-radius: 8px;
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
+    .stats-copy p {
+      font-size: 17px;
+      color: #444;
     }
-    .verified-icon { font-size: 16px; }
-    .verified-text strong { color: #16c784; display: block; font-size: 13px; }
-    .verified-text span { color: rgba(255,255,255,0.4); font-size: 11px; }
 
-    /* Pause visualization */
-    .pause-dot {
-      display: inline-block;
-      width: 6px; height: 6px;
-      background: rgba(255,200,0,0.6);
-      border-radius: 50%;
-      vertical-align: middle;
-      margin: 0 1px;
-      position: relative;
+    .muted {
+      color: #666;
+    }
+
+    .mono {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 840px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      .intro,
+      p,
+      .stats-copy p {
+        font-size: 16px;
+      }
+
+      .doc-page {
+        padding: 24px 20px;
+        font-size: 17px;
+      }
     }
   </style>
 </head>
 <body>
-<header>
-  <div class="logo">HumanProof</div>
-  <div class="badge">&#10003; Verified</div>
-  <div class="session-meta" id="session-date">Loading...</div>
-</header>
+  <div class="page">
+    <div class="content">
+      <h1 id="headline">A Replay of How This Document Was Written</h1>
 
-<div class="main">
-  <div class="sidebar">
-    <div>
-      <div class="sidebar-title">Authenticity</div>
-      <div class="auth-score">
-        <div class="auth-score-value" id="auth-score">--</div>
-        <div class="auth-score-label">Human Score</div>
-        <div class="auth-score-detail" id="auth-detail">Analyzing typing patterns...</div>
+      <div class="intro" id="session-date">Loading session…</div>
+      <div class="intro" id="auth-detail">A timestamped replay of the recorded document session.</div>
+
+      <div class="share-row">
+        <button class="share-btn" id="btn-copy-link">Copy Link</button>
+        <button class="share-btn" id="btn-native-share">Share</button>
+        <button class="share-btn" id="btn-copy-document">Copy Document Text</button>
       </div>
-    </div>
 
-    <div>
-      <div class="sidebar-title">Verified</div>
-      <div class="verified-banner">
-        <div class="verified-icon">&#128272;</div>
-        <div class="verified-text">
-          <strong>Hardware Attested</strong>
-          <span>Built-in keyboard only</span>
+      <p>The replay below shows the document text at each recorded step in the session timeline.</p>
+
+      <div class="replay-shell">
+      <div class="replay-controls">
+        <button class="play-btn" id="btn-play">&#9654;</button>
+        <div class="progress-wrap">
+          <div class="progress-track" id="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+            <div class="progress-thumb" id="progress-thumb"></div>
+          </div>
         </div>
+        <div class="time-display" id="time-display">0:00 / 0:00</div>
+        <select class="speed-select" id="speed-select">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="5">5×</option>
+          <option value="10">10×</option>
+          <option value="50">50×</option>
+        </select>
       </div>
-    </div>
-
-    <div>
-      <div class="sidebar-title">Stats</div>
-      <div class="stat-grid">
-        <div class="stat-mini">
-          <div class="stat-value" id="stat-wpm">--</div>
-          <div class="stat-label">avg WPM</div>
-        </div>
-        <div class="stat-mini">
-          <div class="stat-value" id="stat-words">--</div>
-          <div class="stat-label">words</div>
-        </div>
-        <div class="stat-mini">
-          <div class="stat-value" id="stat-keystrokes">--</div>
-          <div class="stat-label">keystrokes</div>
-        </div>
-        <div class="stat-mini">
-          <div class="stat-value" id="stat-corrections">--</div>
-          <div class="stat-label">corrections</div>
-        </div>
+      <div class="replay-status" id="status-msg">Loading session…</div>
+      <div class="replay-stage">
+        <div class="doc-page"><span id="doc-content"></span><span class="cursor-blink" id="cursor"></span></div>
       </div>
-    </div>
+      <div style="padding:14px 18px 18px;border-top:1px solid #e0e0e0;background:#f1f1f1;">
+        <div class="mono muted" style="margin-bottom:10px;">typing rhythm</div>
+        <div class="progress-track" style="height:58px;background:#ececec;display:flex;align-items:flex-end;gap:2px;padding:8px;cursor:pointer;" id="rhythm-chart"></div>
+      </div>
+      </div>
 
-    <div>
-      <div class="sidebar-title">Typing Rhythm</div>
-      <div class="rhythm-chart" id="rhythm-chart"></div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px;">keystroke density over time</div>
-    </div>
+      <div class="stats-copy" id="stats">
+        <p>
+          This record contains
+          <strong id="stat-keystrokes">--</strong>
+          keystrokes across
+          <strong id="stat-words">--</strong>
+          words, with an average pace of
+          <strong id="stat-wpm">--</strong>
+          words per minute,
+          <strong id="stat-corrections">--</strong>
+          deletions that shortened the visible text, and
+          <strong id="stat-duration">--</strong>
+          of recorded elapsed time.
+        </p>
 
-    <div>
-      <div class="sidebar-title">Pause Analysis</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.4);line-height:1.6;" id="pause-analysis">
-        Loading...
+        <p>The numbers above are taken directly from the recorded session data and replay timeline.</p>
+
+        <p id="rhythm">
+          The strip below the replay shows how many recorded edits fell into each part of the session timeline.
+          Click anywhere on it to jump to that point.
+        </p>
+
+        <p class="muted" id="status-notice" style="margin-top:24px;"></p>
       </div>
     </div>
   </div>
 
-  <div class="doc-area">
-    <div class="controls">
-      <button class="play-btn" id="btn-play">&#9654;</button>
-      <div class="progress-wrap">
-        <div class="progress-track" id="progress-track">
-          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-          <div class="progress-thumb" id="progress-thumb" style="left:0%"></div>
-        </div>
-      </div>
-      <div class="time-display" id="time-display">0:00 / 0:00</div>
-      <select class="speed-select" id="speed-select">
-        <option value="0.5">0.5&times;</option>
-        <option value="1" selected>1&times;</option>
-        <option value="2">2&times;</option>
-        <option value="5">5&times;</option>
-        <option value="10">10&times;</option>
-        <option value="50">50&times;</option>
-      </select>
-    </div>
-    <div class="doc-scroll">
-      <div class="doc-page" id="doc-page">
-        <span id="doc-content"></span><span class="cursor-blink" id="cursor"></span>
-      </div>
-    </div>
-    <div id="status-msg">Loading session...</div>
-  </div>
-</div>
+  <script>
+    const sessionId = location.pathname.split('/').pop()
+    let session = null
+    let history = []
+    let playing = false
+    let speed = 1
+    let currentIdx = 0
+    let animFrame = null
+    let replayStartTime = null
+    let currentElapsedMs = 0
 
-<script>
-// ── Replay Engine ─────────────────────────────────────────────────────────
+    async function loadSession() {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}`)
+        if (!res.ok) throw new Error('Session not found')
+        session = await res.json()
 
-const sessionId = location.pathname.split('/').pop()
-let session = null
-let history = [] // [{t, text}]
-let playing = false
-let speed = 1
-let currentIdx = 0
-let animFrame = null
-let replayStartTime = null
-let sessionStartTime = null
+        history = (session.doc_history || []).sort((a, b) => a.t - b.t)
+        if (history.length === 0) {
+          history = [{ t: Date.now(), text: session.doc_text || '' }]
+        }
 
-async function loadSession() {
-  try {
-    const res = await fetch(`/api/sessions/${sessionId}`)
-    if (!res.ok) throw new Error('Session not found')
-    session = await res.json()
+        document.getElementById('session-date').textContent =
+          `Recorded ${new Date(session.created_at).toLocaleDateString()} at ${new Date(session.created_at).toLocaleTimeString()}`
 
-    // Build history from doc_history
-    history = (session.doc_history || []).sort((a, b) => a.t - b.t)
-    if (history.length === 0) {
-      // Fallback: just show final content
-      history = [{ t: Date.now(), text: session.doc_text || '' }]
+        populateStats()
+        buildRhythmChart()
+
+        document.getElementById('status-msg').textContent = 'Press ▶ to replay'
+        document.getElementById('status-notice').textContent = ''
+        document.getElementById('doc-content').textContent = ''
+        updateProgress(0)
+      } catch (e) {
+        document.getElementById('status-msg').textContent = `Error: ${e.message}`
+        document.getElementById('status-notice').textContent = `Could not load replay: ${e.message}`
+      }
     }
 
-    document.getElementById('session-date').textContent =
-      `Recorded ${new Date(session.created_at).toLocaleDateString()} at ${new Date(session.created_at).toLocaleTimeString()}`
+    function populateStats() {
+      const words = session.doc_text ? session.doc_text.trim().split(/\s+/).filter(Boolean).length : 0
+      document.getElementById('stat-words').textContent = words
+      document.getElementById('stat-keystrokes').textContent = (session.keystroke_count || 0).toLocaleString()
+      document.getElementById('stat-duration').textContent = formatTime(getTotalDuration())
 
-    populateStats()
-    buildRhythmChart()
-    analyzePauses()
-    computeAuthScore()
+      if (history.length > 1) {
+        const totalMs = history[history.length - 1].t - history[0].t
+        const totalMin = totalMs / 60000
+        const wpm = totalMin > 0 ? Math.round(words / totalMin) : 0
+        document.getElementById('stat-wpm').textContent = wpm
+      } else {
+        document.getElementById('stat-wpm').textContent = '0'
+      }
 
-    document.getElementById('status-msg').textContent = 'Press \u25b6 to replay'
-    document.getElementById('doc-content').textContent = ''
-    updateProgress(0)
-  } catch (e) {
-    document.getElementById('status-msg').textContent = `Error: ${e.message}`
-  }
-}
-
-function populateStats() {
-  const words = session.doc_text ? session.doc_text.trim().split(/\s+/).filter(Boolean).length : 0
-  document.getElementById('stat-words').textContent = words
-  document.getElementById('stat-keystrokes').textContent = (session.keystroke_count || 0).toLocaleString()
-
-  // WPM: words / (total time in minutes)
-  if (history.length > 1) {
-    const totalMs = history[history.length - 1].t - history[0].t
-    const totalMin = totalMs / 60000
-    const wpm = totalMin > 0 ? Math.round(words / totalMin) : 0
-    document.getElementById('stat-wpm').textContent = wpm
-  }
-
-  // Count corrections (backspace-like: text got shorter)
-  let corrections = 0
-  for (let i = 1; i < history.length; i++) {
-    if (history[i].text.length < history[i-1].text.length) corrections++
-  }
-  document.getElementById('stat-corrections').textContent = corrections
-}
-
-function buildRhythmChart() {
-  if (history.length < 2) return
-  const chart = document.getElementById('rhythm-chart')
-  const BUCKETS = 40
-  const totalDuration = history[history.length - 1].t - history[0].t
-  const bucketSize = totalDuration / BUCKETS
-  const counts = new Array(BUCKETS).fill(0)
-
-  for (let i = 1; i < history.length; i++) {
-    const t = history[i].t - history[0].t
-    const bucket = Math.min(BUCKETS - 1, Math.floor(t / bucketSize))
-    counts[bucket]++
-  }
-
-  const maxCount = Math.max(...counts, 1)
-  chart.innerHTML = counts.map((c, i) =>
-    `<div class="rhythm-bar" style="height:${Math.max(4, Math.round(c/maxCount*100))}%" data-bucket="${i}"></div>`
-  ).join('')
-}
-
-function analyzePauses() {
-  if (history.length < 2) {
-    document.getElementById('pause-analysis').textContent = 'Not enough data'
-    return
-  }
-  const gaps = []
-  for (let i = 1; i < history.length; i++) {
-    gaps.push(history[i].t - history[i-1].t)
-  }
-  const longPauses = gaps.filter(g => g > 3000).length  // >3s
-  const medPauses = gaps.filter(g => g > 500 && g <= 3000).length
-  const avgGap = gaps.reduce((a,b) => a+b, 0) / gaps.length
-
-  document.getElementById('pause-analysis').innerHTML = `
-    <div>Avg gap: <strong style="color:#7c83ff">${Math.round(avgGap)}ms</strong></div>
-    <div>Short pauses (0.5-3s): <strong style="color:#7c83ff">${medPauses}</strong></div>
-    <div>Long pauses (>3s): <strong style="color:#7c83ff">${longPauses}</strong></div>
-    <div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,0.25);">Natural pause distribution indicates human authorship</div>
-  `
-}
-
-function computeAuthScore() {
-  if (history.length < 3) {
-    document.getElementById('auth-score').textContent = '--'
-    document.getElementById('auth-detail').textContent = 'Not enough data'
-    return
-  }
-
-  const gaps = []
-  for (let i = 1; i < history.length; i++) gaps.push(history[i].t - history[i-1].t)
-
-  // Signals for human typing:
-  // 1. Variance in inter-key intervals (AI paste = 0 variance)
-  const avg = gaps.reduce((a,b)=>a+b,0)/gaps.length
-  const variance = gaps.reduce((s,g) => s + Math.pow(g-avg,2), 0) / gaps.length
-  const cv = Math.sqrt(variance) / avg  // coefficient of variation
-
-  // 2. Corrections (backspaces)
-  let corrections = 0
-  for (let i = 1; i < history.length; i++) {
-    if (history[i].text.length < history[i-1].text.length) corrections++
-  }
-  const correctionRate = corrections / history.length
-
-  // 3. Burst patterns (natural typing has bursts)
-  const hasBursts = gaps.some(g => g < 100) && gaps.some(g => g > 500)
-
-  // Score computation
-  let score = 0
-  if (cv > 0.5) score += 35  // high timing variance = human
-  else if (cv > 0.2) score += 20
-  if (correctionRate > 0.05) score += 25  // corrections = human
-  else if (correctionRate > 0.01) score += 15
-  if (hasBursts) score += 25
-  if (history.length > 10) score += 15  // enough data
-  score = Math.min(99, score)
-
-  document.getElementById('auth-score').textContent = score
-  document.getElementById('auth-detail').textContent =
-    score > 70 ? 'Strong indicators of human authorship' :
-    score > 40 ? 'Moderate indicators of human authorship' :
-    'Insufficient typing data to confirm'
-
-  document.getElementById('auth-score').style.color =
-    score > 70 ? '#16c784' : score > 40 ? '#f0a500' : '#ff6b6b'
-}
-
-// ── Playback ───────────────────────────────────────────────────────────────
-
-function getTotalDuration() {
-  if (history.length < 2) return 1000
-  return history[history.length - 1].t - history[0].t
-}
-
-function formatTime(ms) {
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`
-}
-
-function updateProgress(idx) {
-  const total = getTotalDuration()
-  const elapsed = idx > 0 ? history[Math.min(idx, history.length-1)].t - history[0].t : 0
-  const pct = total > 0 ? (elapsed / total * 100) : 0
-  document.getElementById('progress-fill').style.width = pct + '%'
-  document.getElementById('progress-thumb').style.left = pct + '%'
-  document.getElementById('time-display').textContent =
-    `${formatTime(elapsed)} / ${formatTime(total)}`
-
-  // Update rhythm chart highlight
-  const BUCKETS = 40
-  const bucket = Math.floor(pct / 100 * BUCKETS)
-  document.querySelectorAll('.rhythm-bar').forEach((el, i) => {
-    el.classList.toggle('active', i === bucket)
-  })
-}
-
-function renderFrame(idx) {
-  if (idx >= history.length) {
-    // Done
-    const content = document.getElementById('doc-content')
-    content.textContent = history[history.length - 1]?.text || ''
-    document.getElementById('cursor').style.display = 'none'
-    document.getElementById('status-msg').textContent = 'Replay complete'
-    document.getElementById('btn-play').textContent = '\u21ba'
-    playing = false
-    updateProgress(history.length - 1)
-    return
-  }
-
-  document.getElementById('doc-content').textContent = history[idx].text
-  document.getElementById('cursor').style.display = ''
-  updateProgress(idx)
-}
-
-function startPlay() {
-  if (history.length === 0) return
-  playing = true
-  document.getElementById('btn-play').textContent = '\u23f8'
-  document.getElementById('status-msg').textContent = 'Playing...'
-
-  // Reset if at end
-  if (currentIdx >= history.length - 1) currentIdx = 0
-
-  const startIdx = currentIdx
-  const startHistoryTime = history[startIdx].t
-  replayStartTime = performance.now()
-
-  function tick() {
-    if (!playing) return
-
-    const elapsed = (performance.now() - replayStartTime) * speed
-    const targetTime = startHistoryTime + elapsed
-
-    // Find the last history entry with t <= targetTime
-    let newIdx = startIdx
-    while (newIdx < history.length - 1 && history[newIdx + 1].t <= targetTime) {
-      newIdx++
+      let corrections = 0
+      for (let i = 1; i < history.length; i++) {
+        if (history[i].text.length < history[i - 1].text.length) corrections++
+      }
+      document.getElementById('stat-corrections').textContent = corrections
     }
 
-    currentIdx = newIdx
-    renderFrame(currentIdx)
+    function buildRhythmChart() {
+      if (history.length < 2) return
+      const chart = document.getElementById('rhythm-chart')
+      const buckets = 52
+      const totalDuration = history[history.length - 1].t - history[0].t
+      const bucketSize = totalDuration / buckets
+      const counts = new Array(buckets).fill(0)
 
-    if (currentIdx >= history.length - 1) return // done
+      for (let i = 1; i < history.length; i++) {
+        const t = history[i].t - history[0].t
+        const bucket = Math.min(buckets - 1, Math.floor(t / bucketSize))
+        counts[bucket]++
+      }
 
-    animFrame = requestAnimationFrame(tick)
-  }
+      const maxCount = Math.max(...counts, 1)
+      chart.innerHTML = counts.map((c) =>
+        `<div class="rhythm-bar" style="flex:1;min-height:2px;height:${Math.max(4, Math.round(c / maxCount * 100))}%;background:#bdbdbd;"></div>`
+      ).join('')
+    }
 
-  animFrame = requestAnimationFrame(tick)
-}
+    function getTotalDuration() {
+      if (history.length < 2) return 1000
+      return history[history.length - 1].t - history[0].t
+    }
 
-function pausePlay() {
-  playing = false
-  if (animFrame) cancelAnimationFrame(animFrame)
-  document.getElementById('btn-play').textContent = '\u25b6'
-  document.getElementById('status-msg').textContent = 'Paused'
-}
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000)
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+    }
 
-document.getElementById('btn-play').addEventListener('click', () => {
-  const btnText = document.getElementById('btn-play').textContent
-  if (btnText === '\u21ba') {
-    currentIdx = 0
-    document.getElementById('cursor').style.display = ''
-    startPlay()
-  } else if (playing) {
-    pausePlay()
-  } else {
-    startPlay()
-  }
-})
+    function updateProgress(idx, elapsedOverride = null) {
+      const total = getTotalDuration()
+      const elapsed = elapsedOverride == null
+        ? (idx > 0 ? history[Math.min(idx, history.length - 1)].t - history[0].t : 0)
+        : Math.max(0, Math.min(elapsedOverride, total))
+      const pct = total > 0 ? (elapsed / total * 100) : 0
+      document.getElementById('progress-fill').style.width = pct + '%'
+      document.getElementById('progress-thumb').style.left = pct + '%'
+      document.getElementById('time-display').textContent = `${formatTime(elapsed)} / ${formatTime(total)}`
 
-document.getElementById('speed-select').addEventListener('change', e => {
-  speed = parseFloat(e.target.value)
-  if (playing) {
-    pausePlay()
-    startPlay()
-  }
-})
+      const bars = document.querySelectorAll('#rhythm-chart .rhythm-bar')
+      const bucket = Math.floor(pct / 100 * bars.length)
+      bars.forEach((el, i) => { el.style.background = i === bucket ? '#555' : '#bdbdbd' })
+    }
 
-document.getElementById('progress-track').addEventListener('click', e => {
-  const rect = e.currentTarget.getBoundingClientRect()
-  const pct = (e.clientX - rect.left) / rect.width
-  const total = getTotalDuration()
-  const targetTime = history[0].t + pct * total
+    function renderFrame(idx, elapsedOverride = null) {
+      const total = getTotalDuration()
+      const elapsed = elapsedOverride == null
+        ? (idx > 0 ? history[Math.min(idx, history.length - 1)].t - history[0].t : 0)
+        : Math.max(0, Math.min(elapsedOverride, total))
 
-  let idx = 0
-  while (idx < history.length - 1 && history[idx + 1].t <= targetTime) idx++
-  currentIdx = idx
+      if (idx >= history.length || (history.length > 0 && idx >= history.length - 1 && elapsed >= total)) {
+        document.getElementById('doc-content').textContent = history[history.length - 1]?.text || ''
+        document.getElementById('cursor').style.display = 'none'
+        document.getElementById('status-msg').textContent = 'Replay complete'
+        document.getElementById('status-notice').textContent = ''
+        document.getElementById('btn-play').textContent = '↺'
+        playing = false
+        if (animFrame) cancelAnimationFrame(animFrame)
+        animFrame = null
+        currentElapsedMs = total
+        updateProgress(history.length - 1, currentElapsedMs)
+        return
+      }
 
-  if (playing) {
-    pausePlay()
-    renderFrame(currentIdx)
-  } else {
-    renderFrame(currentIdx)
-  }
-})
+      document.getElementById('doc-content').textContent = history[idx].text
+      document.getElementById('cursor').style.display = ''
+      updateProgress(idx, elapsedOverride)
+    }
 
-// ── Init ──────────────────────────────────────────────────────────────────
-loadSession()
-</script>
+    function startPlay() {
+      if (history.length === 0) return
+      playing = true
+      document.getElementById('btn-play').textContent = '❚❚'
+      document.getElementById('status-msg').textContent = 'Playing…'
+      document.getElementById('status-notice').textContent = ''
+
+      if (currentElapsedMs >= getTotalDuration()) {
+        currentIdx = 0
+        currentElapsedMs = 0
+      }
+
+      const startIdx = currentIdx
+      const baseElapsedMs = currentElapsedMs
+      replayStartTime = performance.now()
+
+      function tick() {
+        if (!playing) return
+
+        const elapsed = baseElapsedMs + (performance.now() - replayStartTime) * speed
+        const total = getTotalDuration()
+        currentElapsedMs = Math.min(elapsed, total)
+        const targetTime = history[0].t + currentElapsedMs
+
+        let newIdx = startIdx
+        while (newIdx < history.length - 1 && history[newIdx + 1].t <= targetTime) newIdx++
+
+        currentIdx = newIdx
+        renderFrame(currentIdx, currentElapsedMs)
+
+        if (currentElapsedMs >= total) {
+          renderFrame(history.length - 1, total)
+          return
+        }
+
+        animFrame = requestAnimationFrame(tick)
+      }
+
+      animFrame = requestAnimationFrame(tick)
+    }
+
+    function pausePlay() {
+      playing = false
+      if (animFrame) cancelAnimationFrame(animFrame)
+      animFrame = null
+      document.getElementById('btn-play').textContent = '▶'
+      document.getElementById('status-msg').textContent = 'Paused'
+      document.getElementById('status-notice').textContent = ''
+    }
+
+    document.getElementById('btn-play').addEventListener('click', () => {
+      const btnText = document.getElementById('btn-play').textContent
+      if (btnText === '↺') {
+        currentIdx = 0
+        currentElapsedMs = 0
+        document.getElementById('cursor').style.display = ''
+        startPlay()
+      } else if (playing) {
+        pausePlay()
+      } else {
+        startPlay()
+      }
+    })
+
+    document.getElementById('speed-select').addEventListener('change', e => {
+      speed = parseFloat(e.target.value)
+      if (playing) {
+        pausePlay()
+        startPlay()
+      }
+    })
+
+    document.getElementById('progress-track').addEventListener('click', e => {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pct = (e.clientX - rect.left) / rect.width
+      const total = getTotalDuration()
+      const targetTime = history[0].t + pct * total
+
+      let idx = 0
+      while (idx < history.length - 1 && history[idx + 1].t <= targetTime) idx++
+      currentIdx = idx
+      currentElapsedMs = pct * total
+
+      if (playing) pausePlay()
+      renderFrame(currentIdx, currentElapsedMs)
+    })
+
+    document.getElementById('rhythm-chart').addEventListener('click', e => {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+      const total = getTotalDuration()
+      const targetTime = history[0].t + pct * total
+
+      let idx = 0
+      while (idx < history.length - 1 && history[idx + 1].t <= targetTime) idx++
+      currentIdx = idx
+      currentElapsedMs = pct * total
+
+      if (playing) pausePlay()
+      renderFrame(currentIdx, currentElapsedMs)
+      document.getElementById('status-notice').textContent = 'Replay position updated from the typing rhythm.'
+    })
+
+    async function copyText(text) {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        return
+      }
+      const input = document.createElement('textarea')
+      input.value = text
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      input.remove()
+    }
+
+    async function shareReplay() {
+      const url = location.href
+      if (navigator.share) {
+        await navigator.share({ title: 'HumanProof Replay', url })
+        return 'shared'
+      }
+      await copyText(url)
+      return 'copied'
+    }
+
+    document.getElementById('btn-copy-link').addEventListener('click', async () => {
+      try {
+        await copyText(location.href)
+        document.getElementById('status-notice').textContent = 'Replay link copied.'
+      } catch {
+        document.getElementById('status-notice').textContent = 'Could not copy replay link.'
+      }
+    })
+
+    document.getElementById('btn-native-share').addEventListener('click', async () => {
+      try {
+        const result = await shareReplay()
+        document.getElementById('status-notice').textContent =
+          result === 'shared' ? 'Share dialog opened.' : 'Replay link copied.'
+      } catch {
+        document.getElementById('status-notice').textContent = 'Could not share replay link.'
+      }
+    })
+
+    document.getElementById('btn-copy-document').addEventListener('click', async () => {
+      try {
+        await copyText(session?.doc_text || history[history.length - 1]?.text || '')
+        document.getElementById('status-notice').textContent = 'Document text copied.'
+      } catch {
+        document.getElementById('status-notice').textContent = 'Could not copy document text.'
+      }
+    })
+
+    loadSession()
+  </script>
 </body>
 </html>

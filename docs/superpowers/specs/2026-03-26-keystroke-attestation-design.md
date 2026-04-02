@@ -1,5 +1,7 @@
 # Keystroke Attestation Word Processor — Design Spec
 
+> Historical note: this spec describes the original Tauri + WebView + ProseMirror design. The current product direction is a Rust-native markdown editor centered on `src-tauri/src/bin/humanproof_native.rs`. Treat the details below as legacy architecture history, not the current target state.
+
 **Date:** 2026-03-26
 **Status:** Approved
 **MVP Scope:** Editor + keystroke log + attestation bundle (no classifier, no verification tool)

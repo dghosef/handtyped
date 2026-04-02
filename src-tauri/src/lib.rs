@@ -99,6 +99,7 @@ pub fn run() {
 
     let state = Arc::new(AppState {
         session: Mutex::new(SessionState::new(start_mach)),
+<<<<<<< Updated upstream
         editor_state: Mutex::new(editor::load_editor_state_from_disk().ok().flatten().unwrap_or_default()),
         hid_active: std::sync::atomic::AtomicBool::new(false),
         pending_builtin_keydowns: std::sync::atomic::AtomicI32::new(0),
@@ -135,6 +136,8 @@ pub fn run() {
             commands::save_session_payload,
             commands::load_session_payload,
             commands::get_document_store_key,
+            commands::load_editor_state,
+            commands::save_editor_state,
             commands::export_bundle,
             commands::upload_proof,
         ])

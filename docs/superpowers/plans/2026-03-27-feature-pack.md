@@ -1,5 +1,7 @@
 # HumanProof Feature Pack Implementation Plan
 
+> Historical note: this plan targets the legacy JS/WebView editor stack. The active product direction is now the Rust-native editor in `src-tauri/`, so keep this as migration history/reference only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add code blocks, task lists, paragraph spacing, footnotes, 2-column layout, smart typography, paste-as-plain-text, selection stats, readability score, keyboard shortcut panel, enhanced vim motions, and markdown live preview.

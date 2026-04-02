@@ -17,12 +17,12 @@ import { invoke } from './bridge.js'
 
 import { schema, tableEditing as schemaTableEditing } from './schema.js'
 import { findPlugin, findKey, findSearch, findNext, findPrev, findClear, getFindState, replaceNext, replaceAll } from './find.js'
-import { initUI, updateDocStats, updateKeystrokeCount, setSaveStatus } from './ui.js'
-import { initMarkdown, cycleMarkdownMode } from './markdown.js'
+import { initUI, updateDocStats, setSaveStatus } from './ui.js'
+import { initMarkdown, cycleMarkdownMode, getMarkdownState, parseFromMarkdown, primeMarkdownSource, getMarkdownSourceText, renderMarkdownToHtml, toggleVimMode, getVimMode } from './markdown.js'
 import { inputRules, InputRule } from 'prosemirror-inputrules'
 import { makeTypographyPlugin } from './typography.js'
-import { fleschKincaid } from './readability.js'
 import { loadDocumentSnapshot, restoreDocumentSnapshot, saveDocumentSnapshot } from './storage.js'
+import { setAlignmentOnSelection } from './alignment.js'
 
 // ── Shared editor view reference ────────────────────────────────────────────
 let view
@@ -79,6 +79,52 @@ const HELP_TOPICS = {
   },
 }
 
+function syncMarkdownWorkspaceButton() {
+  const btn = el('btn-markdown-mode')
+  if (!btn) return
+  btn.textContent = getMarkdownState() === 'split' ? 'Source' : 'Split'
+}
+
+function syncVimButton() {
+  const btn = el('btn-vim-mode')
+  if (!btn) return
+  const mode = getVimMode()
+  btn.textContent = mode === 'off' ? 'Vim Off' : `Vim ${mode[0].toUpperCase()}${mode.slice(1)}`
+}
+
+function toggleMarkdownWorkspaceMode() {
+  const state = getMarkdownState()
+  if (state === 'split') {
+    cycleMarkdownMode()
+  } else if (state === 'source') {
+    cycleMarkdownMode()
+    cycleMarkdownMode()
+  } else {
+    cycleMarkdownMode()
+  }
+  syncMarkdownWorkspaceButton()
+}
+
+function enterMarkdownWorkspace() {
+  document.body.classList.add('markdown-first')
+  const docName = document.querySelector('#title-bar .doc-name')
+  if (docName) docName.textContent = 'Markdown'
+  if (getMarkdownState() === 'off') {
+    cycleMarkdownMode()
+    cycleMarkdownMode()
+  }
+  syncMarkdownWorkspaceButton()
+}
+
+function syncMarkdownDocumentState(text) {
+  updateDocStats(text)
+  updateWordCountDetail(text)
+  if (text !== _lastHistoryText) {
+    _docHistory.push({ t: Date.now(), text })
+    _lastHistoryText = text
+  }
+}
+
 function buildPlugins() {
   _currentTypoPlugin = _typographyEnabled ? makeTypographyPlugin() : inputRules({ rules: [] })
   return [
@@ -94,8 +140,6 @@ function buildPlugins() {
 
 function toggleTypography() {
   _typographyEnabled = !_typographyEnabled
-  const ind = document.getElementById('smart-typo-indicator')
-  if (ind) ind.textContent = _typographyEnabled ? '✓ Smart' : ''
   if (view) {
     const newState = view.state.reconfigure({ plugins: buildPlugins() })
     view.updateState(newState)
@@ -196,18 +240,7 @@ function getBlockInfo(state) {
 
 function setAlignment(align) {
   return (state, dispatch) => {
-    const { from, to } = state.selection
-    let tr = state.tr
-    let changed = false
-    state.doc.nodesBetween(from, to, (node, pos) => {
-      if (node.isBlock && node.type.spec.attrs && 'align' in node.type.spec.attrs) {
-        const newAlign = (align === 'left') ? null : align
-        if (node.attrs.align !== newAlign) {
-          tr = tr.setNodeMarkup(pos, null, { ...node.attrs, align: newAlign })
-          changed = true
-        }
-      }
-    })
+    const { tr, changed } = setAlignmentOnSelection(state, align)
     if (!changed) return false
     if (dispatch) dispatch(tr)
     return true
@@ -683,45 +716,6 @@ function insertOrUpdateTableOfContents() {
   else insertTableOfContents()
 }
 
-// ── Typing speed tracker ─────────────────────────────────────────────────────
-
-const _keyTimestamps = []
-
-function trackKeystroke() {
-  const now = Date.now()
-  _keyTimestamps.push(now)
-  // Purge keystrokes older than 60s
-  const cutoff = now - 60_000
-  while (_keyTimestamps.length && _keyTimestamps[0] < cutoff) _keyTimestamps.shift()
-  updateTypingSpeed()
-}
-
-function updateTypingSpeed() {
-  const span = el('typing-speed')
-  if (!span) return
-  // WPM = keystrokes in last 60s / 5 (avg chars/word) / 1 minute
-  const wpm = Math.round(_keyTimestamps.length / 5)
-  span.textContent = `${wpm} wpm`
-}
-
-// ── Readability ─────────────────────────────────────────────────────────────
-
-let _readabilityTimer = null
-
-function scheduleReadability(text) {
-  clearTimeout(_readabilityTimer)
-  _readabilityTimer = setTimeout(() => {
-    const scoreEl = document.getElementById('readability-score')
-    if (!scoreEl) return
-    if (!text.trim()) {
-      scoreEl.textContent = ''
-      return
-    }
-    const { score, level } = fleschKincaid(text)
-    scoreEl.textContent = `FK ${score} · ${level}`
-  }, 500)
-}
-
 // ── Word count detail ────────────────────────────────────────────────────────
 
 function updateWordCountDetail(docText) {
@@ -859,7 +853,7 @@ document.addEventListener('visibilitychange', () => {
   } else if (_focusLostAt !== null) {
     const duration_ms = Date.now() - _focusLostAt
     _focusLostAt = null
-    invoke('log_focus_loss_event', { duration_ms }).catch(console.error)
+    invoke('log_focus_loss_event', { durationMs: duration_ms }).catch(console.error)
   }
 })
 window.addEventListener('blur', () => { if (_focusLostAt === null) _focusLostAt = Date.now() })
@@ -867,7 +861,7 @@ window.addEventListener('focus', () => {
   if (_focusLostAt !== null) {
     const duration_ms = Date.now() - _focusLostAt
     _focusLostAt = null
-    invoke('log_focus_loss_event', { duration_ms }).catch(console.error)
+    invoke('log_focus_loss_event', { durationMs: duration_ms }).catch(console.error)
   }
 })
 
@@ -901,7 +895,6 @@ function buildEditor(editable = true) {
           _docHistory.push({ t: Date.now(), text })
           _lastHistoryText = text
         }
-        scheduleReadability(text)
       }
       syncToolbar(next)
     },
@@ -918,15 +911,12 @@ function buildEditor(editable = true) {
               const hash = Array.from(new Uint8Array(buf))
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('')
-              invoke('log_paste_event', { char_count: text.length, content_hash: hash }).catch(console.error)
+              invoke('log_paste_event', { charCount: text.length, contentHash: hash }).catch(console.error)
             })
             view.focus()
           }).catch(() => {})
           return true
         }
-        // Keyboard gating: we can't synchronously block, but we track for session.
-        // Actual filtering is done at the HID level via pending_builtin_keydowns.
-        trackKeystroke()
         return false // let ProseMirror handle, filtering done at HID level
       },
       // Allow paste but log a SHA-256 hash of the clipboard content so verifiers
@@ -954,7 +944,7 @@ function buildEditor(editable = true) {
             const hash = Array.from(new Uint8Array(buf))
               .map(b => b.toString(16).padStart(2, '0'))
               .join('')
-            invoke('log_paste_event', { char_count: text.length, content_hash: hash })
+            invoke('log_paste_event', { charCount: text.length, contentHash: hash })
               .catch(console.error)
           })
         }
@@ -1279,6 +1269,11 @@ function wireToolbar() {
 
   // Dark mode
   on('btn-dark', () => document.body.classList.toggle('dark'))
+  on('btn-markdown-mode', toggleMarkdownWorkspaceMode)
+  on('btn-vim-mode', () => {
+    toggleVimMode()
+    syncVimButton()
+  })
 
   // Export
   on('btn-export-title', handleExport)
@@ -1325,7 +1320,7 @@ function wireToolbar() {
 
   // Markdown mode
   on('btn-markdown', () => {
-    cycleMarkdownMode()
+    toggleMarkdownWorkspaceMode()
   })
 
   // Print
@@ -1359,13 +1354,6 @@ function wireToolbar() {
     view.dispatch(state.tr.replaceWith(pos, pos + $from.parent.nodeSize, list))
     view.focus()
   })
-
-  const typoIndicator = document.getElementById('smart-typo-indicator')
-  if (typoIndicator) {
-    typoIndicator.textContent = '✓ Smart'
-    typoIndicator.style.cursor = 'pointer'
-    typoIndicator.addEventListener('click', toggleTypography)
-  }
 
   on('btn-toc', () => insertOrUpdateTableOfContents())
 
@@ -1424,12 +1412,14 @@ function wireToolbar() {
 
 function openFind() {
   el('find-bar')?.classList.add('visible')
+  el('replace-bar')?.classList.add('visible')
   const input = el('find-input')
   input?.focus(); input?.select()
 }
 
 function closeFind() {
   el('find-bar')?.classList.remove('visible')
+  el('replace-bar')?.classList.remove('visible')
   findClear(view)
   el('find-count').textContent = ''
   view.focus()
@@ -1584,23 +1574,23 @@ function startAutosave() {
   }, 30_000)
 }
 
-function startKeystrokePoller() {
-  setInterval(async () => {
-    try { updateKeystrokeCount(await invoke('get_keystroke_count')) } catch {}
-  }, 2_000)
-}
-
 // ── Export ───────────────────────────────────────────────────────────────────
 
 async function handleExport() {
-  const docText = view.state.doc.textContent
-  const tmp = document.createElement('div')
-  const serializer = DOMSerializer.fromSchema(schema)
-  tmp.appendChild(serializer.serializeFragment(view.state.doc.content))
-  const docHtml = tmp.innerHTML
+  const usingMarkdown = document.body.classList.contains('markdown-first')
+  const docText = usingMarkdown ? getMarkdownSourceText() : view.state.doc.textContent
+  let docHtml = ''
+  if (usingMarkdown) {
+    docHtml = renderMarkdownToHtml(docText)
+  } else {
+    const tmp = document.createElement('div')
+    const serializer = DOMSerializer.fromSchema(schema)
+    tmp.appendChild(serializer.serializeFragment(view.state.doc.content))
+    docHtml = tmp.innerHTML
+  }
 
   try {
-    const b64 = await invoke('export_bundle', { doc_text: docText, doc_html: docHtml })
+    const b64 = await invoke('export_bundle', { docText, docHtml })
     if (!b64) { alert('Export produced empty bundle'); return }
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }))
@@ -1616,13 +1606,19 @@ async function handleExport() {
 async function handleUploadProof() {
   try {
     setSaveStatus('Uploading proof...')
-    const docText = view.state.doc.textContent
-    const tmp = document.createElement('div')
-    const serializer = DOMSerializer.fromSchema(schema)
-    tmp.appendChild(serializer.serializeFragment(view.state.doc.content))
-    const docHtml = tmp.innerHTML
+    const usingMarkdown = document.body.classList.contains('markdown-first')
+    const docText = usingMarkdown ? getMarkdownSourceText() : view.state.doc.textContent
+    let docHtml = ''
+    if (usingMarkdown) {
+      docHtml = renderMarkdownToHtml(docText)
+    } else {
+      const tmp = document.createElement('div')
+      const serializer = DOMSerializer.fromSchema(schema)
+      tmp.appendChild(serializer.serializeFragment(view.state.doc.content))
+      docHtml = tmp.innerHTML
+    }
     const docHistory = window.__getDocHistory ? window.__getDocHistory() : []
-    const url = await invoke('upload_proof', { doc_text: docText, doc_html: docHtml, doc_history: docHistory })
+    const url = await invoke('upload_proof', { docText, docHtml, docHistory })
     setSaveStatus('Proof uploaded!')
     showProofUrl(url)
   } catch (e) {
@@ -1712,6 +1708,30 @@ async function boot() {
 
   async function restoreSavedDocument() {
     try {
+      const rustEditorState = await invoke('load_editor_state')
+      if (rustEditorState?.markdown) {
+        const doc = parseFromMarkdown(rustEditorState.markdown)
+        if (doc) {
+          const nextState = EditorState.create({
+            schema,
+            doc,
+            plugins: view.state.plugins,
+          })
+          view.updateState(nextState)
+        }
+        primeMarkdownSource(
+          rustEditorState.markdown,
+          rustEditorState.cursor || 0,
+          rustEditorState.mode || 'source',
+        )
+        syncMarkdownDocumentState(rustEditorState.markdown)
+        return
+      }
+    } catch (err) {
+      console.error('Failed to restore Rust editor state', err)
+    }
+
+    try {
       const snapshot = await loadDocumentSnapshot()
       if (snapshot) {
         restoreDocumentSnapshot(view, snapshot)
@@ -1729,8 +1749,11 @@ async function boot() {
     updateDocStats(view.state.doc.textContent)
     updateWordCountDetail(view.state.doc.textContent)
     applySelectionStats(view.state)
-    scheduleReadability(view.state.doc.textContent)
+    enterMarkdownWorkspace()
   }
+
+  window.__onMarkdownSourceChange = syncMarkdownDocumentState
+  window.__onVimModeChange = syncVimButton
 
   if (!hidOk) {
     buildEditor(false)
@@ -1742,7 +1765,6 @@ async function boot() {
       document.getElementById('hid-blocked')?.remove()
       view.setProps({ editable: () => true })
       startAutosave()
-      startKeystrokePoller()
     }
 
     // Push notification from Swift when HID becomes active
@@ -1773,7 +1795,6 @@ async function boot() {
   await restoreSavedDocument()
   initializeEditorUi()
   startAutosave()
-  startKeystrokePoller()
 }
 
 // ── Native menu command dispatcher ───────────────────────────────────────────
@@ -1857,7 +1878,7 @@ function setupMenuCmd() {
       case 'insert-table':       insertTable(3, 3); break
       case 'insert-page-break':  insertPageBreak(); break
       case 'focus-mode':         toggleFocusMode(); return
-      case 'markdown':           cycleMarkdownMode(); return
+      case 'markdown':           toggleMarkdownWorkspaceMode(); return
       case 'upload-proof':       handleUploadProof(); return
       case 'table-add-row-after': addRowAfter(s, d); break
       case 'table-add-col-after': addColumnAfter(s, d); break

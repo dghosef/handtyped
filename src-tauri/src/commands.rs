@@ -6,6 +6,7 @@ use std::fs;
 use crate::session::{AppState, ExtraEvent};
 use crate::bundle;
 use crate::signing;
+use crate::editor::{self, EditorDocumentState, EditorMode};
 use base64::Engine as _;
 
 fn now_ns() -> u64 {
@@ -104,6 +105,43 @@ pub fn load_session_payload() -> Result<Option<String>, String> {
 pub fn get_document_store_key() -> Result<String, String> {
     let key = signing::derive_document_store_key()?;
     Ok(base64::engine::general_purpose::STANDARD.encode(key))
+}
+
+#[tauri::command]
+pub fn load_editor_state(state: State<Arc<AppState>>) -> Result<EditorDocumentState, String> {
+    if let Some(saved) = editor::load_editor_state_from_disk()? {
+        let mut current = state.editor_state.lock().unwrap();
+        *current = saved.clone();
+        return Ok(saved);
+    }
+
+    Ok(state.editor_state.lock().unwrap().clone())
+}
+
+#[tauri::command]
+pub fn save_editor_state(
+    markdown: String,
+    cursor: usize,
+    mode: String,
+    state: State<Arc<AppState>>,
+) -> Result<(), String> {
+    let parsed_mode = match mode.as_str() {
+        "split" => EditorMode::Split,
+        _ => EditorMode::Source,
+    };
+
+    let next = EditorDocumentState {
+        markdown,
+        cursor,
+        mode: parsed_mode,
+    };
+
+    {
+        let mut current = state.editor_state.lock().unwrap();
+        *current = next.clone();
+    }
+
+    editor::save_editor_state_to_disk(&next)
 }
 
 #[tauri::command]

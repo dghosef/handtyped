@@ -6,6 +6,8 @@ Things that require human judgment, physical hardware, or real-world testing.
 
 ## Hardware / Platform Testing
 
+- [ ] **Verify the native Rust editor only accepts built-in keyboard input** — Grant Input Monitoring to `~/Applications/HumanProof.app`, type from the internal keyboard, then confirm non-built-in input paths are reverted/blocked.
+
 - [ ] **Verify built-in keyboard works on Intel Macs** — SPI transport is Apple Silicon only. Intel MacBooks used a USB-connected internal keyboard. Need to check what transport string appears there (likely `"USB"` with a fixed location ID, or possibly `"I2C"`). May need to add a fallback transport value or use a different identifier.
 
 - [ ] **Verify external USB keyboard is blocked** — Connect a USB keyboard and confirm keystrokes do not appear in the editor.
@@ -23,6 +25,8 @@ Things that require human judgment, physical hardware, or real-world testing.
 - [ ] **Get Apple Developer ID certificate** ($99/year) — Required for notarization and Gatekeeper. Self-signed cert ("HumanProof Dev") only works on your own machine.
 
 - [ ] **Notarize the app** — Required for distribution on macOS 10.15+. Enables TCC grants to persist across app updates when signed with Developer ID.
+
+- [ ] **Promote the native Rust editor bundle to the canonical distribution artifact** — Make sure release packaging points at `humanproof_native` rather than the legacy WebView app.
 
 ---
 

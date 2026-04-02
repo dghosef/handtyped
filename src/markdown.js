@@ -1,5 +1,34 @@
-import { defaultMarkdownParser, defaultMarkdownSerializer } from 'prosemirror-markdown'
+import { MarkdownParser, defaultMarkdownSerializer } from 'prosemirror-markdown'
 import MarkdownIt from 'markdown-it'
+import { schema } from './schema.js'
+import { invoke } from './bridge.js'
+
+// Build a markdown parser that uses the editor's own schema so that parsed
+// nodes are compatible with the editor's ProseMirror instance.
+const _editorMarkdownParser = new MarkdownParser(
+  schema,
+  new MarkdownIt('commonmark', { html: false }),
+  {
+    blockquote:    { block: 'blockquote' },
+    paragraph:     { block: 'paragraph' },
+    list_item:     { block: 'list_item' },
+    bullet_list:   { block: 'bullet_list' },
+    ordered_list:  { block: 'ordered_list', getAttrs: tok => ({ order: +tok.attrGet('start') || 1 }) },
+    heading:       { block: 'heading', getAttrs: tok => ({ level: +tok.tag.slice(1) }) },
+    code_block:    { block: 'code_block', noCloseToken: true },
+    fence:         { block: 'code_block', getAttrs: tok => ({ params: tok.info || '' }), noCloseToken: true },
+    hardbreak:     { node: 'hard_break' },
+    image:         { node: 'image', getAttrs: tok => ({
+      src:   tok.attrGet('src'),
+      title: tok.attrGet('title') || null,
+      alt:   tok.children[0] && tok.children[0].content || null,
+    }) },
+    em:          { mark: 'em' },
+    strong:      { mark: 'strong' },
+    link:        { mark: 'link', getAttrs: tok => ({ href: tok.attrGet('href'), title: tok.attrGet('title') || null }) },
+    code_inline: { mark: 'code' },
+  }
+)
 
 const markdownRenderer = new MarkdownIt({
   html: false,
@@ -80,6 +109,10 @@ let _syncTimer = null
 let _listenersAttached = false
 let _sourceDirty = false
 let _lastSyncedSource = ''
+let _persistTimer = null
+let _pendingSourceState = null
+let _vimEnabled = false
+let _vimMode = 'insert'
 
 function normalizeMarkdownText(text) {
   return String(text ?? '')
@@ -105,6 +138,21 @@ export function isMarkdownMode() {
 
 export function getMarkdownState() {
   return _state
+}
+
+export function isVimEnabled() {
+  return _vimEnabled
+}
+
+export function getVimMode() {
+  return _vimEnabled ? _vimMode : 'off'
+}
+
+export function toggleVimMode() {
+  _vimEnabled = !_vimEnabled
+  _vimMode = _vimEnabled ? 'normal' : 'insert'
+  globalThis.window?.__onVimModeChange?.(getVimMode())
+  return getVimMode()
 }
 
 export function cycleMarkdownMode() {
@@ -143,9 +191,31 @@ export function parseFromMarkdown(text) {
   return _parseMarkdown(text)
 }
 
+export function getMarkdownSourceText() {
+  const srcEl = document.getElementById('md-source-input')
+  if (srcEl) return normalizeMarkdownText(srcEl.value)
+  if (_pendingSourceState) return normalizeMarkdownText(_pendingSourceState.markdown)
+  return ''
+}
+
+export function renderMarkdownToHtml(text) {
+  return markdownRenderer.render(normalizeMarkdownForRender(text))
+}
+
+export function primeMarkdownSource(markdown, cursor = 0, mode = 'source') {
+  _pendingSourceState = {
+    markdown: normalizeMarkdownText(markdown),
+    cursor: Math.max(0, cursor || 0),
+    mode,
+  }
+  _sourceDirty = true
+  _lastSyncedSource = ''
+  if (_state !== 'off') _applyPendingSourceState()
+}
+
 function _parseMarkdown(text) {
   try {
-    return defaultMarkdownParser.parse(normalizeMarkdownForRender(text))
+    return _editorMarkdownParser.parse(normalizeMarkdownForRender(text))
   } catch {
     return null
   }
@@ -174,8 +244,10 @@ function _applyState(prev) {
     return
   }
 
-  const shouldRefreshSource = prev === 'off' || !_sourceDirty
-  const md = _view ? serializeToMarkdown(_view.state) : ''
+  const shouldRefreshSource = prev === 'off' || !_sourceDirty || !!_pendingSourceState
+  const md = _pendingSourceState
+    ? _pendingSourceState.markdown
+    : (_view ? serializeToMarkdown(_view.state) : '')
 
   if (editorEl) editorEl.style.display = 'none'
   if (pageEl) {
@@ -190,6 +262,8 @@ function _applyState(prev) {
   } else if (srcEl) {
     _syncSourceToPreview(true)
   }
+
+  _applyPendingSourceState()
 
   if (_state === 'split') {
     if (prevEl) prevEl.style.display = 'flex'
@@ -213,6 +287,8 @@ function _syncSourceToPreview(force = false) {
   _sourceDirty = true
   _updateHighlight(text)
   if (_state === 'split') _renderPreview(text)
+  _scheduleRustPersist()
+  globalThis.window?.__onMarkdownSourceChange?.(text)
 }
 
 function _startSourceSync() {
@@ -266,6 +342,59 @@ function _setupSourceListeners() {
   srcEl.addEventListener('paste', () => {
     setTimeout(() => syncFromSource(true), 0)
   })
+
+  srcEl.addEventListener('keydown', e => {
+    if (!_vimEnabled) return
+
+    if (_vimMode === 'insert') {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        _vimMode = 'normal'
+        globalThis.window?.__onVimModeChange?.(getVimMode())
+      }
+      return
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      return
+    }
+
+    if (_handleNormalModeKey(srcEl, e.key)) {
+      e.preventDefault()
+      syncFromSource(true)
+      globalThis.window?.__onVimModeChange?.(getVimMode())
+    }
+  })
+}
+
+function _applyPendingSourceState() {
+  if (!_pendingSourceState) return
+  const srcEl = document.getElementById('md-source-input')
+  if (!srcEl) return
+
+  srcEl.value = _pendingSourceState.markdown
+  _syncSourceToPreview(true)
+
+  if (typeof srcEl.setSelectionRange === 'function') {
+    const pos = Math.min(_pendingSourceState.cursor, srcEl.value.length)
+    srcEl.setSelectionRange(pos, pos)
+  }
+
+  _pendingSourceState = null
+}
+
+function _scheduleRustPersist() {
+  const srcEl = document.getElementById('md-source-input')
+  if (!srcEl) return
+  clearTimeout(_persistTimer)
+  _persistTimer = setTimeout(() => {
+    invoke('save_editor_state', {
+      markdown: normalizeMarkdownText(srcEl.value),
+      cursor: typeof srcEl.selectionStart === 'number' ? srcEl.selectionStart : srcEl.value.length,
+      mode: _state === 'split' ? 'split' : 'source',
+    }).catch(() => {})
+  }, 120)
 }
 
 function _renderPreview(markdownText) {
@@ -323,4 +452,56 @@ function _updateHighlight(text) {
   hlEl.innerHTML = normalizeMarkdownText(text).split('\n').map(_highlightLine).join('\n')
   const srcEl = document.getElementById('md-source-input')
   if (srcEl) hlEl.scrollTop = srcEl.scrollTop
+}
+
+function _handleNormalModeKey(srcEl, key) {
+  const start = typeof srcEl.selectionStart === 'number' ? srcEl.selectionStart : srcEl.value.length
+  const end = typeof srcEl.selectionEnd === 'number' ? srcEl.selectionEnd : start
+  const cursor = Math.min(start, end)
+  const value = srcEl.value
+
+  const setCursor = (pos) => {
+    const next = Math.max(0, Math.min(pos, srcEl.value.length))
+    srcEl.selectionStart = next
+    srcEl.selectionEnd = next
+    if (typeof srcEl.setSelectionRange === 'function') srcEl.setSelectionRange(next, next)
+  }
+
+  const lineStart = value.lastIndexOf('\n', Math.max(0, cursor - 1)) + 1
+  const nextBreak = value.indexOf('\n', cursor)
+  const lineEnd = nextBreak === -1 ? value.length : nextBreak
+
+  switch (key) {
+    case 'i':
+      _vimMode = 'insert'
+      return true
+    case 'a':
+      setCursor(cursor + (cursor < value.length ? 1 : 0))
+      _vimMode = 'insert'
+      return true
+    case 'h':
+      setCursor(cursor - 1)
+      return true
+    case 'l':
+      setCursor(cursor + 1)
+      return true
+    case '0':
+      setCursor(lineStart)
+      return true
+    case '$':
+      setCursor(lineEnd)
+      return true
+    case 'x':
+      if (cursor >= value.length) return true
+      srcEl.value = value.slice(0, cursor) + value.slice(cursor + 1)
+      setCursor(cursor)
+      return true
+    case 'o':
+      srcEl.value = value.slice(0, lineEnd) + '\n' + value.slice(lineEnd)
+      setCursor(lineEnd + 1)
+      _vimMode = 'insert'
+      return true
+    default:
+      return false
+  }
 }

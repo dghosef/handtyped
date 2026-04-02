@@ -46,7 +46,7 @@ describe('encrypted document storage', () => {
     invokeMock.mockImplementation(async (command, args = {}) => {
       if (command === 'get_document_store_key') return keyB64
       if (command === 'save_session_payload') {
-        storedPayload = args.payload_b64
+        storedPayload = args.payloadB64
         return null
       }
       if (command === 'load_session_payload') return storedPayload

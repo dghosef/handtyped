@@ -81,7 +81,7 @@ export async function decryptDocumentSnapshot(payloadB64) {
 
 export async function saveDocumentSnapshot(state) {
   const payloadB64 = await encryptDocumentSnapshot(makeDocumentSnapshot(state))
-  await invoke('save_session_payload', { payload_b64: payloadB64 })
+  await invoke('save_session_payload', { payloadB64 })
 }
 
 export async function loadDocumentSnapshot() {
@@ -100,4 +100,3 @@ export function restoreDocumentSnapshot(view, snapshot) {
   view.updateState(nextState)
   return true
 }
-

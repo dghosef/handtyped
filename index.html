@@ -54,7 +54,7 @@
       gap: 8px;
       -webkit-app-region: no-drag;
     }
-    #btn-export-title, #btn-dark {
+    #btn-export-title, #btn-dark, #btn-markdown-mode, #btn-vim-mode {
       background: rgba(255,255,255,0.15);
       border: 1px solid rgba(255,255,255,0.25);
       color: white;
@@ -64,7 +64,7 @@
       font-size: 12px;
       -webkit-app-region: no-drag;
     }
-    #btn-export-title:hover, #btn-dark:hover {
+    #btn-export-title:hover, #btn-dark:hover, #btn-markdown-mode:hover, #btn-vim-mode:hover {
       background: rgba(255,255,255,0.25);
     }
     #tb-save-status {
@@ -299,6 +299,30 @@
     body.dark #find-bar { background: #3a3600; border-color: #665c00; }
     body.dark #find-input { background: #2d2d2d; border-color: #555; color: #ddd; }
     body.dark #find-count { color: #aaa; }
+
+    /* ── Markdown-first shell ───────────────────────────────────────────── */
+    body.markdown-first #toolbar-wrapper,
+    body.markdown-first #find-bar,
+    body.markdown-first #replace-bar,
+    body.markdown-first #table-toolbar,
+    body.markdown-first #outline-panel {
+      display: none !important;
+    }
+    body.markdown-first #page-area {
+      padding: 0;
+      background: #f4f4f4;
+    }
+    body.dark.markdown-first #page-area {
+      background: #161616;
+    }
+    body.markdown-first #md-split-pane {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+    body.markdown-first #page {
+      display: none !important;
+    }
 
     /* ── Page break ────────────────────────────────────────────────────── */
     .page-break {
@@ -745,99 +769,6 @@
       border-radius: 2px;
     }
 
-    /* ── Smart typography indicator ─────────────────────────────────────── */
-    #smart-typo-indicator { font-size: 10px; color: #4ec9b0; }
-
-    /* ── Readability in status bar ──────────────────────────────────────── */
-    #readability-score { font-size: 11px; }
-
-    /* ── Word goal in status bar ────────────────────────────────────────── */
-    #word-goal-area {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      white-space: nowrap;
-    }
-    #word-goal-set-btn {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.25);
-      color: rgba(255,255,255,0.75);
-      padding: 1px 5px;
-      border-radius: 2px;
-      cursor: pointer;
-      font-size: 10px;
-      line-height: 1.4;
-    }
-    #word-goal-set-btn:hover { background: rgba(255,255,255,0.25); }
-    #word-goal-progress { display: none; align-items: center; gap: 4px; }
-    #word-goal-progress.visible { display: flex; }
-    #word-goal-label { font-size: 11px; }
-    #word-goal-label.goal-done  { color: #5dde7a; font-weight: 600; }
-    #word-goal-label.goal-close { color: #f5a623; }
-    #word-goal-bar-wrap {
-      width: 48px; height: 4px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    #word-goal-bar {
-      height: 100%;
-      background: #66a7d4;
-      border-radius: 2px;
-      transition: width 0.2s, background 0.2s;
-    }
-    #word-goal-bar.goal-done  { background: #5dde7a; }
-    #word-goal-bar.goal-close { background: #f5a623; }
-    #word-goal-clear {
-      background: none;
-      border: none;
-      color: rgba(255,255,255,0.5);
-      cursor: pointer;
-      font-size: 12px;
-      padding: 0 1px;
-      line-height: 1;
-    }
-    #word-goal-clear:hover { color: rgba(255,255,255,0.9); }
-    #word-goal-input-wrap {
-      display: none;
-      align-items: center;
-      gap: 4px;
-    }
-    #word-goal-input-wrap.visible { display: flex; }
-    #word-goal-input {
-      width: 64px;
-      height: 17px;
-      border: 1px solid rgba(255,255,255,0.35);
-      border-radius: 2px;
-      background: rgba(0,0,0,0.25);
-      color: white;
-      font-size: 11px;
-      padding: 0 4px;
-      outline: none;
-    }
-    #word-goal-input::placeholder { color: rgba(255,255,255,0.4); }
-    #word-goal-ok {
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: white;
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 2px;
-      cursor: pointer;
-      line-height: 1.4;
-    }
-    #word-goal-ok:hover { background: rgba(255,255,255,0.3); }
-    #word-goal-cancel {
-      background: none;
-      border: none;
-      color: rgba(255,255,255,0.5);
-      cursor: pointer;
-      font-size: 12px;
-      padding: 0;
-      line-height: 1;
-    }
-    #word-goal-cancel:hover { color: rgba(255,255,255,0.9); }
-
     /* ── Link dialog ────────────────────────────────────────────────────── */
     #link-dialog {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
@@ -953,6 +884,8 @@
     </div>
     <div class="title-right">
       <span id="tb-save-status"></span>
+      <button id="btn-markdown-mode">Split</button>
+      <button id="btn-vim-mode">Vim Off</button>
       <button id="btn-dark">Dark</button>
       <button id="btn-export-title">Export Bundle</button>
     </div>
@@ -1185,30 +1118,10 @@
 
   <!-- ── Status Bar ─────────────────────────────────────────────────────── -->
   <div id="status-bar">
-    <span id="word-count">0 words</span>
     <span id="char-count">0 chars</span>
     <span id="page-count">Page 1 of 1</span>
     <span id="reading-time">~1 min read</span>
-    <span id="keystroke-count">0 keystrokes</span>
-    <span id="typing-speed">0 wpm</span>
-    <span id="timer">00:00</span>
     <span id="word-count-detail"></span>
-    <span id="readability-score"></span>
-    <span id="smart-typo-indicator"></span>
-    <!-- Word goal area -->
-    <span id="word-goal-area">
-      <button id="word-goal-set-btn" title="Set word count goal">Goal</button>
-      <span id="word-goal-input-wrap">
-        <input id="word-goal-input" type="number" min="1" placeholder="e.g. 500" />
-        <button id="word-goal-ok">OK</button>
-        <button id="word-goal-cancel">&#x2715;</button>
-      </span>
-      <span id="word-goal-progress">
-        <span id="word-goal-label"></span>
-        <span id="word-goal-bar-wrap"><span id="word-goal-bar"></span></span>
-        <button id="word-goal-clear" title="Clear goal">&#x2715;</button>
-      </span>
-    </span>
     <span id="save-status">Not saved</span>
   </div>
 

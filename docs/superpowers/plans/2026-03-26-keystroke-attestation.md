@@ -1,5 +1,7 @@
 # Keystroke Attestation Word Processor Implementation Plan
 
+> Historical note: this plan targets the original Tauri + WebView + ProseMirror app. The repo is now moving toward the Rust-native editor in `src-tauri/src/bin/humanproof_native.rs`, so this file should be read as implementation history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a native macOS Tauri app that captures keystrokes via IOHIDManager, logs them with nanosecond timestamps, and exports a cryptographically signed attestation bundle.

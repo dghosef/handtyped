@@ -1,6 +1,6 @@
 # HumanProof
 
-A macOS word processor that cryptographically proves text was typed by a human on a physical keyboard.
+A macOS markdown editor that cryptographically proves text was typed by a human on a physical keyboard.
 
 ## Goal
 
@@ -14,23 +14,27 @@ It works by:
 
 ## Architecture
 
-- **Rust/Tauri backend** (`src-tauri/`): IOHIDManager keyboard capture, session recording, ed25519 signing, bundle export, proof upload
-- **JavaScript frontend** (`src/`): ProseMirror rich text editor, vim mode, markdown preview mode, toolbar, find/replace, tables, document outline
+- **Rust-native editor app** (`src-tauri/`): native `egui` markdown editor, IOHIDManager keyboard capture, session recording, ed25519 signing, bundle export, proof upload
+- **Legacy JS/WebView editor** (`src/`, `index.html`): old markdown/editor-features prototype kept only during migration; not the primary product direction
 - **Proof server** (`proof-server/`): Node.js/Express server that stores sessions and serves the replay viewer
 
 ## Key Technical Facts
 
 - Input Monitoring (TCC `kTCCServiceListenEvent`) is required for IOHIDManager access
+- For local development, Input Monitoring is most reliable when the native Rust app is launched as a stable signed `.app` bundle via `npm run dev:native`
+- The native Rust editor binary is `src-tauri/src/bin/humanproof_native.rs`
 - The app only runs on Apple Silicon Macs (SPI transport = built-in keyboard). Intel Mac support is a known TODO.
 - Karabiner-Elements intercepts SPI events and re-emits via virtual HID with no Transport property — users must add HumanProof to Karabiner's excluded applications list
 - The proof server runs separately (`cd proof-server && node server.js`)
-- To run in dev: `npm run tauri dev`
+- The old `npm run tauri dev` / WebView path is legacy and not the preferred editor path
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run tauri dev` | Run the editor in dev mode |
+| `npm run dev:native` | Build, sign, and launch the native Rust editor via `~/Applications/HumanProof.app` |
+| `cargo run --manifest-path src-tauri/Cargo.toml --bin humanproof_native` | Run the native Rust editor directly (useful for debugging, less reliable for TCC) |
+| `npm run tauri dev` | Launch the legacy Tauri/WebView app |
 | `cd proof-server && node server.js` | Start the proof server |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Run Rust tests |
 
@@ -39,4 +43,5 @@ It works by:
 - Intel Mac support (transport may not be "SPI")
 - Dictation input passes the SPI filter (macOS Dictation fires real keyboard-like events)
 - Developer ID certificate needed for distribution/notarization
+- The native Rust editor is the active direction, but some legacy JS/WebView code still exists in the repo during migration
 - Proof server is currently local-only; needs deployment for real sharing

@@ -1,5 +1,7 @@
 # HumanProof Feature Pack Design
 
+> Historical note: this document describes the legacy JS/WebView editor feature pack. The current product direction is the Rust-native editor in `src-tauri/`, so this spec is now migration history rather than the active architecture target.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add a comprehensive set of word-processor and text-editor features across four areas: new document elements, productivity polish, vim enhancements, and markdown live preview.

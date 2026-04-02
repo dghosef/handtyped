@@ -1,0 +1,25 @@
+name = "handtyped-replay"
+main = "./worker.js"
+compatibility_date = "2026-03-31"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = [ "/api/*", "/replay/*", "/" ]
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+preview_id = "84b38853a7e14fd69eb6c890431ac621"
+id = "52b7e89885c146029acaa1184f90a409"
+
+[[routes]]
+pattern = "replay.handtyped.app"
+custom_domain = true
+
+[[routes]]
+pattern = "handtyped.app"
+custom_domain = true
+
+[[routes]]
+pattern = "www.handtyped.app"
+custom_domain = true

@@ -8,3 +8,12 @@ server/.env
 server/humanproof.db
 .build/
 .worktrees/
+target/
+.DS_Store
+.qwen/
+test-results/
+replay-server/node_modules/
+replay-server/sessions/
+replay-server/test-results/
+replay-server/.wrangler/
+qwen-code-export-*.md

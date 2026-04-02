@@ -1,0 +1,56 @@
+[package]
+name = "handtyped"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "handtyped_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+hex = "0.4"
+zip = "2"
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+dirs-next = "2"
+base64 = "0.22"
+zeroize = { version = "1", features = ["derive"] }
+egui = "0.31"
+eframe = "0.31.1"
+egui_extras = { version = "0.31.1", features = ["default", "file", "image"] }
+pulldown-cmark = "0.13.3"
+image = "=0.25.5"
+muda = "0.16"
+rfd = "0.17"
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
+
+[[bin]]
+name = "handtyped_native"
+path = "src/bin/handtyped_native.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+core-foundation-sys = "0.8"
+security-framework = "2"
+objc = "0.2"
+cocoa = "0.25"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[dev-dependencies]
+tempfile = "3"

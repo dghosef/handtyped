@@ -1,14 +1,12 @@
-# HumanProof — Manual TODO
+# Handtyped TODO
 
-Things that require human judgment, physical hardware, or real-world testing.
-
----
-
+# Software features
+- Heatmap of heavily edited text vs non. Take into account type edits vs big edits
+- syntax highlighting
+- Embed button
 ## Hardware / Platform Testing
 
-- [ ] **Verify the native Rust editor only accepts built-in keyboard input** — Grant Input Monitoring to `~/Applications/HumanProof.app`, type from the internal keyboard, then confirm non-built-in input paths are reverted/blocked.
-
-- [ ] **Verify built-in keyboard works on Intel Macs** — SPI transport is Apple Silicon only. Intel MacBooks used a USB-connected internal keyboard. Need to check what transport string appears there (likely `"USB"` with a fixed location ID, or possibly `"I2C"`). May need to add a fallback transport value or use a different identifier.
+- [ ] **Verify the native Rust editor only accepts built-in keyboard input** — Grant Input Monitoring to `~/Applications/Handtyped.app`, type from the internal keyboard, then confirm non-built-in input paths are reverted/blocked.
 
 - [ ] **Verify external USB keyboard is blocked** — Connect a USB keyboard and confirm keystrokes do not appear in the editor.
 
@@ -18,21 +16,20 @@ Things that require human judgment, physical hardware, or real-world testing.
 
 - [ ] **Verify paste is blocked** — Try Cmd+V, right-click → Paste, and drag-and-drop text. None should insert into the editor.
 
+- [ ] **Test different macs**
 ---
 
 ## Distribution / Signing
 
-- [ ] **Get Apple Developer ID certificate** ($99/year) — Required for notarization and Gatekeeper. Self-signed cert ("HumanProof Dev") only works on your own machine.
+- [ ] **Get Apple Developer ID certificate** ($99/year) — Required for notarization and Gatekeeper. Self-signed cert ("Handtyped Dev") only works on your own machine.
 
 - [ ] **Notarize the app** — Required for distribution on macOS 10.15+. Enables TCC grants to persist across app updates when signed with Developer ID.
-
-- [ ] **Promote the native Rust editor bundle to the canonical distribution artifact** — Make sure release packaging points at `humanproof_native` rather than the legacy WebView app.
 
 ---
 
 ## Known Compatibility Issues
 
-- [ ] **Karabiner-Elements conflict** — Karabiner intercepts SPI keyboard events and re-emits them via a virtual HID keyboard with no Transport property. HumanProof's SPI filter blocks these. Users with Karabiner must add HumanProof to Karabiner's "Excluded Applications" list (Karabiner-Elements → Misc → Excluded applications). This is intentional: Karabiner can inject arbitrary keystrokes, so allowing it would undermine attestation.
+- [ ] **Karabiner-Elements conflict** — Karabiner intercepts SPI keyboard events and re-emits them via a virtual HID keyboard with no Transport property. Handtyped's SPI filter blocks these. Users with Karabiner must add Handtyped to Karabiner's "Excluded Applications" list (Karabiner-Elements → Misc → Excluded applications). This is intentional: Karabiner can inject arbitrary keystrokes, so allowing it would undermine attestation.
 
 ---
 

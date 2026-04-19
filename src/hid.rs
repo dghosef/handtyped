@@ -613,13 +613,44 @@ mod tests {
         assert!(fast_interval < SUSPICIOUS_INTERVAL_NS);
     }
 
+    #[test]
+    fn test_make_matching_array_targets_apple_keyboard_only() {
+        let matching_array = make_matching_array();
+        assert_eq!(matching_array.len(), 1);
+
+        let matching = matching_array.get(0).expect("missing matching dictionary");
+        let usage_page_key = CFString::new(K_USAGE_PAGE_KEY);
+        let usage_key = CFString::new(K_USAGE_KEY);
+        let vendor_key = CFString::new(K_VENDOR_ID_KEY);
+
+        let usage_page = matching
+            .find(&usage_page_key)
+            .expect("missing usage page")
+            .to_i32()
+            .expect("usage page is not a CFNumber");
+        let usage = matching
+            .find(&usage_key)
+            .expect("missing usage")
+            .to_i32()
+            .expect("usage is not a CFNumber");
+        let vendor = matching
+            .find(&vendor_key)
+            .expect("missing vendor id")
+            .to_i32()
+            .expect("vendor is not a CFNumber");
+
+        assert_eq!(usage_page, K_HID_PAGE_GENERIC_DESKTOP);
+        assert_eq!(usage, K_HID_USAGE_GD_KEYBOARD);
+        assert_eq!(vendor, K_APPLE_VENDOR_ID);
+    }
+
     /// Test that software-injected keystrokes (no HID callback) cannot bypass filtering.
     /// This test documents the security model - actual verification happens at runtime.
     #[test]
     fn test_software_injection_blocked_by_design() {
         // Software-injected keystrokes (CGEventPost, osascript, etc.) do NOT trigger
         // the IOHIDManager HID callback. They would only appear as NSEvent keystrokes
-        // in the AppKit event stream.
+        // in the macOS event stream.
         //
         // Our editor gates all text mutations on:
         // 1. HID callback firing (increments pending_builtin_keydowns atomic)

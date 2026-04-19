@@ -1,5 +1,7 @@
 use crate::editor::EditorDocumentState;
 use crate::integrity::IntegrityReport;
+use crate::observability::RuntimeObservability;
+use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::{
@@ -7,14 +9,20 @@ use std::sync::{
     Mutex,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::Uuid;
-
 // ---------------------------------------------------------------------------
 // Serde helper
 // ---------------------------------------------------------------------------
 
 fn is_false(b: &bool) -> bool {
     !b
+}
+
+fn new_session_id() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +101,7 @@ impl SessionState {
         let initial_chain: [u8; 32] = h.finalize().into();
 
         Self {
-            session_id: Uuid::new_v4().to_string(),
+            session_id: new_session_id(),
             session_nonce: hex::encode(nonce_bytes),
             start_wall_ns,
             start_mach,
@@ -178,6 +186,8 @@ pub struct AppState {
     pub keyboard_info: Mutex<Option<KeyboardInfo>>,
     /// Wall-clock ns of the most recent keydown, used to detect synthetic bursts.
     pub last_keydown_ns: AtomicU64,
+    /// Runtime observability state used for crash and upload health summaries.
+    pub observability: Mutex<RuntimeObservability>,
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +279,13 @@ mod tests {
             content_hash: None,
         });
         assert_eq!(s.keystroke_count(), 2);
+    }
+
+    #[test]
+    fn test_session_id_is_short_and_url_safe() {
+        let id = SessionState::new(0).session_id;
+        assert_eq!(id.len(), 16);
+        assert!(id.chars().all(|c| c.is_ascii_alphanumeric()));
     }
 
     #[test]

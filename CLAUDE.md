@@ -15,13 +15,13 @@ It works by:
 ## Architecture
 
 - **Rust-native editor app** (`src/`, `Cargo.toml`): native `egui` markdown editor, IOHIDManager keyboard capture, session recording, ed25519 signing, bundle export, replay upload
-- **Legacy Swift/AppKit editor** (`Sources/Typewriter/`): older native prototype kept for reference during migration
 - **Replay server** (`replay-server/`): Node.js/Express server that stores sessions and serves the replay viewer
 
 ## Claude Compatibility
 
 - This repo previously used Claude Code project memory and local Claude settings. Preserve that continuity when possible.
 - Project-local Claude settings live in [.claude/settings.local.json](/Users/dghosef/editor/.claude/settings.local.json).
+- Project-local Codex skills live in [.codex/skills](/Users/dghosef/editor/.codex/skills). Treat [extensive-testing](/Users/dghosef/editor/.codex/skills/extensive-testing/SKILL.md) as active repo policy: after each code change, add extensive tests and run the relevant suites before calling the work done.
 - For this repo, that Claude setup should be treated as active project context rather than stale historical notes. Codex-style agents working here should read this file early, use the local Claude settings when relevant, and prefer these repo-specific conventions over generic defaults.
 - If a future agent is unsure whether a workflow expectation came from Claude Code or from the live repo, assume it is still intentional unless the current code clearly contradicts it.
 - Historical Claude project memory lives in:
@@ -37,12 +37,11 @@ It works by:
 - Preferred native dev launcher: `npm run dev:native`. This runs [native-dev.sh](/Users/dghosef/editor/native-dev.sh), builds [handtyped_native.rs](/Users/dghosef/editor/src/bin/handtyped_native.rs), assembles `~/Applications/Handtyped.app`, signs it, and opens that app bundle.
 - Legacy WebView launcher: `npm run dev:app`. This runs [tauri-dev.sh](/Users/dghosef/editor/tauri-dev.sh) and should be treated as migration-only.
 - If Input Monitoring appears granted but the app still shows "Input Monitoring Required", remove old Handtyped/dev-binary entries in `Privacy & Security > Input Monitoring`, then grant access to `~/Applications/Handtyped.app` and relaunch.
-- The app only runs on Apple Silicon Macs (SPI transport = built-in keyboard). Intel Mac support is a known TODO.
-- Karabiner-Elements intercepts SPI events and re-emits via virtual HID with no Transport property — users must add Handtyped to Karabiner's excluded applications list
+- The app only runs on Apple Silicon Macs (SPI transport = built-in keyboard). Intel Mac support is not planned.
+- Karabiner-Elements is not supported. It intercepts SPI events and re-emits via virtual HID with no Transport property, which breaks the attestation model.
 - The replay server runs separately (`cd replay-server && node server.js`)
 - The Tauri HID startup path previously had a use-after-free in [hid.rs](/Users/dghosef/editor/src/hid.rs) when a device-matching callback fired after a failed `IOHIDManagerOpen`; callback contexts are now intentionally kept alive for process lifetime.
 - The native Rust editor now consumes the shared HID/session state and blocks edits that do not have matching built-in keyboard HID events.
-- The old `npm run tauri dev` path is not the preferred editor path anymore.
 
 ## Commands
 
@@ -59,6 +58,10 @@ It works by:
 
 ## Testing Requirements
 
+Project rule:
+- after each code change, add extensive tests for the changed behavior, not just a single happy-path check
+- prefer regression, malformed-input, boundary, persistence, and round-trip tests where relevant
+
 **For native Rust editor changes, prefer Rust-side verification first:**
 
 1. `cargo build --bin handtyped_native`
@@ -73,8 +76,8 @@ Treat JS/WebView tests as migration coverage, not the long-term product center.
 
 ## Known Limitations / TODO
 
-- Intel Mac support (transport may not be "SPI")
-- Dictation input passes the SPI filter (macOS Dictation fires real keyboard-like events)
+- Apple Silicon only; Intel Mac support is not planned.
+- Dictation is not supported; macOS Dictation fires real keyboard-like events that can undermine the input-gating model.
 - Developer ID certificate needed for distribution/notarization
 - Local dev signing currently uses a self-signed or ad-hoc signature; TCC behavior is good enough for local development but not for distribution
 - The repo still contains legacy JS/WebView editor code while the native Rust editor migration is in progress

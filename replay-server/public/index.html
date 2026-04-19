@@ -50,6 +50,14 @@
       padding: 20px 0 14px;
     }
 
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
     .brand {
       display: inline-flex;
       align-items: center;
@@ -141,6 +149,10 @@
         flex-direction: column;
       }
 
+      .topbar-actions {
+        justify-content: flex-start;
+      }
+
       .brand-name {
         font-size: 1.7rem;
       }
@@ -153,7 +165,10 @@
       <a class="brand" href="/">
         <img src="/handtyped-icon.png" alt="Handtyped" />
       </a>
-      <a class="button" id="download-button" href="/downloads/Handtyped-macos.dmg" download="Handtyped-macos.dmg">Download for macOS</a>
+      <div class="topbar-actions">
+        <a class="button" id="download-button" href="/downloads/Handtyped-macos.dmg" download="Handtyped-macos.dmg">Download for macOS</a>
+        <a class="button" id="github-button" href="https://github.com/dghosef/handtyped">GitHub</a>
+      </div>
     </header>
 
     <main>

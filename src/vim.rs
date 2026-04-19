@@ -49,6 +49,7 @@ impl Default for PendingAction {
 #[derive(Debug, Clone)]
 pub struct VimState {
     pub mode: VimMode,
+    pub visual_line: bool,
     pub pending_operator: Option<Operator>,
     pub pending_count: usize,
     pub pending_replace: bool,
@@ -60,6 +61,8 @@ pub struct VimState {
     pub pending_register: Option<char>, // active for the next yank/put
     pub macros: HashMap<char, Vec<Event>>,
     pub recording_macro: Option<char>,
+    pub pending_visual_exit: bool,
+    pub last_change: Vec<Event>,
 
     // Marks
     pub marks: HashMap<char, usize>,
@@ -70,12 +73,19 @@ pub struct VimState {
     pub last_search: String,
     pub save_requested: bool,
     pub yank_buffer: String,
+    pub yank_is_linewise: bool,
+
+    last_change_recording: Option<Vec<Event>>,
+    last_change_output: Vec<Event>,
+    last_change_dirty: bool,
+    replaying_last_change: bool,
 }
 
 impl Default for VimState {
     fn default() -> Self {
         Self {
             mode: VimMode::Normal,
+            visual_line: false,
             pending_operator: None,
             pending_count: 0,
             pending_replace: false,
@@ -85,12 +95,19 @@ impl Default for VimState {
             pending_register: None,
             macros: HashMap::new(),
             recording_macro: None,
+            pending_visual_exit: false,
+            last_change: Vec::new(),
             marks: HashMap::new(),
             command_prefix: ':',
             command_buffer: String::new(),
             last_search: String::new(),
             save_requested: false,
             yank_buffer: String::new(),
+            yank_is_linewise: false,
+            last_change_recording: None,
+            last_change_output: Vec::new(),
+            last_change_dirty: false,
+            replaying_last_change: false,
         }
     }
 }
@@ -114,25 +131,108 @@ impl VimState {
         self.pending_register.take().unwrap_or('"')
     }
 
+    fn begin_last_change_recording(&mut self) {
+        if self.replaying_last_change || self.last_change_recording.is_some() {
+            return;
+        }
+        self.last_change_recording = Some(Vec::new());
+        self.last_change_output.clear();
+        self.last_change_dirty = false;
+    }
+
+    fn record_last_change_input(&mut self, event: &Event) {
+        if self.replaying_last_change {
+            return;
+        }
+        if let Some(recording) = self.last_change_recording.as_mut() {
+            recording.push(event.clone());
+        }
+    }
+
+    fn note_last_change_output(&mut self, out: &[Event]) {
+        if self.replaying_last_change || self.last_change_recording.is_none() {
+            return;
+        }
+
+        if out.iter().any(|event| match event {
+            Event::Text(_) | Event::Paste(_) => true,
+            Event::Key { key, pressed: true, .. } => matches!(key, Key::Backspace | Key::Enter),
+            _ => false,
+        }) {
+            self.last_change_dirty = true;
+            self.last_change_output.extend(out.iter().cloned());
+        }
+    }
+
+    fn finish_last_change_recording_if_ready(&mut self) {
+        if self.replaying_last_change {
+            return;
+        }
+
+        let ready = self.last_change_recording.is_some()
+            && self.pending_operator.is_none()
+            && self.pending_action == PendingAction::None
+            && !self.pending_replace
+            && self.mode == VimMode::Normal;
+        if !ready {
+            return;
+        }
+
+        if let Some(recording) = self.last_change_recording.take() {
+            if self.last_change_dirty {
+                self.last_change = recording;
+            } else {
+                self.last_change_output.clear();
+            }
+        }
+        self.last_change_dirty = false;
+    }
+
+    fn replay_last_change(
+        &mut self,
+        text: &mut String,
+        te_state: &mut egui::widgets::text_edit::TextEditState,
+    ) -> Vec<Event> {
+        if self.last_change_output.is_empty() {
+            return Vec::new();
+        }
+
+        let _ = (text, te_state);
+        self.last_change_output.clone()
+    }
+
     pub fn handle_event(
         &mut self,
         event: &Event,
         text: &mut String,
         te_state: &mut egui::widgets::text_edit::TextEditState,
     ) -> Vec<Event> {
-        // Record macro if recording
-        if let Some(r) = self.recording_macro {
-            // don't record the 'q' key that stops recording
-            let mut is_stop_record = false;
-            if self.mode == VimMode::Normal {
-                if let Event::Text(t) = event {
-                    if t == "q" {
-                        is_stop_record = true;
+        self.handle_event_impl(event, text, te_state, true)
+    }
+
+    fn handle_event_impl(
+        &mut self,
+        event: &Event,
+        text: &mut String,
+        te_state: &mut egui::widgets::text_edit::TextEditState,
+        record_macro: bool,
+    ) -> Vec<Event> {
+        self.record_last_change_input(event);
+
+        if record_macro {
+            if let Some(r) = self.recording_macro {
+                // don't record the 'q' key that stops recording
+                let mut is_stop_record = false;
+                if self.mode == VimMode::Normal {
+                    if let Event::Text(t) = event {
+                        if t == "q" {
+                            is_stop_record = true;
+                        }
                     }
                 }
-            }
-            if !is_stop_record {
-                self.macros.entry(r).or_default().push(event.clone());
+                if !is_stop_record {
+                    self.macros.entry(r).or_default().push(event.clone());
+                }
             }
         }
 
@@ -236,6 +336,7 @@ impl VimState {
             // Consume both press and release; switch to Normal on press only.
             if let Event::Key { pressed: true, .. } = event {
                 self.mode = VimMode::Normal;
+                self.finish_last_change_recording_if_ready();
             }
         } else {
             out.push(event.clone());
@@ -314,17 +415,20 @@ impl VimState {
                 self.mode = VimMode::Normal;
 
                 if self.command_prefix == ':' {
-                    if self.command_buffer.trim() == "w" {
+                    let cmd = self.command_buffer.trim();
+                    if matches!(cmd, "w" | "wq" | "x") {
                         self.save_requested = true;
                     }
                 } else if self.command_prefix == '/' || self.command_prefix == '?' {
-                    self.last_search = self.command_buffer.clone();
-                    out.extend(self.perform_search(
-                        &self.last_search,
-                        self.command_prefix == '/',
-                        text,
-                        te_state,
-                    ));
+                    if !self.command_buffer.is_empty() {
+                        self.last_search = self.command_buffer.clone();
+                        out.extend(self.perform_search(
+                            &self.last_search,
+                            self.command_prefix == '/',
+                            text,
+                            te_state,
+                        ));
+                    }
                 }
 
                 self.command_buffer.clear();
@@ -432,6 +536,7 @@ impl VimState {
         te_state: &mut egui::widgets::text_edit::TextEditState,
     ) {
         self.mode = VimMode::Visual;
+        self.visual_line = false;
 
         let idx = Self::get_cursor_char_idx(te_state);
         let len = text.chars().count();
@@ -440,6 +545,19 @@ impl VimState {
         } else {
             Self::set_cursor_char_idx(te_state, idx);
         }
+    }
+
+    fn enter_visual_line_mode(
+        &mut self,
+        text: &str,
+        te_state: &mut egui::widgets::text_edit::TextEditState,
+    ) {
+        self.mode = VimMode::Visual;
+        self.visual_line = true;
+
+        let idx = Self::get_cursor_char_idx(te_state);
+        let line_start = Self::line_start_idx(text, idx);
+        Self::set_visual_line_selection(te_state, text, line_start, line_start);
     }
 
     fn exit_visual_mode(
@@ -459,6 +577,7 @@ impl VimState {
             Self::set_cursor_char_idx(te_state, target);
         }
         self.mode = VimMode::Normal;
+        self.visual_line = false;
     }
 
     fn get_visual_anchor_and_cursor(
@@ -488,6 +607,56 @@ impl VimState {
         } else {
             Self::set_selection(te_state, anchor + 1, cursor);
         }
+    }
+
+    fn next_line_start_idx(text: &str, idx: usize) -> usize {
+        let len = text.chars().count();
+        let line_end = Self::line_end_idx(text, idx.min(len));
+        if line_end < len {
+            line_end + 1
+        } else {
+            len
+        }
+    }
+
+    fn prev_line_start_idx(text: &str, idx: usize) -> usize {
+        let line_start = Self::line_start_idx(text, idx);
+        if line_start == 0 {
+            0
+        } else {
+            Self::line_start_idx(text, line_start.saturating_sub(1))
+        }
+    }
+
+    fn set_visual_line_selection(
+        te_state: &mut egui::widgets::text_edit::TextEditState,
+        text: &str,
+        anchor_line_start: usize,
+        cursor_line_start: usize,
+    ) {
+        let start = anchor_line_start.min(cursor_line_start);
+        let end_line_start = anchor_line_start.max(cursor_line_start);
+        let end = Self::next_line_start_idx(text, end_line_start);
+        Self::set_selection(te_state, start, end);
+    }
+
+    fn visual_line_anchor_and_cursor(
+        &self,
+        text: &str,
+        te_state: &egui::widgets::text_edit::TextEditState,
+    ) -> Option<(usize, usize)> {
+        if self.mode != VimMode::Visual || !self.visual_line {
+            return None;
+        }
+
+        let (start, end) = Self::selection_bounds(te_state)?;
+        let anchor = Self::line_start_idx(text, Self::get_cursor_anchor(te_state));
+        let cursor = if anchor == start {
+            Self::line_start_idx(text, end.saturating_sub(1))
+        } else {
+            start
+        };
+        Some((anchor, cursor))
     }
 
     fn set_motion_target(
@@ -535,6 +704,24 @@ impl VimState {
             if reg != '"' {
                 self.registers.insert(reg, content);
             }
+        }
+    }
+
+    fn register_contents(&self, reg: char) -> String {
+        if reg == '"' {
+            self.yank_buffer.clone()
+        } else {
+            self.registers.get(&reg).cloned().unwrap_or_default()
+        }
+    }
+
+    pub(crate) fn flush_pending_visual_exit(
+        &mut self,
+        te_state: &mut egui::widgets::text_edit::TextEditState,
+    ) {
+        if self.pending_visual_exit {
+            self.pending_visual_exit = false;
+            self.exit_visual_mode(te_state, false);
         }
     }
 
@@ -638,6 +825,38 @@ impl VimState {
     ) -> Option<Vec<Event>> {
         if self.mode != VimMode::Visual {
             return None;
+        }
+
+        if self.visual_line {
+            let count = self.consume_count();
+            let (anchor_line, mut cursor_line) =
+                self.visual_line_anchor_and_cursor(text, te_state)?;
+
+            match motion {
+                "j" => {
+                    for _ in 0..count {
+                        let next = Self::next_line_start_idx(text, cursor_line);
+                        if next == cursor_line {
+                            break;
+                        }
+                        cursor_line = next;
+                    }
+                }
+                "k" => {
+                    for _ in 0..count {
+                        let prev = Self::prev_line_start_idx(text, cursor_line);
+                        if prev == cursor_line {
+                            break;
+                        }
+                        cursor_line = prev;
+                    }
+                }
+                "0" | "$" | "h" | "l" => {}
+                _ => return None,
+            }
+
+            Self::set_visual_line_selection(te_state, text, anchor_line, cursor_line);
+            return Some(Vec::new());
         }
 
         let len = text.chars().count();
@@ -997,6 +1216,7 @@ impl VimState {
                     self.pending_action = PendingAction::Jump;
                 }
                 'i' => {
+                    self.begin_last_change_recording();
                     if self.pending_operator.is_some() {
                         self.pending_action = PendingAction::TextObjectInner;
                     } else {
@@ -1004,6 +1224,7 @@ impl VimState {
                     }
                 }
                 'a' => {
+                    self.begin_last_change_recording();
                     if self.pending_operator.is_some() {
                         self.pending_action = PendingAction::TextObjectA;
                     } else {
@@ -1012,28 +1233,34 @@ impl VimState {
                     }
                 }
                 'A' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::End, Modifiers::NONE));
                     self.mode = VimMode::Insert;
                 }
                 'C' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::End, Modifiers::SHIFT));
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
                     self.mode = VimMode::Insert;
                 }
                 'D' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::End, Modifiers::SHIFT));
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
                 }
                 'I' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::Home, Modifiers::NONE));
                     self.mode = VimMode::Insert;
                 }
                 'o' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::End, Modifiers::NONE));
                     out.push(Self::key_event(Key::Enter, Modifiers::NONE));
                     self.mode = VimMode::Insert;
                 }
                 'O' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::Home, Modifiers::NONE));
                     out.push(Self::key_event(Key::Enter, Modifiers::NONE));
                     out.push(Self::key_event(Key::ArrowUp, Modifiers::NONE));
@@ -1042,7 +1269,11 @@ impl VimState {
                 'v' => {
                     self.enter_visual_mode(text, te_state);
                 }
+                'V' => {
+                    self.enter_visual_line_mode(text, te_state);
+                }
                 'x' => {
+                    self.begin_last_change_recording();
                     let c = self.consume_count();
                     for _ in 0..c {
                         out.push(Self::key_event(Key::ArrowRight, Modifiers::SHIFT));
@@ -1050,6 +1281,7 @@ impl VimState {
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
                 }
                 'X' => {
+                    self.begin_last_change_recording();
                     let c = self.consume_count();
                     for _ in 0..c {
                         out.push(Self::key_event(Key::ArrowLeft, Modifiers::SHIFT));
@@ -1057,9 +1289,11 @@ impl VimState {
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
                 }
                 'r' => {
+                    self.begin_last_change_recording();
                     self.pending_replace = true;
                 }
                 's' => {
+                    self.begin_last_change_recording();
                     let c = self.consume_count();
                     for _ in 0..c {
                         out.push(Self::key_event(Key::ArrowRight, Modifiers::SHIFT));
@@ -1068,6 +1302,7 @@ impl VimState {
                     self.mode = VimMode::Insert;
                 }
                 'S' => {
+                    self.begin_last_change_recording();
                     let c = self.consume_count();
                     for _ in 0..c {
                         out.extend(self.change_line());
@@ -1077,26 +1312,38 @@ impl VimState {
                 'u' => {
                     out.push(Self::key_event(Key::Z, Modifiers::MAC_CMD));
                 }
+                '.' => {
+                    out.extend(self.replay_last_change(text, te_state));
+                }
                 'p' => {
+                    self.begin_last_change_recording();
                     let reg = self.active_register();
-                    let content = self
-                        .registers
-                        .get(&reg)
-                        .unwrap_or(&self.yank_buffer)
-                        .clone();
-                    out.push(Self::key_event(Key::ArrowRight, Modifiers::NONE));
+                    let content = self.register_contents(reg);
+                    if self.yank_is_linewise {
+                        out.push(Self::key_event(Key::End, Modifiers::NONE));
+                        out.push(Self::key_event(Key::Enter, Modifiers::NONE));
+                    } else {
+                        out.push(Self::key_event(Key::ArrowRight, Modifiers::NONE));
+                    }
                     out.push(Event::Paste(content));
+                    self.yank_is_linewise = false;
                 }
                 'P' => {
+                    self.begin_last_change_recording();
                     let reg = self.active_register();
-                    let content = self
-                        .registers
-                        .get(&reg)
-                        .unwrap_or(&self.yank_buffer)
-                        .clone();
+                    let content = self.register_contents(reg);
+                    if self.yank_is_linewise {
+                        out.push(Self::key_event(Key::Home, Modifiers::NONE));
+                        out.push(Self::key_event(Key::Enter, Modifiers::NONE));
+                        out.push(Self::key_event(Key::ArrowUp, Modifiers::NONE));
+                    }
                     out.push(Event::Paste(content));
+                    self.yank_is_linewise = false;
                 }
                 'd' => {
+                    if self.pending_operator.is_none() {
+                        self.begin_last_change_recording();
+                    }
                     if let Some(Operator::Delete) = self.pending_operator {
                         let c = self.consume_count();
                         for _ in 0..c {
@@ -1108,6 +1355,9 @@ impl VimState {
                     }
                 }
                 'c' => {
+                    if self.pending_operator.is_none() {
+                        self.begin_last_change_recording();
+                    }
                     if let Some(Operator::Change) = self.pending_operator {
                         let c = self.consume_count();
                         for _ in 0..c {
@@ -1127,6 +1377,7 @@ impl VimState {
                         let line_end =
                             Self::line_end_idx(text, Self::get_cursor_char_idx(te_state));
                         self.store_yank_text(Self::extract_range(text, line_start, line_end));
+                        self.yank_is_linewise = true;
                         for _ in 0..c {
                             out.extend(self.yank_line());
                         }
@@ -1166,6 +1417,7 @@ impl VimState {
                     }
                 }
                 '~' => {
+                    self.begin_last_change_recording();
                     let c_idx = Self::get_cursor_char_idx(te_state);
                     if let Some(t_char) = text.chars().nth(c_idx) {
                         let toggled = if t_char.is_lowercase() {
@@ -1209,6 +1461,7 @@ impl VimState {
                     out.extend(self.move_word_motion(ch, text, te_state));
                 }
                 'J' => {
+                    self.begin_last_change_recording();
                     out.push(Self::key_event(Key::End, Modifiers::NONE));
                     out.push(Self::key_event(Key::ArrowRight, Modifiers::SHIFT));
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
@@ -1262,6 +1515,9 @@ impl VimState {
                 }
                 _ => {}
             }
+
+            self.note_last_change_output(&out);
+            self.finish_last_change_recording_if_ready();
         }
         out
     }
@@ -1290,7 +1546,21 @@ impl VimState {
             }
             match ch {
                 'v' => {
-                    self.exit_visual_mode(te_state, true);
+                    if self.visual_line {
+                        self.visual_line = false;
+                        let idx = Self::get_visual_cursor_char_idx(te_state);
+                        let len = text.chars().count();
+                        if idx < len {
+                            Self::set_selection(te_state, idx, idx + 1);
+                        } else {
+                            Self::set_cursor_char_idx(te_state, idx);
+                        }
+                    } else {
+                        self.exit_visual_mode(te_state, true);
+                    }
+                }
+                'V' => {
+                    self.enter_visual_line_mode(text, te_state);
                 }
                 'i' => {
                     self.pending_action = PendingAction::TextObjectInner;
@@ -1301,14 +1571,26 @@ impl VimState {
                 'd' | 'x' => {
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
                     self.mode = VimMode::Normal;
+                    self.visual_line = false;
                 }
-                'c' => {
+                'c' | 's' => {
                     out.push(Self::key_event(Key::Backspace, Modifiers::NONE));
                     self.mode = VimMode::Insert;
+                    self.visual_line = false;
                 }
                 'y' => {
+                    if let Some(content) = Self::selected_text(text, te_state) {
+                        self.store_yank_text(content);
+                    }
+                    self.yank_is_linewise = self.visual_line;
                     out.push(Event::Copy);
-                    self.exit_visual_mode(te_state, false);
+                    self.pending_visual_exit = true;
+                }
+                'p' => {
+                    let reg = self.active_register();
+                    let content = self.register_contents(reg);
+                    out.push(Event::Paste(content));
+                    self.pending_visual_exit = true;
                 }
                 'f' => {
                     self.pending_action = PendingAction::FindForward;
@@ -1366,7 +1648,8 @@ impl VimState {
             PendingAction::MacroPlayback => {
                 if let Some(events) = self.macros.get(&ch).cloned() {
                     for event in events {
-                        out.extend(self.handle_event(&event, text, te_state));
+                        out.extend(self.handle_event_impl(&event, text, te_state, false));
+                        self.flush_pending_visual_exit(te_state);
                     }
                 }
             }
@@ -1398,9 +1681,14 @@ impl VimState {
                     }
                 }
                 if found == count {
-                    if action == PendingAction::TillForward && target > c_idx {
+                    if self.pending_operator.is_some() {
+                        if matches!(action, PendingAction::FindForward) {
+                            target = target.saturating_add(1);
+                        }
+                    } else if action == PendingAction::TillForward && target > c_idx {
                         target -= 1;
                     }
+                    self.set_motion_target(te_state, target);
                     let shift = if self.mode == VimMode::Visual || self.pending_operator.is_some() {
                         Modifiers::SHIFT
                     } else {
@@ -1433,6 +1721,7 @@ impl VimState {
                     if action == PendingAction::TillBackward && target < c_idx {
                         target += 1;
                     }
+                    self.set_motion_target(te_state, target);
                     let shift = if self.mode == VimMode::Visual || self.pending_operator.is_some() {
                         Modifiers::SHIFT
                     } else {
@@ -1503,6 +1792,34 @@ impl VimState {
                 }
                 while end < chars.len()
                     && is_word_char(chars[end]) == is_alnum
+                    && !chars[end].is_whitespace()
+                {
+                    end += 1;
+                }
+                if !inner {
+                    while end < chars.len() && chars[end].is_whitespace() {
+                        end += 1;
+                    }
+                }
+                Some((start, end))
+            }
+            'W' => {
+                let mut start = c_idx;
+                let mut end = c_idx;
+                if start >= chars.len() {
+                    return None;
+                }
+                let is_word_char = |c: char| !c.is_whitespace();
+                let is_word = is_word_char(chars[start]);
+
+                while start > 0
+                    && is_word_char(chars[start - 1]) == is_word
+                    && !chars[start - 1].is_whitespace()
+                {
+                    start -= 1;
+                }
+                while end < chars.len()
+                    && is_word_char(chars[end]) == is_word
                     && !chars[end].is_whitespace()
                 {
                     end += 1;
@@ -1695,11 +2012,14 @@ impl VimState {
                 if let Some(content) = Self::selected_text(text, te_state) {
                     self.store_yank_text(content);
                 }
+                self.yank_is_linewise = false;
                 out.push(Event::Copy);
                 out.push(Self::key_event(Key::ArrowLeft, Modifiers::NONE));
             } // we rely on egui copy logic; for complete internal yank we'd need text lookup
         }
         self.pending_operator = None;
+        self.note_last_change_output(&out);
+        self.finish_last_change_recording_if_ready();
         out
     }
 
@@ -2387,6 +2707,8 @@ mod tests {
         let mut text = "hello".to_string();
         let evs = send(&mut vim, &mut text, &mut te, "yy");
         assert!(evs.iter().any(|e| matches!(e, Event::Copy)));
+        assert_eq!(vim.yank_buffer, "hello");
+        assert!(vim.yank_is_linewise);
     }
 
     #[test]
@@ -2399,6 +2721,34 @@ mod tests {
         assert!(evs
             .iter()
             .any(|e| matches!(e, Event::Paste(s) if s == "world")));
+    }
+
+    #[test]
+    fn test_yy_then_p_uses_linewise_newline_semantics() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello\nworld".to_string();
+        set_cursor(&mut te, 0);
+
+        send(&mut vim, &mut text, &mut te, "yy");
+        let evs = send(&mut vim, &mut text, &mut te, "p");
+
+        assert!(evs.iter().any(|e| matches!(e, Event::Key { key: Key::End, .. })));
+        assert!(evs.iter().any(|e| matches!(e, Event::Key { key: Key::Enter, .. })));
+        assert!(evs.iter().any(|e| matches!(e, Event::Paste(s) if s == "hello")));
+    }
+
+    #[test]
+    fn test_dot_repeats_last_change() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+
+        let first = send(&mut vim, &mut text, &mut te, "x");
+        let repeated = send(&mut vim, &mut text, &mut te, ".");
+
+        assert!(first.iter().any(|e| matches!(e, Event::Key { key: Key::Backspace, .. })));
+        assert!(repeated.iter().any(|e| matches!(e, Event::Key { key: Key::Backspace, .. })));
     }
 
     #[test]
@@ -2582,8 +2932,58 @@ mod tests {
         let mut text = "hello".to_string();
         send(&mut vim, &mut text, &mut te, "v");
         let evs = send(&mut vim, &mut text, &mut te, "y");
-        assert_eq!(vim.mode, VimMode::Normal);
+        assert_eq!(vim.mode, VimMode::Visual);
+        assert!(vim.pending_visual_exit);
         assert!(evs.iter().any(|e| matches!(e, Event::Copy)));
+
+        vim.flush_pending_visual_exit(&mut te);
+        assert_eq!(vim.mode, VimMode::Normal);
+        assert!(!vim.pending_visual_exit);
+    }
+
+    #[test]
+    fn test_visual_y_writes_internal_yank_buffer_and_named_register() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "alpha beta".to_string();
+        set_cursor(&mut te, 2);
+
+        send(&mut vim, &mut text, &mut te, "\"aviw");
+        let evs = send(&mut vim, &mut text, &mut te, "y");
+
+        assert!(evs.iter().any(|e| matches!(e, Event::Copy)));
+        assert!(vim.pending_visual_exit);
+        vim.flush_pending_visual_exit(&mut te);
+
+        assert_eq!(vim.mode, VimMode::Normal);
+        assert_eq!(vim.yank_buffer, "alpha");
+        assert_eq!(vim.registers.get(&'a').map(String::as_str), Some("alpha"));
+    }
+
+    #[test]
+    fn test_visual_p_replaces_selection_with_yank_buffer() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "alpha beta".to_string();
+        vim.yank_buffer = "omega".to_string();
+        set_cursor(&mut te, 2);
+        send(&mut vim, &mut text, &mut te, "viw");
+
+        assert_eq!(vim.mode, VimMode::Visual);
+        let evs = send(&mut vim, &mut text, &mut te, "p");
+
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, Event::Paste(s) if s == "omega")),
+            "visual p should emit a paste of the yank buffer"
+        );
+        assert!(
+            vim.pending_visual_exit,
+            "visual p should defer exit until the editor flushes the selection"
+        );
+        vim.flush_pending_visual_exit(&mut te);
+        assert_eq!(vim.mode, VimMode::Normal);
+        assert!(!vim.pending_visual_exit);
     }
 
     #[test]
@@ -2604,6 +3004,23 @@ mod tests {
     }
 
     #[test]
+    fn test_visual_s_changes_selection_enters_insert() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+        send(&mut vim, &mut text, &mut te, "v");
+        let evs = send(&mut vim, &mut text, &mut te, "s");
+        assert_eq!(vim.mode, VimMode::Insert);
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+    }
+
+    #[test]
     fn test_visual_motion_updates_selection() {
         let mut vim = VimState::new();
         let mut te = TextEditState::default();
@@ -2611,6 +3028,53 @@ mod tests {
         send(&mut vim, &mut text, &mut te, "v");
         send(&mut vim, &mut text, &mut te, "l");
         assert_eq!(selection(&te), Some((0, 2)));
+    }
+
+    #[test]
+    fn test_v_uppercase_enters_visual_line_mode() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "alpha\nbeta".to_string();
+        set_cursor(&mut te, 2);
+
+        send(&mut vim, &mut text, &mut te, "V");
+
+        assert_eq!(vim.mode, VimMode::Visual);
+        assert!(vim.visual_line);
+        assert_eq!(selection(&te), Some((0, 6)));
+    }
+
+    #[test]
+    fn test_visual_line_j_extends_selection_to_next_line() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "alpha\nbeta\ngamma".to_string();
+        send(&mut vim, &mut text, &mut te, "V");
+
+        send(&mut vim, &mut text, &mut te, "j");
+
+        assert!(vim.visual_line);
+        assert_eq!(selection(&te), Some((0, 11)));
+    }
+
+    #[test]
+    fn test_visual_line_s_changes_selected_lines_enters_insert() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "alpha\nbeta".to_string();
+        send(&mut vim, &mut text, &mut te, "V");
+
+        let evs = send(&mut vim, &mut text, &mut te, "s");
+
+        assert_eq!(vim.mode, VimMode::Insert);
+        assert!(!vim.visual_line);
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
     }
 
     // -----------------------------------------------------------------------
@@ -2626,6 +3090,41 @@ mod tests {
         send(&mut vim, &mut text, &mut te, "w");
         vim.handle_event(&key_press(Key::Enter), &mut text, &mut te);
         assert!(vim.save_requested);
+    }
+
+    #[test]
+    fn test_colon_wq_sets_save_requested() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+        send(&mut vim, &mut text, &mut te, ":");
+        send(&mut vim, &mut text, &mut te, "wq");
+        vim.handle_event(&key_press(Key::Enter), &mut text, &mut te);
+        assert!(vim.save_requested);
+    }
+
+    #[test]
+    fn test_colon_x_sets_save_requested() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+        send(&mut vim, &mut text, &mut te, ":");
+        send(&mut vim, &mut text, &mut te, "x");
+        vim.handle_event(&key_press(Key::Enter), &mut text, &mut te);
+        assert!(vim.save_requested);
+    }
+
+    #[test]
+    fn test_command_backspace_cancels_w_before_enter() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+        send(&mut vim, &mut text, &mut te, ":");
+        send(&mut vim, &mut text, &mut te, "w");
+        vim.handle_event(&key_press(Key::Backspace), &mut text, &mut te);
+        vim.handle_event(&key_press(Key::Enter), &mut text, &mut te);
+        assert!(!vim.save_requested);
+        assert_eq!(vim.mode, VimMode::Normal);
     }
 
     #[test]
@@ -2680,6 +3179,25 @@ mod tests {
         send(&mut vim, &mut text, &mut te, "bar");
         vim.handle_event(&key_press(Key::Enter), &mut text, &mut te);
         assert_eq!(cursor(&te), 4); // "bar" starts at index 4
+    }
+
+    #[test]
+    fn test_empty_search_prompt_does_not_clear_last_search() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "foo bar foo".to_string();
+        vim.last_search = "bar".to_string();
+
+        send(&mut vim, &mut text, &mut te, "/");
+        send(&mut vim, &mut text, &mut te, "bar");
+        vim.handle_event(&key_press(Key::Backspace), &mut text, &mut te);
+        vim.handle_event(&key_press(Key::Backspace), &mut text, &mut te);
+        vim.handle_event(&key_press(Key::Backspace), &mut text, &mut te);
+        vim.handle_event(&key_press(Key::Enter), &mut text, &mut te);
+
+        assert_eq!(vim.last_search, "bar");
+        send(&mut vim, &mut text, &mut te, "n");
+        assert_eq!(cursor(&te), 4);
     }
 
     #[test]
@@ -2774,6 +3292,24 @@ mod tests {
             .any(|e| matches!(e, Event::Paste(s) if s == "stored")));
     }
 
+    #[test]
+    fn test_empty_named_register_does_not_fall_back_to_unnamed_yank_buffer() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+        vim.yank_buffer = "world".to_string();
+
+        send(&mut vim, &mut text, &mut te, "\"");
+        send(&mut vim, &mut text, &mut te, "a");
+        let evs = send(&mut vim, &mut text, &mut te, "p");
+
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, Event::Paste(s) if s.is_empty())),
+            "an empty named register should paste empty content, not the unnamed yank buffer"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // Macro tests
     // -----------------------------------------------------------------------
@@ -2832,6 +3368,35 @@ mod tests {
                 ..
             }
         )));
+    }
+
+    #[test]
+    fn test_recording_macro_does_not_inline_playback_body() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello".to_string();
+
+        vim.macros.insert(
+            'a',
+            vec![Event::Key {
+                key: Key::ArrowRight,
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::NONE,
+                physical_key: None,
+            }],
+        );
+
+        send(&mut vim, &mut text, &mut te, "qb");
+        send(&mut vim, &mut text, &mut te, "@a");
+        send(&mut vim, &mut text, &mut te, "q");
+
+        let recorded = vim.macros.get(&'b').cloned().unwrap_or_default();
+        assert_eq!(
+            recorded,
+            vec![Event::Text("@".into()), Event::Text("a".into())],
+            "macro recording should capture the literal @a invocation, not the expanded playback body",
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -3400,6 +3965,7 @@ mod tests {
         let mut text = "alpha beta".to_string();
         let evs = send(&mut vim, &mut text, &mut te, "yw");
         assert!(evs.iter().any(|e| matches!(e, Event::Copy)));
+        assert_eq!(vim.yank_buffer, "alpha ");
     }
 
     #[test]
@@ -3448,6 +4014,23 @@ mod tests {
     }
 
     #[test]
+    fn test_daw_big_word_selects_non_whitespace_run() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "alpha beta gamma".to_string();
+        set_cursor(&mut te, 7);
+        let evs = send(&mut vim, &mut text, &mut te, "daW");
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+        assert_eq!(vim.mode, VimMode::Normal);
+    }
+
+    #[test]
     fn test_de_selects_through_last_character_before_trailing_whitespace() {
         let mut vim = VimState::new();
         let mut te = TextEditState::default();
@@ -3483,6 +4066,42 @@ mod tests {
     }
 
     #[test]
+    fn test_ct_uses_correct_till_semantics() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc_def".to_string();
+        set_cursor(&mut te, 0);
+        let evs = send(&mut vim, &mut text, &mut te, "ct_");
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+        assert_eq!(vim.mode, VimMode::Insert);
+        assert_eq!(selection(&te), Some((0, 3)));
+    }
+
+    #[test]
+    fn test_cf_uses_correct_find_semantics() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc_def".to_string();
+        set_cursor(&mut te, 0);
+        let evs = send(&mut vim, &mut text, &mut te, "cf_");
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+        assert_eq!(vim.mode, VimMode::Insert);
+        assert_eq!(selection(&te), Some((0, 4)));
+    }
+
+    #[test]
     fn test_ciw_changes_inner_word_and_enters_insert() {
         let mut vim = VimState::new();
         let mut te = TextEditState::default();
@@ -3507,6 +4126,7 @@ mod tests {
         set_cursor(&mut te, 2);
         let evs = send(&mut vim, &mut text, &mut te, "yiw");
         assert!(evs.iter().any(|e| matches!(e, Event::Copy)));
+        assert_eq!(vim.yank_buffer, "alpha");
     }
 
     #[test]
@@ -3762,6 +4382,48 @@ mod tests {
     }
 
     #[test]
+    fn test_t_count_handles_repeated_punctuation_before_trailing_whitespace() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc,def,ghi   ".to_string();
+        set_cursor(&mut te, 0);
+        let evs = send(&mut vim, &mut text, &mut te, "2t,");
+        let rights = evs
+            .iter()
+            .filter(|e| matches!(e, Event::Key { key: Key::ArrowRight, modifiers, .. } if *modifiers == Modifiers::NONE))
+            .count();
+        assert_eq!(rights, 6);
+    }
+
+    #[test]
+    fn test_t_uppercase_count_handles_repeated_punctuation_before_trailing_whitespace() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc,def,ghi   ".to_string();
+        set_cursor(&mut te, text.chars().count());
+        let evs = send(&mut vim, &mut text, &mut te, "2T,");
+        let lefts = evs
+            .iter()
+            .filter(|e| matches!(e, Event::Key { key: Key::ArrowLeft, modifiers, .. } if *modifiers == Modifiers::NONE))
+            .count();
+        assert_eq!(lefts, 10);
+    }
+
+    #[test]
+    fn test_f_count_handles_repeated_punctuation_before_trailing_whitespace() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc.def..ghi   ".to_string();
+        set_cursor(&mut te, 0);
+        let evs = send(&mut vim, &mut text, &mut te, "2f.");
+        let rights = evs
+            .iter()
+            .filter(|e| matches!(e, Event::Key { key: Key::ArrowRight, modifiers, .. } if *modifiers == Modifiers::NONE))
+            .count();
+        assert_eq!(rights, 7);
+    }
+
+    #[test]
     fn test_semicolon_repeats_t_motion_forward() {
         let mut vim = VimState::new();
         let mut te = TextEditState::default();
@@ -3840,6 +4502,33 @@ mod tests {
             .filter(|e| matches!(e, Event::Key { key: Key::ArrowRight, modifiers, .. } if *modifiers == Modifiers::NONE))
             .count();
         assert_eq!(rights, 2);
+    }
+
+    #[test]
+    fn test_macro_playback_flushes_after_visual_y_before_followup_motion() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "hello\nworld".to_string();
+        set_cursor(&mut te, 0);
+        vim.macros.insert(
+            'a',
+            vec![
+                Event::Text("v".into()),
+                Event::Text("w".into()),
+                Event::Text("y".into()),
+                Event::Text("w".into()),
+            ],
+        );
+
+        let _ = send(&mut vim, &mut text, &mut te, "@a");
+        vim.flush_pending_visual_exit(&mut te);
+
+        assert_eq!(vim.mode, VimMode::Normal);
+        assert_eq!(
+            cursor(&te),
+            6,
+            "macro playback should treat the post-y motion as normal-mode input"
+        );
     }
 
     #[test]

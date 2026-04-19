@@ -1,6 +1,7 @@
 use crate::bundle;
 use crate::document::{self, DocumentPayload};
 use crate::editor::{self, EditorDocumentState, EditorMode};
+use crate::observability;
 use crate::session::{AppState, ExtraEvent};
 use crate::signing;
 use base64::Engine as _;
@@ -37,6 +38,25 @@ fn consume_pending_builtin_keydown(counter: &AtomicI32) -> bool {
         return false;
     }
     true
+}
+
+fn build_saved_editor_state(
+    markdown: String,
+    cursor: usize,
+    mode: EditorMode,
+    current: &EditorDocumentState,
+) -> EditorDocumentState {
+    EditorDocumentState {
+        markdown,
+        cursor,
+        mode,
+        vim_enabled: current.vim_enabled,
+        theme: None,
+        undo_changes: Vec::new(),
+        undo_index: 0,
+        recent_files: current.recent_files.clone(),
+        legacy_undo_revisions: Vec::new(),
+    }
 }
 
 /// Log a paste event. `content_hash` is the SHA-256 hex of the pasted text
@@ -139,16 +159,8 @@ pub fn save_editor_state(
         _ => EditorMode::Source,
     };
 
-    let next = EditorDocumentState {
-        markdown,
-        cursor,
-        mode: parsed_mode,
-        theme: None,
-        undo_changes: Vec::new(),
-        undo_index: 0,
-        recent_files: Vec::new(),
-        legacy_undo_revisions: Vec::new(),
-    };
+    let current_snapshot = state.editor_state.lock().unwrap().clone();
+    let next = build_saved_editor_state(markdown, cursor, parsed_mode, &current_snapshot);
 
     {
         let mut current = state.editor_state.lock().unwrap();
@@ -208,25 +220,106 @@ pub async fn upload_replay_session(
         "recorded_timezone": recorded_timezone,
         "recorded_timezone_offset_minutes": recorded_timezone_offset_minutes,
     });
+    let session_id_for_logs = payload["session_id"].as_str().map(str::to_owned);
 
-    let resp_json: serde_json::Value = reqwest::Client::new()
+    let response = reqwest::Client::new()
         .post("https://replay.handtyped.app/api/sessions")
         .json(&payload)
         .send()
         .await
         .map_err(|e| {
-            format!("Cannot connect to replay server at https://replay.handtyped.app: {e}")
-        })?
-        .error_for_status()
-        .map_err(|e| format!("Replay server returned an error: {e}"))?
-        .json()
-        .await
-        .map_err(|e| format!("Bad response from replay server: {e}"))?;
+            let detail =
+                format!("Cannot connect to replay server at https://replay.handtyped.app: {e}");
+            observability::record_upload_failure(
+                &state.observability,
+                session_id_for_logs.as_deref(),
+                None,
+                &detail,
+            );
+            detail
+        })?;
+
+    let response = response.error_for_status().map_err(|e| {
+        let detail = format!("Replay server returned an error: {e}");
+        observability::record_upload_failure(
+            &state.observability,
+            session_id_for_logs.as_deref(),
+            None,
+            &detail,
+        );
+        detail
+    })?;
+
+    let response_body = response.text().await.map_err(|e| {
+        let detail = format!("Bad response from replay server: {e}");
+        observability::record_upload_failure(
+            &state.observability,
+            session_id_for_logs.as_deref(),
+            None,
+            &detail,
+        );
+        detail
+    })?;
+
+    if response_body
+        .trim_start()
+        .to_ascii_lowercase()
+        .starts_with("<!doctype html")
+        || response_body
+            .trim_start()
+            .to_ascii_lowercase()
+            .starts_with("<html")
+    {
+        let detail = if response_body
+            .to_ascii_lowercase()
+            .contains("cloudflare registrar")
+            || response_body
+                .to_ascii_lowercase()
+                .contains("parking.registrar.cloudflare.com")
+        {
+            "Replay server returned an HTML parking page instead of API JSON. The replay domain looks misconfigured or parked right now.".to_string()
+        } else {
+            "Replay server returned HTML instead of API JSON.".to_string()
+        };
+        observability::record_upload_failure(
+            &state.observability,
+            session_id_for_logs.as_deref(),
+            None,
+            &detail,
+        );
+        return Err(detail);
+    }
+
+    let resp_json: serde_json::Value = serde_json::from_str(&response_body).map_err(|e| {
+        let detail = format!("Bad response from replay server: {e}");
+        observability::record_upload_failure(
+            &state.observability,
+            session_id_for_logs.as_deref(),
+            None,
+            &detail,
+        );
+        detail
+    })?;
 
     let url = resp_json["url"]
         .as_str()
-        .ok_or("No url in response")?
+        .ok_or_else(|| {
+            let detail = "No url in response".to_string();
+            observability::record_upload_failure(
+                &state.observability,
+                session_id_for_logs.as_deref(),
+                None,
+                &detail,
+            );
+            detail
+        })?
         .to_string();
+    observability::record_upload_success(
+        &state.observability,
+        session_id_for_logs.as_deref(),
+        None,
+        Some(&url),
+    );
 
     Ok(url)
 }
@@ -306,6 +399,20 @@ mod tests {
         assert!(consume_pending_builtin_keydown(&pending));
         assert_eq!(pending.load(Ordering::SeqCst), 0);
         assert!(!consume_pending_builtin_keydown(&pending));
+    }
+
+    #[test]
+    fn test_build_saved_editor_state_preserves_recent_files() {
+        let current = EditorDocumentState {
+            recent_files: vec![std::path::PathBuf::from("/tmp/one.ht")],
+            ..EditorDocumentState::default()
+        };
+        let next = build_saved_editor_state("draft".into(), 12, EditorMode::Source, &current);
+
+        assert_eq!(next.markdown, "draft");
+        assert_eq!(next.cursor, 12);
+        assert_eq!(next.mode, EditorMode::Source);
+        assert_eq!(next.recent_files, current.recent_files);
     }
 
     #[cfg(target_os = "macos")]

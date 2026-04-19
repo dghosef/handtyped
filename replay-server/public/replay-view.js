@@ -27,41 +27,119 @@ export function dedupeHistory(items) {
   })
 }
 
+export function makeStrictlyIncreasingTimeline(items) {
+  const normalized = []
+  let lastT = -Infinity
+
+  for (const entry of items) {
+    const rawT = Number(entry?.t)
+    const t = Number.isFinite(rawT) ? rawT : 0
+    const nextT = t <= lastT ? lastT + 1 : t
+    normalized.push({
+      ...entry,
+      t: nextT,
+    })
+    lastT = nextT
+  }
+
+  return normalized
+}
+
 export function getDurationFromKeydowns(keyEvents) {
   if (keyEvents.length < 2) return 0
   return Math.max(0, Math.round((keyEvents[keyEvents.length - 1].t - keyEvents[0].t) / 1e6))
 }
 
 export function getDurationFromHistory(entries) {
-  if (entries.length < 2) return 0
-  return Math.max(0, entries[entries.length - 1].t - entries[0].t)
+  if (!entries.length) return 0
+  return Math.max(0, Number(entries[entries.length - 1].t) || 0)
 }
 
-function normalizeHistoryEntries(entries) {
-  const normalized = entries.map((entry) => ({
-    t: Math.max(0, Number(entry?.t) || 0),
-    text: typeof entry?.text === 'string' ? entry.text : '',
-  }))
+export function getRawDurationFromHistory(entries) {
+  if (!entries.length) return 0
 
-  const firstContentIndex = normalized.findIndex((entry) => entry.text !== '')
-  if (firstContentIndex === -1) {
-    return [{ t: 0, text: '' }]
-  }
-
-  const needsShift = normalized[firstContentIndex].t <= 0
-  const shifted = normalized.map((entry, index) => {
-    if (index < firstContentIndex) return entry
-    return {
-      ...entry,
-      t: needsShift ? entry.t + 1 : entry.t,
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const rawT = Number(entries[i]?.raw_t)
+    if (Number.isFinite(rawT) && rawT >= 0) {
+      return rawT
     }
-  })
-
-  if (shifted[0].text === '') {
-    return shifted
   }
 
-  return [{ t: 0, text: '' }, ...shifted]
+  return getDurationFromHistory(entries)
+}
+
+export function getElapsedRawTime(entries, index) {
+  if (!Array.isArray(entries) || index < 0 || index >= entries.length) {
+    return 0
+  }
+
+  const rawT = Number(entries[index]?.raw_t)
+  if (Number.isFinite(rawT) && rawT >= 0) {
+    return rawT
+  }
+
+  return Math.max(0, Number(entries[index]?.t) || 0)
+}
+
+export function compressIdleGaps(history, maxGapMs = 5000) {
+  if (!Array.isArray(history) || history.length === 0) return []
+
+  const normalizedMaxGap = Math.max(1, Number(maxGapMs) || 0)
+  const compressed = []
+  let previousRawT = 0
+  let currentCompressedT = 0
+
+  for (let i = 0; i < history.length; i++) {
+    const entry = history[i]
+    const rawT = Math.max(0, Number(entry?.t) || 0)
+
+    if (i === 0) {
+      currentCompressedT = Math.min(rawT, normalizedMaxGap)
+    } else {
+      const rawGap = Math.max(0, rawT - previousRawT)
+      currentCompressedT += Math.min(rawGap, normalizedMaxGap)
+    }
+
+    compressed.push({
+      ...entry,
+      raw_t: rawT,
+      t: currentCompressedT,
+    })
+
+    previousRawT = rawT
+  }
+
+  return makeStrictlyIncreasingTimeline(dedupeHistory(compressed))
+}
+
+export function buildRhythmSamples(history, keyEvents = []) {
+  if (Array.isArray(history) && history.length > 1) {
+    const samples = []
+    for (let i = 1; i < history.length; i++) {
+      const prev = history[i - 1]?.text || ''
+      const next = history[i]?.text || ''
+      const diff = Math.abs(Array.from(next).length - Array.from(prev).length)
+      const t = Math.max(0, Number(history[i]?.t) || 0)
+      if (diff > 0 || next !== prev) {
+        samples.push({
+          t,
+          weight: Math.max(1, diff),
+        })
+      }
+    }
+    if (samples.length > 0) {
+      return samples
+    }
+  }
+
+  if (keyEvents.length > 0) {
+    return keyEvents.map((event) => ({
+      t: Math.max(0, Math.round((event.t - keyEvents[0].t) / 1e6)),
+      weight: 1,
+    }))
+  }
+
+  return []
 }
 
 export function buildSyntheticHistory(finalText, keyEvents) {
@@ -87,7 +165,33 @@ export function buildSyntheticHistory(finalText, keyEvents) {
     })
   }
 
-  return normalizeHistoryEntries(dedupeHistory(snapshots))
+  return makeStrictlyIncreasingTimeline(dedupeHistory(snapshots))
+}
+
+export function documentWithAttribution(text, url) {
+  const trimmed = String(text || '').replace(/[ \t]+$/, '')
+  const attributionUrl = String(url || '').trim()
+  const attribution = `This document was handtyped. See the replay [here](${attributionUrl})`
+  return trimmed ? `${trimmed}\n\n${attribution}` : attribution
+}
+
+export function downloadFilenameForDocument(documentName, fallbackText) {
+  const explicitName = String(documentName || '').trim()
+  if (explicitName) {
+    return explicitName.endsWith('.md')
+      ? explicitName
+      : `${explicitName.replace(/\.[^.]+$/, '')}.md`
+  }
+
+  const firstLine = String(fallbackText || '')
+    .split('\n')
+    .find(Boolean)
+  const stem = String(firstLine || 'handtyped-document')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'handtyped-document'
+  return `${stem}.md`
 }
 
 export function parseHistory(session, keydowns = []) {
@@ -137,11 +241,12 @@ export function parseHistory(session, keydowns = []) {
     })
   }
 
-  return normalizeHistoryEntries(dedupeHistory(parsed))
+  return makeStrictlyIncreasingTimeline(dedupeHistory(parsed))
 }
 
 export function findHistoryIndex(history, elapsedMs) {
-  if (!history.length) return 0
+  if (!history.length) return -1
+  if (elapsedMs < history[0].t) return -1
   let low = 0
   let high = history.length - 1
   while (low < high) {

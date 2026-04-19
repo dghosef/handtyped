@@ -50,5 +50,15 @@ The deployed Worker should serve production traffic from `https://handtyped.app`
 
 - `POST /api/sessions` stores a replay session in KV
 - `GET /api/sessions/:id` loads a session from KV
-- `GET /replay/:id` serves `public/replay.html`
+- `GET /api/health` reports replay upload health, trust source, and recent failure counts
+- `GET /:id` serves `public/replay.html`
+- `GET /replay/:id` remains as a compatibility alias
 - all static assets in `public/` are served by Cloudflare assets
+
+## Trust model
+
+- The replay host is replay-only; the root path returns 404.
+- Replay uploads must be signed by a trusted Handtyped public key.
+- The server rejects unsigned uploads, untrusted signers, non-SPI keyboard uploads, and runtime tampering flags.
+- For a self-hosted deployment, point `REPLAY_TRUSTED_SIGNER_KEYS` at the trusted public key or provide `HANDTYPED_TRUSTED_SIGNER_FILE`.
+- For a local same-machine setup, the app writes its public key to `~/.config/handtyped/pubkey.hex` and the server can read that file automatically.

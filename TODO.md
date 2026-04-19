@@ -4,6 +4,7 @@
 - Heatmap of heavily edited text vs non. Take into account type edits vs big edits
 - syntax highlighting
 - Embed button
+- Replay should allow you to pick between realtime or give each character constant time.
 ## Hardware / Platform Testing
 
 - [ ] **Verify the native Rust editor only accepts built-in keyboard input** — Grant Input Monitoring to `~/Applications/Handtyped.app`, type from the internal keyboard, then confirm non-built-in input paths are reverted/blocked.
@@ -16,7 +17,7 @@
 
 - [ ] **Verify paste is blocked** — Try Cmd+V, right-click → Paste, and drag-and-drop text. None should insert into the editor.
 
-- [ ] **Test different macs**
+- [ ] **Test on multiple Apple Silicon Macs** — Confirm the built-in keyboard / SPI path behaves consistently across Apple Silicon hardware.
 ---
 
 ## Distribution / Signing
@@ -29,12 +30,11 @@
 
 ## Known Compatibility Issues
 
-- [ ] **Karabiner-Elements conflict** — Karabiner intercepts SPI keyboard events and re-emits them via a virtual HID keyboard with no Transport property. Handtyped's SPI filter blocks these. Users with Karabiner must add Handtyped to Karabiner's "Excluded Applications" list (Karabiner-Elements → Misc → Excluded applications). This is intentional: Karabiner can inject arbitrary keystrokes, so allowing it would undermine attestation.
+- [ ] **Karabiner-Elements is unsupported** — Karabiner intercepts SPI keyboard events and re-emits them via a virtual HID keyboard with no Transport property. Handtyped intentionally blocks these events because allowing them would undermine attestation.
 
 ---
 
-## Design Decisions Requiring Human Judgment
+## Product Policy
 
-- [ ] **What to do on Intel Macs** — Decide whether to support Intel Macs (requires different transport filter) or document Apple Silicon only.
-
-- [ ] **Dictation policy** — macOS Dictation fires real keyboard-like events and currently passes the SPI filter. Decide whether to allow or block dictation input (blocking it fully may require CGEvent tap + Accessibility permission, adding another permission request).
+- **Apple Silicon only** — Intel Mac support is not planned.
+- **Dictation is unsupported** — macOS Dictation can look like real keyboard input and is not part of the attested input model.

@@ -8,6 +8,7 @@ pub mod document;
 pub mod editor;
 pub mod hid;
 pub mod integrity;
+pub mod observability;
 pub mod preview;
 pub mod session;
 pub mod signing;
@@ -109,6 +110,8 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
 }
 
 pub fn run() {
+    observability::install_panic_hook();
+
     // ── 1. Block debugger attachment immediately ─────────────────────────────
     integrity::deny_debugger_attach();
 
@@ -153,6 +156,7 @@ pub fn run() {
         integrity: report,
         keyboard_info: Mutex::new(None),
         last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
+        observability: Mutex::new(observability::RuntimeObservability::load_from_disk()),
     });
 
     let state_for_hid = Arc::clone(&state);

@@ -1,15 +1,22 @@
+use egui::text::{CCursor, CCursorRange};
 #[allow(unused_imports)]
 use egui::text::{LayoutJob, TextFormat};
+use egui::text_edit::TextEditState;
 #[allow(unused_imports)]
 use egui::{Color32, FontId};
-use egui::text::{CCursor, CCursorRange};
-use egui::text_edit::TextEditState;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::editor::{build_text_change_with_cursors, TextChange};
 
 // ── Inline spans ──────────────────────────────────────────────────────────────
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum InsertKind {
+    Word,
+    Separator,
+    Newline,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InlineSpan {
@@ -70,7 +77,10 @@ pub fn parse_inline(text: &str) -> Vec<InlineSpan> {
             }
         }
         // Italic: *
-        if chars[i] == '*' && (i == 0 || chars[i - 1] != '*') {
+        if chars[i] == '*'
+            && (i == 0 || chars[i - 1] != '*')
+            && (i + 1 >= chars.len() || chars[i + 1] != '*')
+        {
             if let Some(end) = find_closing(&chars, i + 1, "*") {
                 flush_plain!(i);
                 let inner: String = chars[i + 1..end].iter().collect();
@@ -435,9 +445,10 @@ pub fn parse_blocks(markdown: &str) -> Vec<Block> {
             while i < lines.len() {
                 let l = lines[i];
                 raw_lines.push(l.to_string());
-                // Closing fence: at most fence_indent leading spaces, then ```
+                // Closing fence: CommonMark allows up to three leading spaces
+                // before a closing fence regardless of opener indent.
                 let leading_spaces = l.bytes().take_while(|&b| b == b' ').count();
-                if leading_spaces <= fence_indent && l[leading_spaces..].starts_with("```") {
+                if leading_spaces <= fence_indent + 3 && l[leading_spaces..].starts_with("```") {
                     i += 1;
                     break;
                 }
@@ -732,7 +743,9 @@ impl MarkdownEditor {
 
     fn set_caret(te_state: &mut TextEditState, index: usize) {
         let cursor = CCursor::new(index);
-        te_state.cursor.set_char_range(Some(CCursorRange::one(cursor)));
+        te_state
+            .cursor
+            .set_char_range(Some(CCursorRange::one(cursor)));
     }
 
     fn clipboard_mac(text: &str) -> Option<[u8; 32]> {
@@ -786,29 +799,57 @@ impl MarkdownEditor {
         self.suppress_undo_snapshot = true;
     }
 
+    fn insert_tail_kind(text: &str) -> Option<InsertKind> {
+        text.chars().last().map(Self::insert_kind)
+    }
+
+    fn insert_kind(ch: char) -> InsertKind {
+        if ch == '\n' || ch == '\r' {
+            InsertKind::Newline
+        } else if ch.is_alphanumeric() || matches!(ch, '_' | '\'' | '-') {
+            InsertKind::Word
+        } else {
+            InsertKind::Separator
+        }
+    }
+
     fn should_merge_change(previous: &TextChange, next: &TextChange, elapsed_ms: u64) -> bool {
         const GROUP_MS: u64 = 1_200;
-        if elapsed_ms > GROUP_MS {
-            return false;
-        }
-
         let prev_ins = previous.ins.chars().count();
         let next_ins = next.ins.chars().count();
         let prev_del = previous.del.chars().count();
         let next_del = next.del.chars().count();
 
         let both_insert = prev_del == 0 && next_del == 0;
-        let both_backspace = prev_ins == 0 && next_ins == 0 && next.pos == previous.pos.saturating_sub(prev_del);
+        let both_backspace =
+            prev_ins == 0 && next_ins == 0 && next.pos == previous.pos.saturating_sub(prev_del);
         let inserted_contiguously = previous.pos + prev_ins == next.pos;
 
-        (both_insert && inserted_contiguously) || both_backspace
+        if both_backspace {
+            return true;
+        }
+
+        if !both_insert || !inserted_contiguously {
+            return false;
+        }
+
+        if next_ins == 1 {
+            let prev_kind = Self::insert_tail_kind(&previous.ins);
+            let next_kind = next.ins.chars().next().map(Self::insert_kind);
+            match (prev_kind, next_kind) {
+                (Some(InsertKind::Word), Some(InsertKind::Word))
+                | (Some(InsertKind::Word), Some(InsertKind::Separator))
+                | (Some(InsertKind::Separator), Some(InsertKind::Separator)) => {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+
+        elapsed_ms <= GROUP_MS && (prev_ins > 1 || next_ins > 1)
     }
 
-    fn record_forward_edit_snapshot(
-        &mut self,
-        cursor_before: usize,
-        cursor_after: usize,
-    ) {
+    fn record_forward_edit_snapshot(&mut self, cursor_before: usize, cursor_after: usize) {
         // Clear redo history on forward edit.
         if self.undo_index < self.undo_changes.len() {
             self.undo_changes.truncate(self.undo_index);
@@ -1069,6 +1110,7 @@ impl MarkdownEditor {
                     .margin(egui::vec2(0.0, 0.0))
                     .show(ui);
                 te_state = output.state;
+                self.vim.flush_pending_visual_exit(&mut te_state);
 
                 if self.vim_enabled {
                     // egui 0.31 processes Escape in its memory module *before* our
@@ -1373,6 +1415,51 @@ mod tests {
     }
 
     #[test]
+    fn inline_segments_unclosed_markers_fall_back_to_plain_text() {
+        let segs = parse_inline("**bold and *italic");
+        assert_eq!(segs, vec![InlineSpan::Plain("**bold and *italic".into())]);
+    }
+
+    #[test]
+    fn inline_segments_bold_italic_parses_as_single_span() {
+        let segs = parse_inline("***very***");
+        assert_eq!(segs, vec![InlineSpan::BoldItalic("very".into())]);
+    }
+
+    #[test]
+    fn parse_blocks_preserves_blockquote_marker_only_line() {
+        let blocks = parse_blocks(">\n> next");
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].kind, BlockKind::Blockquote);
+        assert_eq!(blocks[0].raw, ">");
+        assert_eq!(blocks[1].kind, BlockKind::Blockquote);
+    }
+
+    #[test]
+    fn parse_blocks_keeps_lazy_blockquote_continuation_as_paragraph() {
+        let blocks = parse_blocks("> quote\nstill quote?");
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].kind, BlockKind::Blockquote);
+        assert_eq!(blocks[1].kind, BlockKind::Paragraph);
+        assert_eq!(blocks[1].raw, "still quote?");
+    }
+
+    #[test]
+    fn parse_blocks_collects_indented_fence_closer() {
+        let md = "```rust\nfn main() {}\n  ```\nnext";
+        let blocks = parse_blocks(md);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(
+            blocks[0].kind,
+            BlockKind::FencedCode {
+                language: "rust".into()
+            }
+        );
+        assert_eq!(blocks[1].kind, BlockKind::Paragraph);
+        assert_eq!(blocks[1].raw, "next");
+    }
+
+    #[test]
     fn markdown_editor_new_and_roundtrip() {
         let md = "# Hello\n\nWorld";
         let ed = MarkdownEditor::new(md);
@@ -1486,6 +1573,42 @@ mod tests {
             }]
         );
         assert_eq!(ed.to_markdown(), "one");
+    }
+
+    #[test]
+    fn persistent_redo_restores_cursor_position() {
+        let mut ed = MarkdownEditor::new("one");
+        ed.set_undo_state(
+            vec![TextChange {
+                pos: 3,
+                del: "".into(),
+                ins: "!".into(),
+                cursor_before: 3,
+                cursor_after: 4,
+            }],
+            0,
+        );
+
+        let ctx = egui::Context::default();
+        let mut raw = egui::RawInput::default();
+        raw.events.push(egui::Event::Key {
+            key: egui::Key::Z,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::MAC_CMD | egui::Modifiers::SHIFT,
+            physical_key: None,
+        });
+
+        let _ = ctx.run(raw, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let _ = ed.show(ui, true);
+            });
+        });
+
+        let (revs, idx) = ed.get_undo_state();
+        assert_eq!(idx, 1);
+        assert_eq!(ed.to_markdown(), "one!");
+        assert_eq!(revs[0].cursor_after, 4);
     }
 
     fn run_editor_frame(
@@ -1650,8 +1773,10 @@ mod tests {
         let mut ed = MarkdownEditor::new("");
         ed.content = "h".into();
         ed.record_forward_edit_snapshot(0, 1);
+        ed.last_edit_at_ms = 0;
         ed.content = "he".into();
         ed.record_forward_edit_snapshot(1, 2);
+        ed.last_edit_at_ms = 0;
         ed.content = "hey".into();
         ed.record_forward_edit_snapshot(2, 3);
 
@@ -1668,6 +1793,55 @@ mod tests {
                 cursor_after: 3,
             }
         );
+    }
+
+    #[test]
+    fn grouped_typing_merges_word_characters_even_with_pause() {
+        let mut ed = MarkdownEditor::new("");
+        ed.content = "h".into();
+        ed.record_forward_edit_snapshot(0, 1);
+        ed.last_edit_at_ms = 0;
+        ed.content = "he".into();
+        ed.record_forward_edit_snapshot(1, 2);
+        ed.last_edit_at_ms = 0;
+        ed.content = "hey".into();
+        ed.record_forward_edit_snapshot(2, 3);
+
+        let (revs, idx) = ed.get_undo_state();
+        assert_eq!(idx, 1);
+        assert_eq!(revs.len(), 1);
+        assert_eq!(
+            revs[0],
+            TextChange {
+                pos: 0,
+                del: String::new(),
+                ins: "hey".into(),
+                cursor_before: 0,
+                cursor_after: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn separator_creates_new_undo_group_after_word() {
+        let mut ed = MarkdownEditor::new("");
+        ed.content = "h".into();
+        ed.record_forward_edit_snapshot(0, 1);
+        ed.last_edit_at_ms = 0;
+        ed.content = "he".into();
+        ed.record_forward_edit_snapshot(1, 2);
+        ed.last_edit_at_ms = 0;
+        ed.content = "he ".into();
+        ed.record_forward_edit_snapshot(2, 3);
+        ed.last_edit_at_ms = 0;
+        ed.content = "he w".into();
+        ed.record_forward_edit_snapshot(3, 4);
+
+        let (revs, idx) = ed.get_undo_state();
+        assert_eq!(idx, 2);
+        assert_eq!(revs.len(), 2);
+        assert_eq!(revs[0].ins, "he ");
+        assert_eq!(revs[1].ins, "w");
     }
 
     #[test]

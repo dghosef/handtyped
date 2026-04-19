@@ -24,6 +24,29 @@ fn tc(pos: usize, del: &str, ins: &str) -> TextChange {
     }
 }
 
+fn replay_text_from_history(history: &[serde_json::Value]) -> String {
+    history.iter().fold(String::new(), |current, entry| {
+        let pos = entry
+            .get("pos")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0) as usize;
+        let del = entry
+            .get("del")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        let ins = entry
+            .get("ins")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        let mut chars: Vec<char> = current.chars().collect();
+        let pos = pos.min(chars.len());
+        let delete_len = del.chars().count();
+        let end = pos.saturating_add(delete_len).min(chars.len());
+        chars.splice(pos..end, ins.chars());
+        chars.into_iter().collect()
+    })
+}
+
 #[test]
 fn test_edit_document_preserves_history() {
     let temp_dir = TempDir::new().unwrap();
@@ -80,8 +103,14 @@ fn test_undo_persistence_single_session() {
     assert_eq!(loaded.payload.undo_changes.len(), 2);
     assert_eq!(loaded.payload.undo_index, 2);
     assert_eq!(loaded.payload.markdown, "second edit");
-    assert_eq!(loaded.payload.undo_changes[0], tc(0, "initial", "first edit"));
-    assert_eq!(loaded.payload.undo_changes[1], tc(0, "first edit", "second edit"));
+    assert_eq!(
+        loaded.payload.undo_changes[0],
+        tc(0, "initial", "first edit")
+    );
+    assert_eq!(
+        loaded.payload.undo_changes[1],
+        tc(0, "first edit", "second edit")
+    );
 }
 
 #[test]
@@ -216,6 +245,117 @@ fn test_rapid_save_load_cycle() {
 
     let loaded = document::load_document(&path).unwrap().unwrap();
     assert_eq!(loaded.payload.markdown, "version 9");
+}
+
+#[test]
+fn test_saved_document_writes_compact_undo_changes_not_legacy_snapshots() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("compact-undo.ht");
+
+    let mut payload = document::new_document_payload("hello".to_string());
+    payload.undo_changes = vec![tc(5, "", " world")];
+    payload.undo_index = 1;
+    document::save_document(&path, payload).unwrap();
+
+    let json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    let payload_json = &json["payload"];
+
+    assert!(payload_json["undo_changes"].is_array());
+    assert!(payload_json.get("undo_revisions").is_none());
+}
+
+#[test]
+fn test_saved_document_writes_compact_doc_history_deltas() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("compact-history.ht");
+
+    let mut payload = document::new_document_payload("hello".to_string());
+    payload.doc_history = vec![
+        serde_json::json!({ "t": 0_u64, "pos": 0_usize, "del": "", "ins": "he" }),
+        serde_json::json!({ "t": 10_u64, "pos": 2_usize, "del": "", "ins": "llo" }),
+    ];
+    document::save_document(&path, payload).unwrap();
+
+    let json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    let history = json["payload"]["doc_history"].as_array().unwrap();
+
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0]["pos"], 0);
+    assert_eq!(history[0]["del"], "");
+    assert_eq!(history[0]["ins"], "he");
+    assert!(history[0].get("text").is_none());
+}
+
+#[test]
+fn test_saved_document_keeps_plaintext_markdown_and_replay_reconstructs_to_it() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("plaintext-and-history.ht");
+
+    let mut payload = document::new_document_payload("hello world".to_string());
+    payload.doc_history = vec![
+        serde_json::json!({ "t": 0_u64, "pos": 0_usize, "del": "", "ins": "hello" }),
+        serde_json::json!({ "t": 10_u64, "pos": 5_usize, "del": "", "ins": " world" }),
+    ];
+    document::save_document(&path, payload).unwrap();
+
+    let loaded = document::load_document(&path).unwrap().unwrap();
+    assert_eq!(loaded.payload.markdown, "hello world");
+    assert_eq!(
+        replay_text_from_history(&loaded.payload.doc_history),
+        loaded.payload.markdown
+    );
+}
+
+#[test]
+fn test_string_delete_doc_history_roundtrips_through_disk() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("string-delete.ht");
+
+    let mut payload = document::new_document_payload("abX".to_string());
+    payload.doc_history = vec![
+        serde_json::json!({ "t": 0_u64, "pos": 0_usize, "del": "", "ins": "abc" }),
+        serde_json::json!({ "t": 10_u64, "pos": 2_usize, "del": "c", "ins": "X" }),
+    ];
+    document::save_document(&path, payload.clone()).unwrap();
+
+    let loaded = document::load_document(&path).unwrap().unwrap();
+    assert_eq!(loaded.payload.doc_history, payload.doc_history);
+}
+
+#[test]
+fn test_split_mode_persists_across_save_and_load() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("split.ht");
+
+    let mut payload = document::new_document_payload("body".to_string());
+    payload.mode = EditorMode::Split;
+    document::save_document(&path, payload).unwrap();
+
+    let loaded = document::load_document(&path).unwrap().unwrap();
+    assert_eq!(loaded.payload.mode, EditorMode::Split);
+}
+
+#[test]
+fn test_undo_changes_preserve_cursor_positions_across_save_and_load() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("cursor-undo.ht");
+
+    let mut payload = document::new_document_payload("hello world".to_string());
+    payload.undo_changes = vec![TextChange {
+        pos: 5,
+        del: "".into(),
+        ins: " world".into(),
+        cursor_before: 5,
+        cursor_after: 11,
+    }];
+    payload.undo_index = 1;
+    document::save_document(&path, payload).unwrap();
+
+    let loaded = document::load_document(&path).unwrap().unwrap();
+    assert_eq!(loaded.payload.undo_changes[0].cursor_before, 5);
+    assert_eq!(loaded.payload.undo_changes[0].cursor_after, 11);
 }
 
 // ============================================================================

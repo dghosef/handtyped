@@ -15,13 +15,13 @@ It works by:
 ## Architecture
 
 - **Rust-native editor app** (`src/`, `Cargo.toml`): native `egui` markdown editor, IOHIDManager keyboard capture, session recording, ed25519 signing, bundle export, replay upload
-- **Legacy Swift/AppKit editor** (`Sources/Typewriter/`): older native prototype kept for reference during migration
 - **Replay server** (`replay-server/`): Node.js/Express server that stores sessions and serves the replay viewer
 
 ## Claude Compatibility
 
 - This repo was previously driven through Claude Code. When working here, treat [CLAUDE.md](/Users/dghosef/editor/CLAUDE.md) as a primary project instruction source alongside this file.
 - For this project, Codex-style agents should behave as if the Claude project setup is part of the repo contract: read [CLAUDE.md](/Users/dghosef/editor/CLAUDE.md) early, consult [.claude/settings.local.json](/Users/dghosef/editor/.claude/settings.local.json) when tool/workflow expectations matter, and prefer continuity with prior Claude project practices unless they conflict with the current code.
+- Project-local skills live under [.codex/skills](/Users/dghosef/editor/.codex/skills). Treat [extensive-testing](/Users/dghosef/editor/.codex/skills/extensive-testing/SKILL.md) as active repo policy: after each code change, add extensive tests and run the relevant suites before considering the work complete.
 - If a future agent is deciding whether to follow generic defaults or the project’s Claude-oriented conventions, follow the project conventions.
 - Historical Claude project memory lives in:
   - `/Users/dghosef/.claude/projects/-Users-dghosef-editor/memory/MEMORY.md`
@@ -34,10 +34,9 @@ It works by:
 - Input Monitoring (TCC `kTCCServiceListenEvent`) is required for IOHIDManager access
 - For local development, Input Monitoring is most reliable when the native Rust app is launched as a stable signed `.app` bundle via `npm run dev:native`
 - The native Rust editor binary is `src/bin/handtyped_native.rs`
-- The app only runs on Apple Silicon Macs (SPI transport = built-in keyboard). Intel Mac support is a known TODO.
-- Karabiner-Elements intercepts SPI events and re-emits via virtual HID with no Transport property — users must add Handtyped to Karabiner's excluded applications list
+- The app only runs on Apple Silicon Macs (SPI transport = built-in keyboard). Intel Mac support is not planned.
+- Karabiner-Elements is not supported. It intercepts SPI events and re-emits via virtual HID with no Transport property, which breaks Handtyped's attestation model.
 - The replay server runs separately in local dev (`cd replay-server && node server.js`) and is deployed at `https://replay.handtyped.app`
-- The old `npm run tauri dev` / WebView path is legacy and not the preferred editor path
 
 ## Commands
 
@@ -49,10 +48,16 @@ It works by:
 | `cd replay-server && node server.js` | Start the replay server |
 | `cargo test` | Run Rust tests |
 
+## Testing Policy
+
+- After each code change, add extensive tests for the changed behavior.
+- Prefer regression tests plus edge cases, malformed inputs, and round-trip coverage over a single happy-path assertion.
+- If touched code already has a nearby suite, extend that suite instead of creating isolated low-value tests.
+
 ## Known Limitations / TODO
 
-- Intel Mac support (transport may not be "SPI")
-- Dictation input passes the SPI filter (macOS Dictation fires real keyboard-like events)
+- Apple Silicon only; Intel Mac support is not planned.
+- Dictation is not supported; macOS Dictation fires real keyboard-like events that can undermine the input-gating model.
 - Developer ID certificate needed for distribution/notarization
 - The native Rust editor is the active direction, but some legacy JS/WebView code still exists in the repo during migration
 - Production replay host is `https://replay.handtyped.app`

@@ -1,0 +1,3 @@
+display_name: Git Handoff
+short_description: Stage and commit the intended change set at the end of a task
+default_prompt: Inspect the diff, stage only the intended files, and create a focused commit unless the user says not to use Git.

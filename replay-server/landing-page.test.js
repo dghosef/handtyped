@@ -51,6 +51,8 @@ describe('landing page copy', () => {
     expect(landingPageHtml).toContain('id="download-button"')
     expect(landingPageHtml).toContain('href="/downloads/Handtyped-macos.dmg"')
     expect(landingPageHtml).toContain('download="Handtyped-macos.dmg"')
+    expect(landingPageHtml).toContain('id="github-button"')
+    expect(landingPageHtml).toContain('href="https://github.com/dghosef/handtyped"')
     expect(landingPageHtml).toContain('How it works:')
   })
 })

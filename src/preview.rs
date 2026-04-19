@@ -8,6 +8,7 @@ use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 #[derive(Debug, Clone, PartialEq)]
 pub struct InlineSeg {
     pub text: String,
+    pub link_url: Option<String>,
     pub bold: bool,
     pub italic: bool,
     pub code: bool,
@@ -18,6 +19,7 @@ impl InlineSeg {
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
+            link_url: None,
             bold: false,
             italic: false,
             code: false,
@@ -27,6 +29,7 @@ impl InlineSeg {
     pub fn bold(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
+            link_url: None,
             bold: true,
             italic: false,
             code: false,
@@ -36,6 +39,7 @@ impl InlineSeg {
     pub fn italic(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
+            link_url: None,
             bold: false,
             italic: true,
             code: false,
@@ -45,6 +49,7 @@ impl InlineSeg {
     pub fn code(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
+            link_url: None,
             bold: false,
             italic: false,
             code: true,
@@ -54,6 +59,7 @@ impl InlineSeg {
     pub fn strike(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
+            link_url: None,
             bold: false,
             italic: false,
             code: false,
@@ -74,9 +80,17 @@ pub enum PreviewBlock {
         quote: bool, // inside blockquote
     },
     /// Heading H1–H6
-    Heading { level: u8, segs: Vec<InlineSeg> },
+    Heading {
+        level: u8,
+        segs: Vec<InlineSeg>,
+        quote: bool,
+    },
     /// Fenced / indented code block
-    Code { text: String },
+    Code {
+        text: String,
+        quote: bool,
+        indent: usize,
+    },
     /// Markdown image
     Image { alt: String, url: String },
     /// Horizontal rule
@@ -114,6 +128,7 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
     let mut bold = false;
     let mut italic = false;
     let mut strike = false;
+    let mut current_link_url: Option<String> = None;
 
     let flush = |blocks: &mut Vec<PreviewBlock>,
                  segs: &mut Vec<InlineSeg>,
@@ -138,6 +153,7 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
                 PreviewBlock::Heading {
                     level,
                     segs: bold_segs,
+                    quote: quote_depth > 0,
                 }
             }
             None => PreviewBlock::Para {
@@ -298,7 +314,9 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
             }
             Event::End(TagEnd::CodeBlock) => {
                 blocks.push(PreviewBlock::Code {
-                    text: code_buf.trim_end().to_string(),
+                    text: code_buf.clone(),
+                    quote: quote_depth > 0,
+                    indent: list_depth,
                 });
                 in_code_block = false;
                 code_buf.clear();
@@ -354,7 +372,12 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
             Event::End(TagEnd::Strikethrough) => {
                 strike = false;
             }
-            Event::Start(Tag::Link { .. }) | Event::End(TagEnd::Link) => {}
+            Event::Start(Tag::Link { dest_url, .. }) => {
+                current_link_url = Some(dest_url.to_string());
+            }
+            Event::End(TagEnd::Link) => {
+                current_link_url = None;
+            }
             Event::Text(text) => {
                 if in_image {
                     image_alt.push_str(&text);
@@ -363,6 +386,7 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
                 } else {
                     segs.push(InlineSeg {
                         text: text.to_string(),
+                        link_url: current_link_url.clone(),
                         bold,
                         italic,
                         code: false,
@@ -376,6 +400,7 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
                 } else {
                     segs.push(InlineSeg {
                         text: code.to_string(),
+                        link_url: current_link_url.clone(),
                         bold,
                         italic,
                         code: true,
@@ -384,17 +409,21 @@ pub fn parse_markdown_for_preview(markdown: &str) -> Vec<PreviewBlock> {
                 }
             }
             Event::SoftBreak => {
-                segs.push(InlineSeg::plain(" "));
+                if quote_depth > 0 {
+                    flush(
+                        &mut blocks,
+                        &mut segs,
+                        heading_level,
+                        list_depth,
+                        current_item_number,
+                        quote_depth,
+                    );
+                } else {
+                    segs.push(InlineSeg::plain(" "));
+                }
             }
             Event::HardBreak => {
-                flush(
-                    &mut blocks,
-                    &mut segs,
-                    heading_level,
-                    list_depth,
-                    current_item_number,
-                    quote_depth,
-                );
+                segs.push(InlineSeg::plain("\n"));
             }
             Event::TaskListMarker(done) => {
                 segs.push(InlineSeg::plain(if done { "☑ " } else { "☐ " }));
@@ -443,6 +472,7 @@ mod tests {
         PreviewBlock::Heading {
             level,
             segs: vec![InlineSeg::bold(text)],
+            quote: false,
         }
     }
 
@@ -516,6 +546,19 @@ mod tests {
         assert_eq!(blocks.len(), 1, "soft-break must stay in same block");
     }
 
+    #[test]
+    fn hard_break_within_paragraph_is_not_a_new_block() {
+        let blocks = parse_markdown_for_preview("line1  \nline2");
+        assert_eq!(blocks.len(), 1, "hard-break must stay in same block");
+        let PreviewBlock::Para { segs, .. } = &blocks[0] else {
+            panic!("expected Para")
+        };
+        assert_eq!(
+            segs.iter().map(|seg| seg.text.as_str()).collect::<String>(),
+            "line1\nline2"
+        );
+    }
+
     // ── Inline formatting ─────────────────────────────────────────────────────
 
     #[test]
@@ -587,6 +630,31 @@ mod tests {
     }
 
     #[test]
+    fn link_text_retains_destination() {
+        let blocks = parse_markdown_for_preview("[Handtyped](https://handtyped.app)");
+        let PreviewBlock::Para { segs, .. } = &blocks[0] else {
+            panic!("expected Para")
+        };
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].text, "Handtyped");
+        assert_eq!(segs[0].link_url.as_deref(), Some("https://handtyped.app"));
+    }
+
+    #[test]
+    fn plain_text_around_link_stays_plain() {
+        let blocks = parse_markdown_for_preview("see [docs](https://example.com) now");
+        let PreviewBlock::Para { segs, .. } = &blocks[0] else {
+            panic!("expected Para")
+        };
+        assert_eq!(segs[0].text, "see ");
+        assert_eq!(segs[0].link_url, None);
+        assert_eq!(segs[1].text, "docs");
+        assert_eq!(segs[1].link_url.as_deref(), Some("https://example.com"));
+        assert_eq!(segs[2].text, " now");
+        assert_eq!(segs[2].link_url, None);
+    }
+
+    #[test]
     fn bold_and_italic_do_not_bleed_across_paragraphs() {
         let blocks = parse_markdown_for_preview("**bold**\n\nnormal");
         let PreviewBlock::Para { segs, .. } = &blocks[1] else {
@@ -617,10 +685,35 @@ mod tests {
     #[test]
     fn fenced_code_block_text_preserved() {
         let blocks = parse_markdown_for_preview("```\nfn foo() {}\n```");
-        let PreviewBlock::Code { text } = &blocks[0] else {
+        let PreviewBlock::Code { text, .. } = &blocks[0] else {
             panic!("expected Code")
         };
         assert!(text.contains("fn foo()"), "code text missing: {text:?}");
+    }
+
+    #[test]
+    fn fenced_code_block_preserves_blank_lines_inside() {
+        let blocks = parse_markdown_for_preview("```\nfn foo() {}\n\nreturn 1;\n```");
+        let PreviewBlock::Code { text, .. } = &blocks[0] else {
+            panic!("expected Code")
+        };
+        assert_eq!(text, "fn foo() {}\n\nreturn 1;\n");
+    }
+
+    #[test]
+    fn fenced_code_block_inside_list_keeps_list_indent() {
+        let blocks = parse_markdown_for_preview("- item\n\n    ```\n    let x = 1;\n    ```");
+        assert!(
+            blocks.iter().any(|b| matches!(
+                b,
+                PreviewBlock::Code {
+                    indent: 1,
+                    quote: false,
+                    ..
+                }
+            )),
+            "expected indented code block inside list, got: {blocks:?}"
+        );
     }
 
     #[test]
@@ -687,6 +780,232 @@ mod tests {
                 .iter()
                 .any(|b| matches!(b, PreviewBlock::Para { quote: true, .. })),
             "no quoted block found: {blocks:?}"
+        );
+    }
+
+    #[test]
+    fn blockquote_softbreak_stays_on_separate_preview_lines() {
+        let blocks = parse_markdown_for_preview("> testhjhkjhjkh\n> tjkhej");
+        let quoted_blocks: Vec<_> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para {
+                    segs, quote: true, ..
+                } => Some(segs.iter().map(|seg| seg.text.as_str()).collect::<String>()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            quoted_blocks,
+            vec!["testhjhkjhjkh".to_string(), "tjkhej".to_string()]
+        );
+    }
+
+    #[test]
+    fn blockquote_with_blank_line_stays_as_two_quoted_paragraphs() {
+        let blocks = parse_markdown_for_preview("> first\n>\n> second");
+        let quoted_blocks: Vec<_> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para {
+                    segs, quote: true, ..
+                } => Some(segs.iter().map(|seg| seg.text.as_str()).collect::<String>()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            quoted_blocks,
+            vec!["first".to_string(), "second".to_string()]
+        );
+    }
+
+    #[test]
+    fn blockquote_code_block_should_keep_quote_context() {
+        let blocks = parse_markdown_for_preview("> ```\n> let x = 1;\n> ```");
+        assert!(
+            blocks
+                .iter()
+                .any(|b| matches!(b, PreviewBlock::Code { quote: true, .. })),
+            "expected quoted code block in quoted markdown: {blocks:?}"
+        );
+    }
+
+    #[test]
+    fn blockquote_preserves_inline_formatting() {
+        let blocks = parse_markdown_for_preview("> **bold** and `code`");
+        let PreviewBlock::Para {
+            segs, quote: true, ..
+        } = &blocks[0]
+        else {
+            panic!("expected quoted paragraph")
+        };
+
+        assert!(segs.iter().any(|seg| seg.bold && seg.text == "bold"));
+        assert!(segs.iter().any(|seg| seg.code && seg.text == "code"));
+    }
+
+    #[test]
+    fn blockquote_preserves_links() {
+        let blocks = parse_markdown_for_preview("> [docs](https://example.com)");
+        let PreviewBlock::Para {
+            segs, quote: true, ..
+        } = &blocks[0]
+        else {
+            panic!("expected quoted paragraph")
+        };
+
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].text, "docs");
+        assert_eq!(segs[0].link_url.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn blockquote_followed_by_plain_paragraph_does_not_leak_quote_state() {
+        let blocks = parse_markdown_for_preview("> quoted\n\nplain");
+
+        assert!(matches!(&blocks[0], PreviewBlock::Para { quote: true, .. }));
+        assert_eq!(blocks[1], plain_para("plain"));
+    }
+
+    #[test]
+    fn nested_bullet_inside_blockquote_keeps_quote_and_indent() {
+        let blocks = parse_markdown_for_preview("> - first\n>   - nested");
+        let quoted_list_blocks: Vec<_> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para {
+                    quote,
+                    indent,
+                    segs,
+                    ..
+                } if *quote => Some((
+                    *indent,
+                    segs.iter().map(|seg| seg.text.as_str()).collect::<String>(),
+                )),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            quoted_list_blocks,
+            vec![(1, "first".to_string()), (2, "nested".to_string())]
+        );
+    }
+
+    #[test]
+    fn image_between_paragraphs_stays_its_own_block() {
+        let blocks = parse_markdown_for_preview("before\n\n![alt](img.png)\n\nafter");
+        assert_eq!(blocks.len(), 3);
+        assert_eq!(blocks[0], plain_para("before"));
+        assert!(matches!(
+            &blocks[1],
+            PreviewBlock::Image { alt, url } if alt == "alt" && url == "img.png"
+        ));
+        assert_eq!(blocks[2], plain_para("after"));
+    }
+
+    #[test]
+    fn heading_with_inline_code_and_emphasis_preserves_inline_flags() {
+        let blocks = parse_markdown_for_preview("# `cmd` and *note*");
+        let PreviewBlock::Heading { segs, .. } = &blocks[0] else {
+            panic!("expected Heading")
+        };
+
+        assert!(segs.iter().any(|seg| seg.code && seg.text == "cmd"));
+        assert!(segs.iter().any(|seg| seg.italic && seg.text == "note"));
+        assert!(segs.iter().all(|seg| seg.bold));
+    }
+
+    #[test]
+    fn blockquote_heading_keeps_quote_context() {
+        let blocks = parse_markdown_for_preview("> # Title");
+        assert!(
+            matches!(&blocks[0], PreviewBlock::Heading { quote: true, .. }),
+            "expected quoted heading, got: {blocks:?}"
+        );
+    }
+
+    #[test]
+    fn ordered_list_start_number_is_preserved() {
+        let blocks = parse_markdown_for_preview("3. third\n4. fourth");
+        let numbers: Vec<usize> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para {
+                    indent,
+                    list_number: Some(n),
+                    ..
+                } if *indent > 0 => Some(*n),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(numbers, vec![3, 4]);
+    }
+
+    #[test]
+    fn task_list_markers_stay_in_paragraph_text() {
+        let blocks = parse_markdown_for_preview("- [x] done\n- [ ] todo");
+        let lines: Vec<String> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para { segs, indent, .. } if *indent > 0 => {
+                    Some(segs.iter().map(|seg| seg.text.as_str()).collect::<String>())
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(lines, vec!["☑ done".to_string(), "☐ todo".to_string()]);
+    }
+
+    #[test]
+    fn nested_blockquote_and_list_keeps_both_quote_and_indent() {
+        let blocks = parse_markdown_for_preview("> - first\n> - second");
+        let quoted_list_blocks: Vec<(usize, bool, String)> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para {
+                    segs,
+                    indent,
+                    quote,
+                    ..
+                } if *indent > 0 => Some((
+                    *indent,
+                    *quote,
+                    segs.iter().map(|seg| seg.text.as_str()).collect::<String>(),
+                )),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            quoted_list_blocks,
+            vec![
+                (1, true, "first".to_string()),
+                (1, true, "second".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn lazy_blockquote_continuation_stays_quoted_across_lines() {
+        let blocks = parse_markdown_for_preview("> first line\nsecond line");
+        let quoted_blocks: Vec<String> = blocks
+            .iter()
+            .filter_map(|b| match b {
+                PreviewBlock::Para {
+                    segs, quote: true, ..
+                } => Some(segs.iter().map(|seg| seg.text.as_str()).collect::<String>()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            quoted_blocks,
+            vec!["first line".to_string(), "second line".to_string()]
         );
     }
 

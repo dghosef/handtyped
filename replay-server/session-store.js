@@ -1,18 +1,37 @@
 import { isTrustedSigner } from './trusted-signers.js'
 
-const REPLAY_ATTESTATION_FORMAT = 'handtyped-replay-attestation-v1'
+const REPLAY_ATTESTATION_FORMAT_V1 = 'handtyped-replay-attestation-v1'
+const REPLAY_ATTESTATION_FORMAT_V2 = 'handtyped-replay-attestation-v2'
 const ED25519_SPKI_PREFIX = Uint8Array.from([
   0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
 ])
 
 const MAX_PAYLOAD_JSON_BYTES = 5 * 1024 * 1024
+const MAX_PAYLOAD_GZIP_B64_BYTES = 8 * 1024 * 1024
 const MAX_DOC_TEXT_BYTES = 1 * 1024 * 1024
 const MAX_DOC_HTML_BYTES = 1 * 1024 * 1024
 const MAX_KEYSTROKE_LOG_BYTES = 4 * 1024 * 1024
 const MAX_DOC_HISTORY_ENTRIES = 50_000
+const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+const SHORT_ID_LENGTH = 16
 
 function newId() {
-  return globalThis.crypto.randomUUID()
+  const bytes = new Uint8Array(24)
+  let id = ''
+
+  while (id.length < SHORT_ID_LENGTH) {
+    globalThis.crypto.getRandomValues(bytes)
+    for (const byte of bytes) {
+      if (byte < 248) {
+        id += SHORT_ID_ALPHABET[byte % SHORT_ID_ALPHABET.length]
+        if (id.length === SHORT_ID_LENGTH) {
+          return id
+        }
+      }
+    }
+  }
+
+  return id
 }
 
 function utf8ByteLength(value) {
@@ -33,6 +52,23 @@ function decodeHex(value, label) {
     bytes[i / 2] = byte
   }
   return bytes
+}
+
+function decodeBase64(value, label) {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Invalid ${label}`)
+  }
+
+  try {
+    const binary = globalThis.atob(value)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return bytes
+  } catch {
+    throw new Error(`Invalid ${label}`)
+  }
 }
 
 function requireString(payload, key, { maxBytes, allowEmpty = true } = {}) {
@@ -100,7 +136,7 @@ function buildEd25519Spki(rawPublicKey) {
   return spki
 }
 
-async function verifyEd25519Signature(publicKeyHex, signatureHex, payloadJson) {
+async function verifyEd25519Signature(publicKeyHex, signatureHex, payloadBytes) {
   const publicKeyRaw = decodeHex(publicKeyHex, 'signer public key')
   const signature = decodeHex(signatureHex, 'signature')
   const spki = buildEd25519Spki(publicKeyRaw)
@@ -116,8 +152,15 @@ async function verifyEd25519Signature(publicKeyHex, signatureHex, payloadJson) {
     { name: 'Ed25519' },
     key,
     signature,
-    new TextEncoder().encode(payloadJson),
+    payloadBytes,
   )
+}
+
+async function gunzipUtf8(payloadBytes) {
+  const stream = new Response(
+    new Blob([payloadBytes]).stream().pipeThrough(new DecompressionStream('gzip')),
+  )
+  return stream.text()
 }
 
 function normalizeVerifiedPayload(payload) {
@@ -126,6 +169,7 @@ function normalizeVerifiedPayload(payload) {
     maxBytes: 256,
     allowEmpty: false,
   })
+  const document_name = optionalString(payload, 'document_name', { maxBytes: 512 })
   const doc_text = requireString(payload, 'doc_text', { maxBytes: MAX_DOC_TEXT_BYTES })
   const doc_html = requireString(payload, 'doc_html', { maxBytes: MAX_DOC_HTML_BYTES })
   const doc_history = requireArray(payload, 'doc_history', { maxLength: MAX_DOC_HISTORY_ENTRIES })
@@ -164,6 +208,7 @@ function normalizeVerifiedPayload(payload) {
   return {
     session_id,
     session_nonce,
+    document_name,
     doc_text,
     doc_html,
     doc_history,
@@ -224,17 +269,16 @@ export async function parseReplayAttestation(envelope = {}) {
   if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
     throw new Error('Replay upload must be an object')
   }
-  if (envelope.version !== 1) {
+  if (envelope.version !== 1 && envelope.version !== 2) {
     throw new Error('Unsupported replay attestation version')
   }
-  if (envelope.format !== REPLAY_ATTESTATION_FORMAT) {
+  if (
+    envelope.format !== REPLAY_ATTESTATION_FORMAT_V1 &&
+    envelope.format !== REPLAY_ATTESTATION_FORMAT_V2
+  ) {
     throw new Error('Unsupported replay attestation format')
   }
 
-  const payloadJson = requireString(envelope, 'payload_json', {
-    maxBytes: MAX_PAYLOAD_JSON_BYTES,
-    allowEmpty: false,
-  })
   const signerPubkeyHex = requireString(envelope, 'signer_pubkey_hex', {
     maxBytes: 128,
     allowEmpty: false,
@@ -244,6 +288,23 @@ export async function parseReplayAttestation(envelope = {}) {
     allowEmpty: false,
   })
 
+  let payloadJson
+  let payloadBytes
+  if (envelope.format === REPLAY_ATTESTATION_FORMAT_V1) {
+    payloadJson = requireString(envelope, 'payload_json', {
+      maxBytes: MAX_PAYLOAD_JSON_BYTES,
+      allowEmpty: false,
+    })
+    payloadBytes = new TextEncoder().encode(payloadJson)
+  } else {
+    const payloadGzipB64 = requireString(envelope, 'payload_gzip_b64', {
+      maxBytes: MAX_PAYLOAD_GZIP_B64_BYTES,
+      allowEmpty: false,
+    })
+    payloadBytes = decodeBase64(payloadGzipB64, 'payload gzip base64')
+    payloadJson = await gunzipUtf8(payloadBytes)
+  }
+
   let payload
   try {
     payload = JSON.parse(payloadJson)
@@ -251,7 +312,11 @@ export async function parseReplayAttestation(envelope = {}) {
     throw new Error('Invalid replay attestation payload JSON')
   }
 
-  const signatureValid = await verifyEd25519Signature(signerPubkeyHex, signatureHex, payloadJson)
+  const signatureValid = await verifyEd25519Signature(
+    signerPubkeyHex,
+    signatureHex,
+    payloadBytes,
+  )
   if (!signatureValid) {
     throw new Error('Replay attestation signature verification failed')
   }
@@ -265,5 +330,5 @@ export async function parseReplayAttestation(envelope = {}) {
 }
 
 export function buildReplayUrl(origin, id) {
-  return `${origin.replace(/\/$/, '')}/replay/${id}`
+  return `${origin.replace(/\/$/, '')}/${id}`
 }

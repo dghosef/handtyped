@@ -2612,6 +2612,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_extras",
+ "flate2",
  "hex",
  "image",
  "muda 0.16.1",

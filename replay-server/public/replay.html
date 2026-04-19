@@ -20,7 +20,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Georgia, "Times New Roman", Times, serif;
       color: var(--ink);
       background: var(--page);
       line-height: 1.45;
@@ -57,6 +57,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted);
+      font-family: inherit;
       margin-bottom: 4px;
     }
 
@@ -65,6 +66,7 @@
       line-height: 1.15;
       font-weight: 650;
       letter-spacing: -0.02em;
+      font-family: inherit;
       margin: 0 0 14px;
     }
 
@@ -92,6 +94,7 @@
       font-size: 14px;
       font-weight: 500;
       line-height: 1;
+      font-family: inherit;
       padding: 10px 14px;
       cursor: pointer;
       text-align: center;
@@ -154,6 +157,7 @@
       padding: 8px 12px;
       font-size: 14px;
       border-radius: 6px;
+      font-family: inherit;
     }
 
     .play-btn {
@@ -197,6 +201,13 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .time-meta {
+      font-size: 13px;
+      color: var(--muted);
+      padding: 0 0 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
     .replay-status {
       font-size: 14px;
       color: var(--muted);
@@ -205,6 +216,12 @@
 
     .replay-stage {
       padding: 0 0 14px;
+    }
+
+    .replay-stage-scroll {
+      max-height: min(70vh, 840px);
+      overflow: auto;
+      border-radius: 2px;
     }
 
     .doc-page {
@@ -235,10 +252,6 @@
       50% { opacity: 0; }
     }
 
-    .rhythm-wrap {
-      padding: 6px 0 0;
-    }
-
     .muted {
       color: var(--muted);
     }
@@ -248,27 +261,6 @@
       font-size: 12px;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-    }
-
-    .rhythm-chart {
-      height: 72px;
-      background: transparent;
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      padding: 8px 0 0;
-      cursor: pointer;
-    }
-
-    .rhythm-bar {
-      flex: 1;
-      min-height: 4px;
-      background: #cfcfcf;
-      transition: background .15s ease, height .15s ease;
-    }
-
-    .rhythm-bar.active {
-      background: var(--accent-dark);
     }
 
     .stats-copy p {
@@ -282,6 +274,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted);
+      font-family: inherit;
     }
 
     .keyboard-note {
@@ -332,6 +325,7 @@
 
       <div class="share-row">
         <button class="share-btn" id="btn-copy-link">Copy Replay Link</button>
+        <button class="share-btn" id="btn-download-document">Download Document</button>
         <button class="share-btn" id="btn-copy-document">Copy Document Text</button>
       </div>
 
@@ -358,13 +352,12 @@
             <option value="5000">5000×</option>
           </select>
         </div>
+        <div class="time-meta" id="time-meta">Recorded span: 0:00 / 0:00</div>
         <div class="replay-status" id="status-msg">Loading session…</div>
         <div class="replay-stage">
-          <div class="doc-page"><span id="doc-content"></span><span class="cursor-blink" id="cursor"></span></div>
-        </div>
-        <div class="rhythm-wrap">
-          <div class="section-label">Typing rhythm</div>
-          <div class="rhythm-chart" id="rhythm-chart" title="Click to jump through the writing timeline"></div>
+          <div class="replay-stage-scroll" id="replay-stage-scroll">
+            <div class="doc-page"><span id="doc-content"></span><span class="cursor-blink" id="cursor"></span></div>
+          </div>
         </div>
       </div>
 
@@ -382,7 +375,7 @@
       <div class="keyboard-note">
         <div class="section-label">Input verification</div>
         <p>
-          This document was typed on a physical MacBook keyboard. Handtyped only accepts input from the built-in SPI keyboard. External USB keyboards, Bluetooth keyboards, and software-injected keystrokes are excluded.
+          This session was recorded from the built-in SPI keyboard, signed by Handtyped on the Mac, and verified by the replay server before storage. External USB keyboards, Bluetooth keyboards, and software-injected keystrokes are excluded.
         </p>
       </div>
     </div>
@@ -390,8 +383,13 @@
 
   <script type="module">
     import {
+      compressIdleGaps,
+      documentWithAttribution,
+      downloadFilenameForDocument,
       findHistoryIndex,
+      getElapsedRawTime,
       getDurationFromHistory,
+      getRawDurationFromHistory,
       getDurationFromKeydowns,
       parseHistory,
       parseKeydowns,
@@ -399,6 +397,7 @@
 
     const sessionId = location.pathname.split('/').pop()
     const shareUrl = location.href
+    const headlineEl = document.getElementById('headline')
 
     let session = null
     let history = []
@@ -413,68 +412,44 @@
     const cursorEl = document.getElementById('cursor')
     const statusMsgEl = document.getElementById('status-msg')
     const playBtnEl = document.getElementById('btn-play')
+    const replayStageScrollEl = document.getElementById('replay-stage-scroll')
 
-    function buildRhythmSamples(session, parsedHistory, keyEvents) {
-      const raw = Array.isArray(session?.doc_history) ? session.doc_history : []
-      const samples = []
-      let previousText = ''
+    function currentDocumentName() {
+      return session?.document_name || ''
+    }
 
-      raw
-        .slice()
-        .sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
-        .forEach(entry => {
-          if (!entry || typeof entry !== 'object') return
-          const t = Math.max(0, Number(entry.t) || 0)
+    function currentDocumentText() {
+      return session?.doc_text || history[history.length - 1]?.text || ''
+    }
 
-          if (
-            Number.isInteger(entry.pos) &&
-            typeof entry.ins === 'string'
-          ) {
-            const deletedCount = typeof entry.del === 'string'
-              ? Array.from(entry.del).length
-              : Math.max(0, Number(entry.del) || 0)
-            const weight = Math.max(1, deletedCount + Array.from(entry.ins).length)
-            samples.push({ t, weight })
-            return
-          }
+    function buildReplayHistoryWithAttribution(baseHistory) {
+      const items = Array.isArray(baseHistory) ? baseHistory.slice() : []
+      const finalText = session?.doc_text || items[items.length - 1]?.text || ''
+      const finalDocument = documentWithAttribution(finalText, shareUrl)
+      const lastT = items.length ? Number(items[items.length - 1]?.t) || 0 : 0
 
-          if (typeof entry.text === 'string') {
-            const diff = Math.abs(Array.from(entry.text).length - Array.from(previousText).length)
-            if (diff > 0 || entry.text !== previousText) {
-              samples.push({ t, weight: Math.max(1, diff) })
-            }
-            previousText = entry.text
-          }
-        })
-
-      if (samples.length > 0) {
-        return samples
+      if (!items.length) {
+        return [{ t: 0, text: finalDocument }]
       }
 
-      if (parsedHistory.length > 1) {
-        const fallback = []
-        for (let i = 1; i < parsedHistory.length; i++) {
-          const prev = parsedHistory[i - 1]?.text || ''
-          const next = parsedHistory[i]?.text || ''
-          const diff = Math.abs(Array.from(next).length - Array.from(prev).length)
-          fallback.push({
-            t: Math.max(0, Number(parsedHistory[i]?.t) || 0),
-            weight: Math.max(1, diff),
-          })
-        }
-        if (fallback.length > 0) {
-          return fallback
-        }
+      if (items[items.length - 1]?.text === finalDocument) {
+        return items
       }
 
-      return keyEvents.map(event => ({
-        t: Math.max(0, Math.round((event.t - keyEvents[0].t) / 1e6)),
-        weight: 1,
-      }))
+      items.push({
+        t: lastT + 800,
+        text: finalDocument,
+      })
+      return items
     }
 
     function getTotalDuration() {
-      return Math.max(getDurationFromKeydowns(keydowns), getDurationFromHistory(history), 1000)
+      const historyDuration = getDurationFromHistory(history)
+      if (historyDuration > 0) {
+        return Math.max(historyDuration, 1000)
+      }
+
+      return Math.max(getDurationFromKeydowns(keydowns), 1000)
     }
 
     function formatTime(ms) {
@@ -485,10 +460,13 @@
     function renderAt(elapsedMs) {
       const total = getTotalDuration()
       currentElapsedMs = Math.max(0, Math.min(elapsedMs, total))
-      const idx = findHistoryIndex(currentElapsedMs)
-      const text = history[idx]?.text || ''
+      const idx = findHistoryIndex(history, currentElapsedMs)
+      const text = idx >= 0 ? history[idx]?.text || '' : ''
       docContentEl.textContent = text
       cursorEl.style.display = currentElapsedMs >= total ? 'none' : ''
+      if (replayStageScrollEl) {
+        replayStageScrollEl.scrollTop = replayStageScrollEl.scrollHeight
+      }
 
       if (currentElapsedMs >= total) {
         playing = false
@@ -499,18 +477,24 @@
       updateProgress(currentElapsedMs)
     }
 
+    function renderBlankState() {
+      docContentEl.textContent = ''
+      cursorEl.style.display = ''
+      playBtnEl.textContent = '▶'
+      statusMsgEl.textContent = 'Press ▶ to replay'
+      updateProgress(0)
+    }
+
     function updateProgress(elapsedMs) {
       const total = getTotalDuration()
       const pct = total > 0 ? (elapsedMs / total) * 100 : 0
+      const idx = findHistoryIndex(history, elapsedMs)
+      const rawElapsed = idx >= 0 ? getElapsedRawTime(history, idx) : 0
+      const rawTotal = getRawDurationFromHistory(history)
       document.getElementById('progress-fill').style.width = pct + '%'
       document.getElementById('progress-thumb').style.left = pct + '%'
       document.getElementById('time-display').textContent = `${formatTime(elapsedMs)} / ${formatTime(total)}`
-
-      const bars = document.querySelectorAll('#rhythm-chart .rhythm-bar')
-      const activeIdx = bars.length ? Math.min(bars.length - 1, Math.floor((pct / 100) * bars.length)) : -1
-      bars.forEach((bar, index) => {
-        bar.classList.toggle('active', index === activeIdx)
-      })
+      document.getElementById('time-meta').textContent = `Recorded span: ${formatTime(rawElapsed)} / ${formatTime(rawTotal)}`
     }
 
     function startPlay() {
@@ -548,37 +532,6 @@
       animationHandle = null
       playBtnEl.textContent = '▶'
       statusMsgEl.textContent = status
-    }
-
-    function buildRhythmChart() {
-      const wrap = document.querySelector('.rhythm-wrap')
-      const chart = document.getElementById('rhythm-chart')
-      const samples = buildRhythmSamples(session, history, keydowns)
-      const hasTypingData = samples.length > 0
-
-      if (!hasTypingData) {
-        chart.innerHTML = ''
-        wrap.style.display = 'none'
-        return
-      }
-
-      wrap.style.display = ''
-      const buckets = 60
-      const totalDuration = getTotalDuration()
-      const bucketSize = totalDuration / buckets
-      const counts = new Array(buckets).fill(0)
-
-      samples.forEach(sample => {
-        const elapsedMs = Math.max(0, Number(sample.t) || 0)
-        const bucket = Math.min(buckets - 1, Math.floor(elapsedMs / Math.max(bucketSize, 1)))
-        counts[bucket] += Math.max(1, Number(sample.weight) || 1)
-      })
-
-      const maxCount = Math.max(...counts, 1)
-      chart.innerHTML = counts.map(count => {
-        const height = Math.max(6, Math.round((count / maxCount) * 100))
-        return `<div class="rhythm-bar" style="height:${height}%"></div>`
-      }).join('')
     }
 
     function populateStats() {
@@ -650,6 +603,22 @@
       return false
     }
 
+    function downloadDocument() {
+      const text = documentWithAttribution(currentDocumentText(), shareUrl)
+      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = downloadFilenameForDocument(
+        currentDocumentName(),
+        currentDocumentText(),
+      )
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    }
+
     async function loadSession() {
       try {
         const res = await fetch(`/api/sessions/${sessionId}`)
@@ -657,19 +626,20 @@
         session = await res.json()
 
         keydowns = parseKeydowns(session.keystroke_log)
-        history = parseHistory(session, keydowns)
+        history = compressIdleGaps(
+          buildReplayHistoryWithAttribution(parseHistory(session, keydowns))
+        )
 
         document.getElementById('session-date').textContent = formatRecordedDateTime(
           session.created_at,
           session.recorded_timezone,
           Number(session.recorded_timezone_offset_minutes || 0),
         )
+        headlineEl.textContent = currentDocumentName() || 'Writing Session Analysis'
 
         populateStats()
-        buildRhythmChart()
-        renderAt(0)
-        playBtnEl.textContent = '▶'
-        statusMsgEl.textContent = 'Press ▶ to replay'
+        renderBlankState()
+        startPlay()
       } catch (error) {
         statusMsgEl.textContent = `Error: ${error.message}`
       }
@@ -727,22 +697,20 @@
       seekTo(pct * total, 'Replay position updated from the timeline.')
     })
 
-    document.getElementById('rhythm-chart').addEventListener('click', event => {
-      const rect = event.currentTarget.getBoundingClientRect()
-      const pct = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-      const total = getTotalDuration()
-      seekTo(pct * total, 'Replay position updated from the typing rhythm.')
-    })
-
     document.getElementById('btn-copy-link').addEventListener('click', async () => {
       const copied = await copyText(shareUrl)
       statusMsgEl.textContent = copied ? 'Replay link copied!' : 'Replay link ready to copy.'
     })
 
     document.getElementById('btn-copy-document').addEventListener('click', async () => {
-      const text = session?.doc_text || history[history.length - 1]?.text || ''
+      const text = documentWithAttribution(currentDocumentText(), shareUrl)
       const copied = await copyText(text)
       statusMsgEl.textContent = copied ? 'Document text copied!' : 'Document text ready to copy.'
+    })
+
+    document.getElementById('btn-download-document').addEventListener('click', () => {
+      downloadDocument()
+      statusMsgEl.textContent = 'Document downloaded.'
     })
 
     loadSession()

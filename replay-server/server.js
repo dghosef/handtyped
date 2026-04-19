@@ -16,7 +16,7 @@ const fallbackKeyPath = process.env.HANDTYPED_TRUSTED_SIGNER_FILE || join(
 
 if (!process.env.REPLAY_TRUSTED_SIGNER_KEYS && !process.env.HANDTYPED_TRUSTED_SIGNER_FILE) {
   console.warn(
-    `Replay uploads will auto-bootstrap from ${fallbackKeyPath} if that file exists; otherwise set REPLAY_TRUSTED_SIGNER_KEYS for production.`,
+    `Replay uploads require a trusted signer source; set REPLAY_TRUSTED_SIGNER_KEYS or ensure ${fallbackKeyPath} exists before uploading. Health is available at /api/health.`,
   )
 }
 

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev:native": "./native-dev.sh",
+    "build:app": "./build-release-app.sh",
     "test:replay-flow": "cargo test upload:: && npm --prefix replay-server test -- server.test.js",
     "test": "cargo test && cd replay-server && npm test"
   },

@@ -102,9 +102,7 @@ pub fn load_or_create_key() -> Result<SigningKey, String> {
             let _ = write_public_key(key.verifying_key());
             Ok(key)
         }
-        Err(_) => {
-            create_and_store_local_key()
-        }
+        Err(_) => create_and_store_local_key(),
     }
 }
 

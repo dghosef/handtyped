@@ -77,7 +77,7 @@ cat > "$INFO_PLIST" <<'PLIST'
 PLIST
 
 echo "Signing native app bundle..."
-codesign --force --deep --sign "Handtyped Dev" "$APP" 2>/dev/null || \
+codesign --force --deep --sign "Developer ID Application: Joseph Tan (JJJL5W8N9N)" "$APP" 2>/dev/null || \
   codesign --force --deep --sign - "$APP" 2>/dev/null
 
 echo "Launching Handtyped..."

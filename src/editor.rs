@@ -112,6 +112,8 @@ pub struct EditorDocumentState {
     #[serde(default)]
     pub mode: EditorMode,
     #[serde(default)]
+    pub vim_enabled: bool,
+    #[serde(default)]
     pub theme: Option<String>,
     #[serde(default)]
     pub undo_changes: Vec<TextChange>,
@@ -240,6 +242,7 @@ mod tests {
     fn editor_mode_defaults_to_split() {
         let state = EditorDocumentState::default();
         assert_eq!(state.mode, EditorMode::Split);
+        assert!(!state.vim_enabled);
         assert_eq!(state.cursor, 0);
         assert!(state.markdown.is_empty());
         assert!(state.undo_changes.is_empty());
@@ -253,6 +256,7 @@ mod tests {
             markdown: "# Test\n\nBody".into(),
             cursor: 4,
             mode: EditorMode::Split,
+            vim_enabled: true,
             theme: Some("nord".into()),
             undo_changes: vec![TextChange {
                 pos: 0,
@@ -275,6 +279,7 @@ mod tests {
         assert_eq!(restored.markdown, "# Test\n\nBody");
         assert_eq!(restored.cursor, 4);
         assert_eq!(restored.mode, EditorMode::Split);
+        assert!(restored.vim_enabled);
         assert_eq!(restored.theme.as_deref(), Some("nord"));
         assert_eq!(restored.undo_changes.len(), 1);
         assert_eq!(restored.undo_changes[0].ins, "# Test\n\nBody");
@@ -290,6 +295,7 @@ mod tests {
             markdown: "# Test\n\nBody".into(),
             cursor: 4,
             mode: EditorMode::Split,
+            vim_enabled: true,
             theme: Some("gruvbox".into()),
             undo_changes: vec![TextChange {
                 pos: 0,
@@ -311,6 +317,7 @@ mod tests {
         let restored = load_editor_state_from_path(&path).unwrap().unwrap();
         assert_eq!(restored.markdown, state.markdown);
         assert_eq!(restored.mode, state.mode);
+        assert_eq!(restored.vim_enabled, state.vim_enabled);
         assert_eq!(restored.undo_changes, state.undo_changes);
         assert_eq!(restored.recent_files, state.recent_files);
     }
@@ -323,6 +330,7 @@ mod tests {
             markdown: "legacy".into(),
             cursor: 1,
             mode: EditorMode::Source,
+            vim_enabled: true,
             theme: Some("nord".into()),
             undo_changes: Vec::new(),
             undo_index: 0,
@@ -342,6 +350,7 @@ mod tests {
         let restored = load_editor_state_from_path(&path).unwrap().unwrap();
         assert_eq!(restored.markdown, state.markdown);
         assert_eq!(restored.mode, state.mode);
+        assert_eq!(restored.vim_enabled, state.vim_enabled);
         assert_eq!(restored.recent_files, state.recent_files);
         assert!(restored.undo_changes.is_empty());
     }
@@ -352,6 +361,7 @@ mod tests {
             markdown: "third".into(),
             cursor: 0,
             mode: EditorMode::Source,
+            vim_enabled: false,
             theme: None,
             undo_changes: Vec::new(),
             undo_index: 2,
@@ -392,5 +402,150 @@ mod tests {
         assert_eq!(change.ins, "rust");
         assert_eq!(change.apply_to("hello world"), "hello rust");
         assert_eq!(change.apply_inverse_to("hello rust"), "hello world");
+    }
+
+    #[test]
+    fn text_change_handles_insert_at_start() {
+        let change = build_text_change("world", "hello world").unwrap();
+        assert_eq!(change.pos, 0);
+        assert_eq!(change.del, "");
+        assert_eq!(change.ins, "hello ");
+        assert_eq!(change.apply_to("world"), "hello world");
+        assert_eq!(change.apply_inverse_to("hello world"), "world");
+    }
+
+    #[test]
+    fn text_change_handles_insert_at_end() {
+        let change = build_text_change("hello", "hello world").unwrap();
+        assert_eq!(change.pos, 5);
+        assert_eq!(change.del, "");
+        assert_eq!(change.ins, " world");
+        assert_eq!(change.apply_to("hello"), "hello world");
+        assert_eq!(change.apply_inverse_to("hello world"), "hello");
+    }
+
+    #[test]
+    fn text_change_handles_full_replacement() {
+        let change = build_text_change("alpha", "beta").unwrap();
+        assert_eq!(change.pos, 0);
+        assert_eq!(change.del, "alph");
+        assert_eq!(change.ins, "bet");
+        assert_eq!(change.apply_to("alpha"), "beta");
+        assert_eq!(change.apply_inverse_to("beta"), "alpha");
+    }
+
+    #[test]
+    fn text_change_handles_deletion_only() {
+        let change = build_text_change("hello world", "hello ").unwrap();
+        assert_eq!(change.pos, 6);
+        assert_eq!(change.del, "world");
+        assert_eq!(change.ins, "");
+        assert_eq!(change.apply_to("hello world"), "hello ");
+        assert_eq!(change.apply_inverse_to("hello "), "hello world");
+    }
+
+    #[test]
+    fn text_change_handles_unicode_graphemeish_sequences() {
+        let change = build_text_change("hi 😀 there", "hi 😎 there").unwrap();
+        assert_eq!(change.pos, 3);
+        assert_eq!(change.del, "😀");
+        assert_eq!(change.ins, "😎");
+        assert_eq!(change.apply_to("hi 😀 there"), "hi 😎 there");
+        assert_eq!(change.apply_inverse_to("hi 😎 there"), "hi 😀 there");
+    }
+
+    #[test]
+    fn text_change_handles_multiline_replacement() {
+        let change = build_text_change("a\nb\nc", "a\nx\nc").unwrap();
+        assert_eq!(change.pos, 2);
+        assert_eq!(change.del, "b");
+        assert_eq!(change.ins, "x");
+        assert_eq!(change.apply_to("a\nb\nc"), "a\nx\nc");
+        assert_eq!(change.apply_inverse_to("a\nx\nc"), "a\nb\nc");
+    }
+
+    #[test]
+    fn changes_from_revisions_reconstructs_final_revision() {
+        let revisions = vec![
+            "".to_string(),
+            "a".to_string(),
+            "ab".to_string(),
+            "ax".to_string(),
+            "ax\nz".to_string(),
+        ];
+        let changes = changes_from_revisions(&revisions);
+        let rebuilt = changes
+            .iter()
+            .fold(revisions[0].clone(), |current, change| {
+                change.apply_to(&current)
+            });
+
+        assert_eq!(rebuilt, revisions.last().unwrap().to_string());
+    }
+
+    #[test]
+    fn changes_from_revisions_reconstructs_every_intermediate_revision() {
+        let revisions = vec![
+            "".to_string(),
+            "a".to_string(),
+            "ab".to_string(),
+            "aβ".to_string(),
+            "aβ\nz".to_string(),
+            "β\nz".to_string(),
+        ];
+        let changes = changes_from_revisions(&revisions);
+        let mut current = revisions[0].clone();
+
+        for (change, expected) in changes.iter().zip(revisions.iter().skip(1)) {
+            current = change.apply_to(&current);
+            assert_eq!(&current, expected);
+        }
+    }
+
+    #[test]
+    fn inverse_changes_restore_previous_revision_sequence() {
+        let revisions = vec![
+            "".to_string(),
+            "hello".to_string(),
+            "hello world".to_string(),
+            "hello\nworld".to_string(),
+        ];
+        let changes = changes_from_revisions(&revisions);
+        let final_text = revisions.last().cloned().unwrap();
+
+        let restored = changes.iter().rev().fold(final_text, |current, change| {
+            change.apply_inverse_to(&current)
+        });
+
+        assert_eq!(restored, revisions[0]);
+    }
+
+    #[test]
+    fn normalize_editor_state_clamps_undo_index_after_legacy_conversion() {
+        let state = EditorDocumentState {
+            markdown: "third".into(),
+            cursor: 0,
+            mode: EditorMode::Split,
+            vim_enabled: false,
+            theme: None,
+            undo_changes: Vec::new(),
+            undo_index: 99,
+            recent_files: Vec::new(),
+            legacy_undo_revisions: vec!["first".into(), "second".into(), "third".into()],
+        };
+
+        let normalized = normalize_editor_state(state);
+        assert_eq!(normalized.undo_changes.len(), 2);
+        assert_eq!(normalized.undo_index, 2);
+    }
+
+    #[test]
+    fn text_change_handles_inserting_newline_in_middle() {
+        let change = build_text_change("hello world", "hello\nworld").unwrap();
+        assert_eq!(change.pos, 5);
+        assert_eq!(change.del, " ");
+        assert_eq!(change.ins, "\n");
+        assert_eq!(change.apply_to("hello world"), "hello\nworld");
+        assert_eq!(change.apply_inverse_to("hello\nworld"), "hello world");
     }
 }

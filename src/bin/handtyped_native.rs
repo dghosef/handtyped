@@ -3,6 +3,7 @@ use handtyped_lib::document::{self, DocumentPayload};
 use handtyped_lib::editor::{self, EditorDocumentState, EditorMode, TextChange};
 use handtyped_lib::hid;
 use handtyped_lib::integrity;
+use handtyped_lib::observability;
 use handtyped_lib::preview::{parse_markdown_for_preview, PreviewBlock};
 use handtyped_lib::session::{AppState, SessionState};
 use handtyped_lib::signing;
@@ -10,12 +11,17 @@ use handtyped_lib::wysiwyg::{MarkdownEditor, ModeColors};
 use muda::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const EDITOR_WIDGET_ID: &str = "handtyped_md_editor";
+static NEXT_TAB_ID: AtomicU64 = AtomicU64::new(1);
+
 fn main() -> eframe::Result<()> {
+    observability::install_panic_hook();
     integrity::deny_debugger_attach();
     let report = integrity::run_checks();
     let start_mach = unsafe { hid::mach_absolute_time() };
@@ -32,6 +38,7 @@ fn main() -> eframe::Result<()> {
         integrity: report,
         keyboard_info: Mutex::new(None),
         last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
+        observability: Mutex::new(observability::RuntimeObservability::load_from_disk()),
     });
 
     unsafe { hid::request_input_monitoring_access() };
@@ -304,6 +311,161 @@ mod tests {
         );
     }
 
+    #[test]
+    fn preview_links_use_explicit_accent_color() {
+        assert_eq!(
+            preview_link_color(),
+            egui::Color32::from_rgb(0x26, 0x8b, 0xd2)
+        );
+    }
+
+    #[test]
+    fn preview_links_open_in_new_tab() {
+        let target = preview_link_target("https://example.com");
+        assert_eq!(target.url, "https://example.com");
+        assert!(target.new_tab);
+    }
+
+    #[test]
+    fn preview_segments_only_become_clickable_when_they_have_links() {
+        assert!(preview_segment_is_clickable(Some("https://example.com")));
+        assert!(!preview_segment_is_clickable(None));
+    }
+
+    #[test]
+    fn save_as_completion_updates_origin_tab_not_whatever_is_active() {
+        let mut tabs = vec![
+            DocumentTab {
+                tab_id: 1,
+                path: PathBuf::from("/tmp/original.ht"),
+                editor_state: EditorDocumentState {
+                    markdown: "scratch draft".into(),
+                    ..EditorDocumentState::default()
+                },
+                persisted_markdown: "".into(),
+                doc_history: default_doc_history("scratch draft"),
+                replay_origin_wall_ms: 1,
+                replay_url: None,
+                published_history_len: None,
+                theme: Theme::Gruvbox,
+                pane_mode: PaneMode::Split,
+                doc_is_writable: true,
+            },
+            DocumentTab {
+                tab_id: 2,
+                path: PathBuf::from("/tmp/other.ht"),
+                editor_state: EditorDocumentState {
+                    markdown: "other tab".into(),
+                    ..EditorDocumentState::default()
+                },
+                persisted_markdown: "other tab".into(),
+                doc_history: default_doc_history("other tab"),
+                replay_origin_wall_ms: 2,
+                replay_url: None,
+                published_history_len: None,
+                theme: Theme::Nord,
+                pane_mode: PaneMode::Source,
+                doc_is_writable: true,
+            },
+        ];
+
+        let saved_path = PathBuf::from("/tmp/saved.ht");
+        let snapshot = EditorDocumentState {
+            markdown: "scratch draft".into(),
+            ..EditorDocumentState::default()
+        };
+        let origin_tab_id = tabs[0].tab_id;
+
+        let updated = apply_save_as_result(
+            &mut tabs,
+            Some(1),
+            Some(origin_tab_id),
+            saved_path.clone(),
+            "scratch draft".into(),
+            snapshot,
+            Theme::Catppuccin,
+            PaneMode::Source,
+            true,
+        );
+
+        assert_eq!(updated, Some(0));
+        assert_eq!(tabs[0].path, saved_path);
+        assert_eq!(tabs[0].editor_state.markdown, "scratch draft");
+        assert_eq!(tabs[0].theme, Theme::Catppuccin);
+        assert!(matches!(tabs[0].pane_mode, PaneMode::Source));
+        assert_eq!(tabs[1].path, PathBuf::from("/tmp/other.ht"));
+        assert_eq!(tabs[1].editor_state.markdown, "other tab");
+        assert_eq!(tabs[1].theme, Theme::Nord);
+        assert!(matches!(tabs[1].pane_mode, PaneMode::Source));
+    }
+
+    #[test]
+    fn save_as_completion_ignores_tab_index_shifts_and_leaves_other_tabs_alone() {
+        let mut tabs = vec![
+            DocumentTab {
+                tab_id: 1,
+                path: PathBuf::from("/tmp/original.ht"),
+                editor_state: EditorDocumentState {
+                    markdown: "draft one".into(),
+                    ..EditorDocumentState::default()
+                },
+                persisted_markdown: "draft one".into(),
+                doc_history: default_doc_history("draft one"),
+                replay_origin_wall_ms: 1,
+                replay_url: None,
+                published_history_len: None,
+                theme: Theme::Gruvbox,
+                pane_mode: PaneMode::Split,
+                doc_is_writable: true,
+            },
+            DocumentTab {
+                tab_id: 2,
+                path: PathBuf::from("/tmp/other.ht"),
+                editor_state: EditorDocumentState {
+                    markdown: "other tab".into(),
+                    ..EditorDocumentState::default()
+                },
+                persisted_markdown: "other tab".into(),
+                doc_history: default_doc_history("other tab"),
+                replay_origin_wall_ms: 2,
+                replay_url: None,
+                published_history_len: None,
+                theme: Theme::Nord,
+                pane_mode: PaneMode::Source,
+                doc_is_writable: true,
+            },
+        ];
+
+        let origin_tab_id = tabs[0].tab_id;
+        tabs.remove(0);
+
+        let saved_path = PathBuf::from("/tmp/saved.ht");
+        let snapshot = EditorDocumentState {
+            markdown: "draft one".into(),
+            ..EditorDocumentState::default()
+        };
+
+        let updated = apply_save_as_result(
+            &mut tabs,
+            Some(0),
+            Some(origin_tab_id),
+            saved_path.clone(),
+            "draft one".into(),
+            snapshot,
+            Theme::Catppuccin,
+            PaneMode::Source,
+            true,
+        );
+
+        assert_eq!(updated, Some(1));
+        assert_eq!(tabs[0].path, PathBuf::from("/tmp/other.ht"));
+        assert_eq!(tabs[0].editor_state.markdown, "other tab");
+        assert_eq!(tabs[0].theme, Theme::Nord);
+        assert_eq!(tabs[1].path, saved_path);
+        assert_eq!(tabs[1].editor_state.markdown, "draft one");
+        assert_eq!(tabs[1].theme, Theme::Catppuccin);
+    }
+
     /// Cmd+S on a new document (no path) must prompt for a filename, not
     /// silently save to the legacy editor-state path.
     #[test]
@@ -334,7 +496,7 @@ mod tests {
     #[test]
     fn replay_upload_required_when_history_has_changed() {
         assert!(replay_upload_required(
-            Some("http://localhost/replay/abc"),
+            Some("http://localhost/abc"),
             Some(1),
             2
         ));
@@ -343,10 +505,80 @@ mod tests {
     #[test]
     fn replay_upload_not_required_when_cache_matches_history() {
         assert!(!replay_upload_required(
-            Some("http://localhost/replay/abc"),
+            Some("http://localhost/abc"),
             Some(3),
             3,
         ));
+    }
+
+    #[test]
+    fn replay_open_plan_prefers_fresh_upload_over_stale_cached_replay() {
+        assert_eq!(
+            replay_open_plan(Some("http://localhost/stale"), Some(1), 2),
+            ReplayOpenPlan::UploadAndOpenAfterReady
+        );
+    }
+
+    #[test]
+    fn replay_open_plan_uses_cached_replay_when_history_matches() {
+        assert_eq!(
+            replay_open_plan(Some("http://localhost/current"), Some(3), 3),
+            ReplayOpenPlan::OpenCachedReplay
+        );
+    }
+
+    #[test]
+    fn replay_upload_completion_ignores_missing_origin_tab_and_leaves_others_untouched() {
+        let mut tabs = vec![
+            DocumentTab {
+                tab_id: 11,
+                path: PathBuf::from("/tmp/original.ht"),
+                editor_state: EditorDocumentState {
+                    markdown: "draft one".into(),
+                    ..EditorDocumentState::default()
+                },
+                persisted_markdown: "draft one".into(),
+                doc_history: default_doc_history("draft one"),
+                replay_origin_wall_ms: 1,
+                replay_url: None,
+                published_history_len: None,
+                theme: Theme::Gruvbox,
+                pane_mode: PaneMode::Split,
+                doc_is_writable: true,
+            },
+            DocumentTab {
+                tab_id: 22,
+                path: PathBuf::from("/tmp/other.ht"),
+                editor_state: EditorDocumentState {
+                    markdown: "other tab".into(),
+                    ..EditorDocumentState::default()
+                },
+                persisted_markdown: "other tab".into(),
+                doc_history: default_doc_history("other tab"),
+                replay_origin_wall_ms: 2,
+                replay_url: None,
+                published_history_len: None,
+                theme: Theme::Nord,
+                pane_mode: PaneMode::Source,
+                doc_is_writable: true,
+            },
+        ];
+
+        let origin_tab_id = tabs[0].tab_id;
+        tabs.remove(0);
+
+        let updated = apply_replay_upload_result(
+            &mut tabs,
+            origin_tab_id,
+            "https://replay.handtyped.app/abc123".into(),
+            9,
+        );
+
+        assert_eq!(updated, None);
+        assert_eq!(tabs[0].replay_url, None);
+        assert_eq!(tabs[0].published_history_len, None);
+        assert_eq!(tabs[0].path, PathBuf::from("/tmp/other.ht"));
+        assert_eq!(tabs[0].editor_state.markdown, "other tab");
     }
 
     #[test]
@@ -357,6 +589,63 @@ mod tests {
     #[test]
     fn replay_origin_starts_at_now_without_saved_history() {
         assert_eq!(replay_origin_wall_ms_for(5_000, None), 5_000);
+    }
+
+    #[test]
+    fn vim_toggle_requests_editor_focus() {
+        let mut vim_enabled = false;
+        let mut focus_editor_next_frame = false;
+
+        toggle_vim_and_request_editor_focus(&mut vim_enabled, &mut focus_editor_next_frame);
+
+        assert!(vim_enabled);
+        assert!(focus_editor_next_frame);
+    }
+
+    #[test]
+    fn pane_toggle_requests_editor_focus() {
+        let mut pane_mode = PaneMode::Split;
+        let mut focus_editor_next_frame = false;
+
+        toggle_pane_mode_and_request_editor_focus(&mut pane_mode, &mut focus_editor_next_frame);
+
+        assert!(matches!(pane_mode, PaneMode::Source));
+        assert!(focus_editor_next_frame);
+    }
+
+    #[test]
+    fn theme_change_requests_editor_focus() {
+        let mut focus_editor_next_frame = false;
+
+        set_theme_and_request_editor_focus(true, &mut focus_editor_next_frame);
+
+        assert!(focus_editor_next_frame);
+    }
+
+    #[test]
+    fn schedule_editor_focus_marks_next_frame() {
+        let mut focus_editor_next_frame = false;
+        schedule_editor_focus(&mut focus_editor_next_frame);
+        assert!(focus_editor_next_frame);
+    }
+
+    #[test]
+    fn editor_focus_request_reaches_first_editor_frame() {
+        let ctx = egui::Context::default();
+        request_editor_focus(&ctx);
+
+        let mut editor = MarkdownEditor::new("hello");
+        let raw = egui::RawInput::default();
+        let _ = ctx.run(raw, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let _ = editor.show(ui, true);
+            });
+        });
+
+        assert!(
+            ctx.memory(|mem| mem.has_focus(egui::Id::new(EDITOR_WIDGET_ID))),
+            "the editor must receive focus on the first frame after opening a document"
+        );
     }
 
     #[test]
@@ -401,6 +690,85 @@ mod tests {
     }
 
     #[test]
+    fn launcher_returns_to_prior_active_tab_when_closed() {
+        assert_eq!(launcher_return_index(Some(2), None, 3), Some(2));
+        assert_eq!(launcher_return_index(None, Some(1), 3), Some(1));
+        assert_eq!(launcher_return_index(None, None, 3), Some(2));
+        assert_eq!(launcher_return_index(Some(4), None, 3), Some(2));
+        assert_eq!(launcher_return_index(None, None, 0), None);
+    }
+
+    #[test]
+    fn startup_recent_file_path_skips_missing_entries_and_picks_first_existing() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let missing = dir.path().join("missing.ht");
+        let first = dir.path().join("first.ht");
+        let second = dir.path().join("second.ht");
+        fs::write(&first, "one").unwrap();
+        fs::write(&second, "two").unwrap();
+
+        let selected = startup_recent_file_path(&[missing.clone(), first.clone(), second.clone()]);
+
+        assert_eq!(selected, Some(first));
+    }
+
+    #[test]
+    fn recent_files_show_named_unsaved_open_documents() {
+        let unsaved = PathBuf::from("/tmp/blog1.ht");
+        let tabs = vec![DocumentTab {
+            tab_id: 1,
+            path: unsaved.clone(),
+            editor_state: EditorDocumentState::default(),
+            persisted_markdown: String::new(),
+            doc_history: default_doc_history(""),
+            replay_origin_wall_ms: 0,
+            replay_url: None,
+            published_history_len: None,
+            theme: Theme::Gruvbox,
+            pane_mode: PaneMode::Split,
+            doc_is_writable: true,
+        }];
+
+        assert!(
+            should_show_recent_file(&unsaved, &tabs),
+            "a named document that is currently open should still appear in Recent Files before its first save"
+        );
+    }
+
+    #[test]
+    fn recent_files_hide_missing_paths_that_are_not_open() {
+        let missing = PathBuf::from("/tmp/missing-blog1.ht");
+
+        assert!(
+            !should_show_recent_file(&missing, &[]),
+            "stale missing paths should still be pruned from Recent Files"
+        );
+    }
+
+    #[test]
+    fn path_is_open_in_tabs_matches_equivalent_open_document_paths() {
+        let path = PathBuf::from("/tmp/blog1.ht");
+        let tabs = vec![DocumentTab {
+            tab_id: 1,
+            path: path.clone(),
+            editor_state: EditorDocumentState::default(),
+            persisted_markdown: String::new(),
+            doc_history: default_doc_history(""),
+            replay_origin_wall_ms: 0,
+            replay_url: None,
+            published_history_len: None,
+            theme: Theme::Gruvbox,
+            pane_mode: PaneMode::Split,
+            doc_is_writable: true,
+        }];
+
+        assert!(path_is_open_in_tabs(&path, &tabs));
+    }
+
+    #[test]
     fn history_delta_entry_captures_simple_insert() {
         let delta = build_history_delta_entry("abc", "abXc", 42).unwrap();
         assert_eq!(delta["t"], 42);
@@ -416,6 +784,30 @@ mod tests {
         assert_eq!(delta["pos"], 6);
         assert_eq!(delta["del"], "world");
         assert_eq!(delta["ins"], "rust");
+    }
+
+    #[test]
+    fn same_openable_path_treats_symlink_and_canonical_path_as_the_same_file() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let real_path = dir.path().join("document.ht");
+        fs::write(&real_path, "hello").unwrap();
+
+        #[cfg(unix)]
+        let alias_path = {
+            use std::os::unix::fs::symlink;
+            let alias = dir.path().join("alias.ht");
+            symlink(&real_path, &alias).unwrap();
+            alias
+        };
+
+        #[cfg(not(unix))]
+        let alias_path = std::fs::canonicalize(&real_path).unwrap();
+
+        assert!(same_openable_path(&real_path, &alias_path));
+        assert!(same_openable_path(&alias_path, &real_path));
     }
 }
 
@@ -925,6 +1317,7 @@ enum LaunchScreen {
 
 #[derive(Clone)]
 struct DocumentTab {
+    tab_id: u64,
     path: PathBuf,
     editor_state: EditorDocumentState,
     persisted_markdown: String,
@@ -952,16 +1345,19 @@ struct NativeEditorApp {
     /// Set when the theme changes outside of the top-bar ComboBox (e.g. on file open).
     needs_theme_apply: bool,
     input_monitoring_prompt_dismissed: bool,
+    focus_editor_next_frame: bool,
+    launcher_return_tab_index: Option<usize>,
     background_tx: Sender<BackgroundResult>,
     background_rx: Receiver<BackgroundResult>,
     saving_paths: HashSet<PathBuf>,
     opening_paths: HashSet<PathBuf>,
-    uploading_tabs: HashSet<usize>,
+    uploading_tabs: HashSet<u64>,
     modal_error: Option<String>,
 }
 
 #[derive(Clone)]
 struct OpenedDocumentData {
+    tab_id: u64,
     path: PathBuf,
     editor_state: EditorDocumentState,
     persisted_markdown: String,
@@ -985,6 +1381,7 @@ enum BackgroundResult {
         result: Result<(), String>,
     },
     SaveAs {
+        origin_tab_id: Option<u64>,
         path: PathBuf,
         markdown: String,
         snapshot: EditorDocumentState,
@@ -998,8 +1395,9 @@ enum BackgroundResult {
         result: Result<OpenedDocumentData, String>,
     },
     ReplayUpload {
-        tab_index: usize,
+        tab_id: u64,
         published_history_len: usize,
+        open_when_ready: bool,
         result: Result<String, String>,
     },
 }
@@ -1010,6 +1408,24 @@ fn replay_upload_required(
     current_history_len: usize,
 ) -> bool {
     replay_url.is_none() || published_history_len != Some(current_history_len)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplayOpenPlan {
+    OpenCachedReplay,
+    UploadAndOpenAfterReady,
+}
+
+fn replay_open_plan(
+    replay_url: Option<&str>,
+    published_history_len: Option<usize>,
+    current_history_len: usize,
+) -> ReplayOpenPlan {
+    if replay_upload_required(replay_url, published_history_len, current_history_len) {
+        ReplayOpenPlan::UploadAndOpenAfterReady
+    } else {
+        ReplayOpenPlan::OpenCachedReplay
+    }
 }
 
 fn should_autosave_document(
@@ -1031,8 +1447,97 @@ fn should_skip_tab_reload(
     active_tab == Some(requested_index) && launch_screen != LaunchScreen::Start
 }
 
+fn launcher_return_index(
+    launcher_return_tab_index: Option<usize>,
+    active_tab: Option<usize>,
+    tab_count: usize,
+) -> Option<usize> {
+    if tab_count == 0 {
+        return None;
+    }
+    Some(
+        launcher_return_tab_index
+            .or(active_tab)
+            .unwrap_or(tab_count - 1)
+            .min(tab_count - 1),
+    )
+}
+
 fn replay_origin_wall_ms_for(now_ms: u64, last_history_t_ms: Option<u64>) -> u64 {
     now_ms.saturating_sub(last_history_t_ms.unwrap_or(0))
+}
+
+fn apply_save_as_result(
+    tabs: &mut Vec<DocumentTab>,
+    active_tab: Option<usize>,
+    origin_tab_id: Option<u64>,
+    path: PathBuf,
+    markdown: String,
+    snapshot: EditorDocumentState,
+    theme: Theme,
+    pane_mode: PaneMode,
+    doc_is_writable: bool,
+) -> Option<usize> {
+    let normalized_path = normalize_existing_path(&path);
+    let origin_index = origin_tab_id.and_then(|tab_id| find_tab_index_by_id(tabs, tab_id));
+    if let Some(origin_index) = origin_index {
+        if let Some(tab) = tabs.get_mut(origin_index) {
+            tab.path = normalized_path;
+            tab.editor_state = snapshot;
+            tab.persisted_markdown = markdown;
+            tab.theme = theme;
+            tab.pane_mode = pane_mode;
+            tab.doc_is_writable = doc_is_writable;
+            return Some(origin_index);
+        }
+    }
+
+    if origin_tab_id.is_none() {
+        if let Some(active_index) = active_tab {
+            if let Some(tab) = tabs.get_mut(active_index) {
+                tab.path = normalized_path;
+                tab.editor_state = snapshot;
+                tab.persisted_markdown = markdown;
+                tab.theme = theme;
+                tab.pane_mode = pane_mode;
+                tab.doc_is_writable = doc_is_writable;
+                return Some(active_index);
+            }
+        }
+    }
+
+    tabs.push(DocumentTab {
+        tab_id: next_tab_id(),
+        path: normalized_path,
+        editor_state: snapshot,
+        persisted_markdown: markdown.clone(),
+        doc_history: default_doc_history(&markdown),
+        replay_origin_wall_ms: now_wall_ms(),
+        replay_url: None,
+        published_history_len: None,
+        theme,
+        pane_mode,
+        doc_is_writable,
+    });
+    Some(tabs.len() - 1)
+}
+
+fn find_tab_index_by_id(tabs: &[DocumentTab], tab_id: u64) -> Option<usize> {
+    tabs.iter().position(|tab| tab.tab_id == tab_id)
+}
+
+fn apply_replay_upload_result(
+    tabs: &mut [DocumentTab],
+    tab_id: u64,
+    replay_url: String,
+    published_history_len: usize,
+) -> Option<usize> {
+    let tab_index = find_tab_index_by_id(tabs, tab_id)?;
+    if let Some(tab) = tabs.get_mut(tab_index) {
+        tab.replay_url = Some(replay_url);
+        tab.published_history_len = Some(published_history_len);
+    }
+    Some(tab_index)
 }
 
 fn now_wall_ms() -> u64 {
@@ -1040,6 +1545,60 @@ fn now_wall_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+fn next_tab_id() -> u64 {
+    NEXT_TAB_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+fn normalize_existing_path(path: &std::path::Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn same_openable_path(lhs: &std::path::Path, rhs: &std::path::Path) -> bool {
+    normalize_existing_path(lhs) == normalize_existing_path(rhs)
+}
+
+fn path_is_open_in_tabs(path: &std::path::Path, tabs: &[DocumentTab]) -> bool {
+    tabs.iter().any(|tab| same_openable_path(&tab.path, path))
+}
+
+fn should_show_recent_file(path: &std::path::Path, tabs: &[DocumentTab]) -> bool {
+    path.exists() || path_is_open_in_tabs(path, tabs)
+}
+
+fn startup_recent_file_path(recent_files: &[PathBuf]) -> Option<PathBuf> {
+    recent_files.iter().find(|path| path.exists()).cloned()
+}
+
+fn request_editor_focus(ctx: &egui::Context) {
+    ctx.memory_mut(|mem| mem.request_focus(egui::Id::new(EDITOR_WIDGET_ID)));
+}
+
+fn schedule_editor_focus(focus_editor_next_frame: &mut bool) {
+    *focus_editor_next_frame = true;
+}
+
+fn toggle_vim_and_request_editor_focus(vim_enabled: &mut bool, focus_editor_next_frame: &mut bool) {
+    *vim_enabled = !*vim_enabled;
+    *focus_editor_next_frame = true;
+}
+
+fn toggle_pane_mode_and_request_editor_focus(
+    pane_mode: &mut PaneMode,
+    focus_editor_next_frame: &mut bool,
+) {
+    *pane_mode = match pane_mode {
+        PaneMode::Split => PaneMode::Source,
+        PaneMode::Source => PaneMode::Split,
+    };
+    *focus_editor_next_frame = true;
+}
+
+fn set_theme_and_request_editor_focus(theme_changed: bool, focus_editor_next_frame: &mut bool) {
+    if theme_changed {
+        *focus_editor_next_frame = true;
+    }
 }
 
 fn history_last_t_ms(history: &[serde_json::Value]) -> Option<u64> {
@@ -1100,7 +1659,11 @@ fn history_last_text(history: &[serde_json::Value]) -> String {
     })
 }
 
-fn build_history_delta_entry(previous: &str, next: &str, elapsed_ms: u64) -> Option<serde_json::Value> {
+fn build_history_delta_entry(
+    previous: &str,
+    next: &str,
+    elapsed_ms: u64,
+) -> Option<serde_json::Value> {
     editor::build_text_change(previous, next).map(|change| {
         serde_json::json!({
             "t": elapsed_ms,
@@ -1123,17 +1686,20 @@ fn load_opened_document_data(
             } else {
                 doc.payload.doc_history.clone()
             };
+            let normalized_path = normalize_existing_path(path);
             let theme = Theme::from_storage_key(doc.payload.theme.as_deref());
             let pane_mode = match doc.payload.mode {
                 EditorMode::Split => PaneMode::Split,
                 EditorMode::Source => PaneMode::Source,
             };
             Ok(Some(OpenedDocumentData {
-                path: path.to_path_buf(),
+                tab_id: next_tab_id(),
+                path: normalized_path,
                 editor_state: EditorDocumentState {
                     markdown: markdown.clone(),
                     cursor: doc.payload.cursor,
                     mode: doc.payload.mode,
+                    vim_enabled: false,
                     theme: doc.payload.theme.clone(),
                     undo_changes: doc.payload.undo_changes.clone(),
                     undo_index: doc.payload.undo_index,
@@ -1165,17 +1731,20 @@ fn load_opened_document_data(
                 } else {
                     doc.payload.doc_history.clone()
                 };
+                let normalized_path = normalize_existing_path(path);
                 let theme = Theme::from_storage_key(doc.payload.theme.as_deref());
                 let pane_mode = match doc.payload.mode {
                     EditorMode::Split => PaneMode::Split,
                     EditorMode::Source => PaneMode::Source,
                 };
                 Ok(Some(OpenedDocumentData {
-                    path: path.to_path_buf(),
+                    tab_id: next_tab_id(),
+                    path: normalized_path,
                     editor_state: EditorDocumentState {
                         markdown: markdown.clone(),
                         cursor: doc.payload.cursor,
                         mode: doc.payload.mode,
+                        vim_enabled: false,
                         theme: doc.payload.theme.clone(),
                         undo_changes: doc.payload.undo_changes.clone(),
                         undo_index: doc.payload.undo_index,
@@ -1222,17 +1791,22 @@ impl NativeEditorApp {
 
     fn open_launcher(&mut self) {
         self.sync_active_tab_from_editor();
+        self.launcher_return_tab_index = self.active_tab;
         self.active_tab = None;
         self.launch_screen = LaunchScreen::Start;
         self.set_info_status("Ready");
     }
 
     fn close_launcher(&mut self) {
-        if self.tabs.is_empty() {
+        let Some(index) = launcher_return_index(
+            self.launcher_return_tab_index,
+            self.active_tab,
+            self.tabs.len(),
+        ) else {
             return;
-        }
-        let index = self.active_tab.unwrap_or(self.tabs.len() - 1);
-        self.load_tab_into_editor(index.min(self.tabs.len() - 1));
+        };
+        self.launcher_return_tab_index = None;
+        self.load_tab_into_editor(index);
     }
 
     fn close_current_tab(&mut self) {
@@ -1281,7 +1855,9 @@ impl NativeEditorApp {
     }
 
     fn find_tab_index_by_path(&self, path: &std::path::Path) -> Option<usize> {
-        self.tabs.iter().position(|tab| tab.path == path)
+        self.tabs
+            .iter()
+            .position(|tab| same_openable_path(&tab.path, path))
     }
 
     fn current_editor_state_snapshot(&self) -> EditorDocumentState {
@@ -1293,6 +1869,7 @@ impl NativeEditorApp {
                 PaneMode::Split => EditorMode::Split,
                 PaneMode::Source => EditorMode::Source,
             },
+            vim_enabled: self.editor.vim_enabled,
             theme: Some(self.theme.storage_key().to_string()),
             undo_changes,
             undo_index,
@@ -1321,6 +1898,7 @@ impl NativeEditorApp {
         self.active_tab = Some(index);
         self.editor = MarkdownEditor::new(&tab.editor_state.markdown);
         self.editor.mode_colors = tab.theme.mode_colors();
+        self.editor.vim_enabled = tab.editor_state.vim_enabled;
         self.editor.set_undo_state(
             tab.editor_state.undo_changes.clone(),
             tab.editor_state.undo_index,
@@ -1330,11 +1908,13 @@ impl NativeEditorApp {
         self.doc_is_writable = tab.doc_is_writable;
         self.needs_theme_apply = true;
         self.launch_screen = LaunchScreen::Editor;
+        schedule_editor_focus(&mut self.focus_editor_next_frame);
         self.persist_editor_state_snapshot();
     }
 
     fn apply_opened_document(&mut self, opened: OpenedDocumentData) {
         let tab = DocumentTab {
+            tab_id: opened.tab_id,
             path: opened.path.clone(),
             editor_state: opened.editor_state,
             persisted_markdown: opened.persisted_markdown,
@@ -1399,6 +1979,7 @@ impl NativeEditorApp {
 
     fn spawn_save_as(
         &mut self,
+        origin_tab_id: Option<u64>,
         path: PathBuf,
         payload: DocumentPayload,
         markdown: String,
@@ -1421,6 +2002,7 @@ impl NativeEditorApp {
         std::thread::spawn(move || {
             let result = document::save_document(&path, payload);
             let _ = tx.send(BackgroundResult::SaveAs {
+                origin_tab_id,
                 path,
                 markdown,
                 snapshot,
@@ -1435,12 +2017,14 @@ impl NativeEditorApp {
 
     fn spawn_replay_upload(
         &mut self,
-        tab_index: usize,
+        tab_id: u64,
+        document_name: Option<String>,
         doc_text: String,
         doc_history: Vec<serde_json::Value>,
+        open_when_ready: bool,
         ctx: &egui::Context,
     ) {
-        if !self.uploading_tabs.insert(tab_index) {
+        if !self.uploading_tabs.insert(tab_id) {
             return;
         }
         self.set_info_status("Uploading replay...");
@@ -1453,6 +2037,7 @@ impl NativeEditorApp {
             let tx_for_progress = tx.clone();
             let result = handtyped_lib::upload::upload_replay_session_native_with_progress(
                 &state,
+                document_name.as_deref(),
                 &doc_text,
                 &doc_history,
                 |stage| {
@@ -1464,8 +2049,9 @@ impl NativeEditorApp {
                 },
             );
             let _ = tx.send(BackgroundResult::ReplayUpload {
-                tab_index,
+                tab_id,
                 published_history_len,
+                open_when_ready,
                 result,
             });
             repaint.request_repaint();
@@ -1501,6 +2087,7 @@ impl NativeEditorApp {
                     }
                 }
                 BackgroundResult::SaveAs {
+                    origin_tab_id,
                     path,
                     markdown,
                     snapshot,
@@ -1512,31 +2099,17 @@ impl NativeEditorApp {
                     self.saving_paths.remove(&path);
                     match result {
                         Ok(()) => {
-                            if let Some(active_index) = self.active_tab {
-                                if let Some(tab) = self.tabs.get_mut(active_index) {
-                                    tab.path = path.clone();
-                                    tab.editor_state = snapshot;
-                                    tab.persisted_markdown = markdown;
-                                    tab.theme = theme;
-                                    tab.pane_mode = pane_mode;
-                                    tab.doc_is_writable = doc_is_writable;
-                                }
-                            } else {
-                                let tab = DocumentTab {
-                                    path: path.clone(),
-                                    editor_state: snapshot,
-                                    persisted_markdown: markdown.clone(),
-                                    doc_history: default_doc_history(&markdown),
-                                    replay_origin_wall_ms: now_wall_ms(),
-                                    replay_url: None,
-                                    published_history_len: None,
-                                    theme,
-                                    pane_mode,
-                                    doc_is_writable,
-                                };
-                                self.tabs.push(tab);
-                                self.active_tab = Some(self.tabs.len() - 1);
-                            }
+                            self.active_tab = apply_save_as_result(
+                                &mut self.tabs,
+                                self.active_tab,
+                                origin_tab_id,
+                                path.clone(),
+                                markdown,
+                                snapshot,
+                                theme,
+                                pane_mode,
+                                doc_is_writable,
+                            );
                             self.record_recent_file(&path);
                             self.set_info_status(format!(
                                 "Saved: {}",
@@ -1560,26 +2133,33 @@ impl NativeEditorApp {
                     }
                 }
                 BackgroundResult::ReplayUpload {
-                    tab_index,
+                    tab_id,
                     published_history_len,
+                    open_when_ready,
                     result,
                 } => {
-                    self.uploading_tabs.remove(&tab_index);
+                    self.uploading_tabs.remove(&tab_id);
                     match result {
                         Ok(url) => {
-                            if let Some(tab) = self.tabs.get_mut(tab_index) {
-                                tab.replay_url = Some(url.clone());
-                                tab.published_history_len = Some(published_history_len);
-                            }
+                            let _ = apply_replay_upload_result(
+                                &mut self.tabs,
+                                tab_id,
+                                url.clone(),
+                                published_history_len,
+                            );
                             self.set_info_status("Replay ready");
-                            ctx.open_url(egui::OpenUrl::new_tab(url));
+                            if open_when_ready {
+                                ctx.open_url(egui::OpenUrl::new_tab(url));
+                            }
                         }
                         Err(err) => {
-                            if self.active_tab == Some(tab_index) {
-                                self.clear_replay_cache();
-                            } else if let Some(tab) = self.tabs.get_mut(tab_index) {
-                                tab.replay_url = None;
-                                tab.published_history_len = None;
+                            if let Some(tab_index) = find_tab_index_by_id(&self.tabs, tab_id) {
+                                if self.active_tab == Some(tab_index) {
+                                    self.clear_replay_cache();
+                                } else if let Some(tab) = self.tabs.get_mut(tab_index) {
+                                    tab.replay_url = None;
+                                    tab.published_history_len = None;
+                                }
                             }
                             self.set_error_status(format!("Upload failed: {err}"));
                         }
@@ -1590,6 +2170,7 @@ impl NativeEditorApp {
     }
 
     fn activate_tab(&mut self, index: usize) {
+        self.launcher_return_tab_index = Some(index);
         if should_skip_tab_reload(self.active_tab, index, self.launch_screen) {
             return;
         }
@@ -1605,6 +2186,15 @@ impl NativeEditorApp {
             self.sync_active_tab_from_editor();
         }
         self.tabs.remove(index);
+        if let Some(return_index) = self.launcher_return_tab_index {
+            self.launcher_return_tab_index = if return_index == index {
+                None
+            } else if return_index > index {
+                Some(return_index - 1)
+            } else {
+                Some(return_index)
+            };
+        }
         match self.tabs.len() {
             0 => {
                 self.open_launcher();
@@ -1640,15 +2230,24 @@ impl NativeEditorApp {
 
     fn enter_editor(&mut self) {
         self.launch_screen = LaunchScreen::Editor;
+        schedule_editor_focus(&mut self.focus_editor_next_frame);
+        self.persist_editor_state_snapshot();
+    }
+
+    fn persist_before_exit(&mut self) {
+        self.sync_active_tab_from_editor();
         self.persist_editor_state_snapshot();
     }
 
     fn record_recent_file(&mut self, path: &std::path::Path) {
         const MAX_RECENT_FILES: usize = 8;
+        let normalized_path = normalize_existing_path(path);
 
-        self.recent_files.retain(|existing| existing != path);
-        self.recent_files.insert(0, path.to_path_buf());
-        self.recent_files.retain(|existing| existing.exists());
+        self.recent_files
+            .retain(|existing| normalize_existing_path(existing) != normalized_path);
+        self.recent_files.insert(0, normalized_path);
+        self.recent_files
+            .retain(|existing| should_show_recent_file(existing, &self.tabs));
         if self.recent_files.len() > MAX_RECENT_FILES {
             self.recent_files.truncate(MAX_RECENT_FILES);
         }
@@ -1761,6 +2360,7 @@ impl NativeEditorApp {
         };
         let mut editor = MarkdownEditor::new("");
         editor.mode_colors = theme.mode_colors();
+        editor.vim_enabled = loaded.vim_enabled;
 
         // Apply synchronously for the font/spacing side-effects, then set the
         // flag so update() re-applies on the first real frame — eframe can
@@ -1769,7 +2369,7 @@ impl NativeEditorApp {
 
         let (background_tx, background_rx) = mpsc::channel();
 
-        Self {
+        let mut app = Self {
             state,
             editor,
             pane_mode,
@@ -1783,17 +2383,34 @@ impl NativeEditorApp {
             recent_files: loaded.recent_files,
             needs_theme_apply: true,
             input_monitoring_prompt_dismissed: false,
+            focus_editor_next_frame: false,
+            launcher_return_tab_index: None,
             background_tx,
             background_rx,
             saving_paths: HashSet::new(),
             opening_paths: HashSet::new(),
             uploading_tabs: HashSet::new(),
             modal_error: None,
+        };
+
+        app.restore_recent_document_if_available();
+        app
+    }
+
+    fn restore_recent_document_if_available(&mut self) {
+        let Some(path) = startup_recent_file_path(&self.recent_files) else {
+            return;
+        };
+
+        match load_opened_document_data(&path, &self.recent_files) {
+            Ok(Some(opened)) => self.apply_opened_document(opened),
+            Ok(None) => {}
+            Err(err) => self.set_error_status(format!("Failed to restore last document: {err}")),
         }
     }
 
     fn prompt_for_input_monitoring_if_needed(&mut self, ctx: &egui::Context) {
-                        if self.hid_active() {
+        if self.hid_active() {
             self.input_monitoring_prompt_dismissed = false;
             return;
         }
@@ -1802,32 +2419,45 @@ impl NativeEditorApp {
             return;
         }
 
-        egui::Window::new("Input Monitoring Required")
+        let screen_rect = ctx.available_rect();
+        ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            egui::Id::new("input_monitoring_dimmer"),
+        ))
+        .rect_filled(screen_rect, 0.0, egui::Color32::from_black_alpha(160));
+
+        egui::Area::new(egui::Id::new("input_monitoring_prompt"))
+            .order(egui::Order::Foreground)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .collapsible(false)
-            .resizable(false)
-            .movable(false)
             .show(ctx, |ui| {
-                ui.set_max_width(420.0);
-                ui.label(
-                    "Handtyped needs Input Monitoring to verify that writing comes from the built-in keyboard.",
-                );
-                ui.add_space(8.0);
-                ui.label(
-                    "macOS may show its own permission dialog. If it does not, open Settings and enable Handtyped under Privacy & Security > Input Monitoring.",
-                );
-                ui.add_space(6.0);
-                ui.label("After enabling it, quit and reopen Handtyped.");
-                ui.add_space(16.0);
-                ui.horizontal(|ui| {
-                    if ui.button("Open Settings").clicked() {
-                        open_input_monitoring_settings();
-                    }
-                    if ui.button("Not Now").clicked() {
-                        self.input_monitoring_prompt_dismissed = true;
-                    }
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.set_max_width(420.0);
+                    ui.vertical_centered(|ui| {
+                        ui.heading("Input Monitoring Required");
+                        ui.add_space(10.0);
+                        ui.label(
+                            "Handtyped needs Input Monitoring to verify that writing comes from the built-in keyboard.",
+                        );
+                        ui.add_space(8.0);
+                        ui.label(
+                            "macOS may show its own permission dialog. If it does not, open Settings and enable Handtyped under Privacy & Security > Input Monitoring.",
+                        );
+                        ui.add_space(6.0);
+                        ui.label("After enabling it, quit and reopen Handtyped.");
+                        ui.add_space(16.0);
+                        ui.horizontal(|ui| {
+                            if ui.button("Open Settings").clicked() {
+                                open_input_monitoring_settings();
+                            }
+                            if ui.button("Not Now").clicked() {
+                                self.input_monitoring_prompt_dismissed = true;
+                            }
+                        });
+                    });
                 });
             });
+
+        ctx.request_repaint();
     }
 
     fn document_display_name(&self) -> String {
@@ -1878,6 +2508,7 @@ impl NativeEditorApp {
                 PaneMode::Split => EditorMode::Split,
                 PaneMode::Source => EditorMode::Source,
             },
+            vim_enabled: self.editor.vim_enabled,
             theme: Some(self.theme.storage_key().to_string()),
             undo_changes: Vec::new(),
             undo_index: 0,
@@ -1905,6 +2536,7 @@ impl NativeEditorApp {
         if let Some(path) = self.pick_document_save_path("document.ht") {
             let editor_state = self.blank_editor_state();
             let tab = DocumentTab {
+                tab_id: next_tab_id(),
                 path: path.clone(),
                 editor_state,
                 persisted_markdown: String::new(),
@@ -1944,7 +2576,8 @@ impl NativeEditorApp {
         let md = self.editor.to_markdown();
         let payload = self.build_document_payload();
         let snapshot = self.current_editor_state_snapshot();
-        self.spawn_save_as(path, payload, md, snapshot, ctx);
+        let origin_tab_id = self.active_tab().map(|tab| tab.tab_id);
+        self.spawn_save_as(origin_tab_id, path, payload, md, snapshot, ctx);
     }
 
     /// Show file open dialog.
@@ -2044,26 +2677,26 @@ impl NativeEditorApp {
                                     self.show_open_dialog(ctx);
                                 }
 
-        ui.add_space(12.0);
-        ui.allocate_ui(egui::vec2(260.0, 18.0), |ui| {
-            if !self.status.is_empty() && self.status != "Ready" {
-                let status_color = if self.status_is_error {
-                    error_color
-                } else {
-                    dim_color
-                };
-                ui.label(
-                    egui::RichText::new(&self.status)
-                        .color(status_color)
-                        .small(),
-                );
-            }
-        });
+                                ui.add_space(12.0);
+                                ui.allocate_ui(egui::vec2(260.0, 18.0), |ui| {
+                                    if !self.status.is_empty() && self.status != "Ready" {
+                                        let status_color = if self.status_is_error {
+                                            error_color
+                                        } else {
+                                            dim_color
+                                        };
+                                        ui.label(
+                                            egui::RichText::new(&self.status)
+                                                .color(status_color)
+                                                .small(),
+                                        );
+                                    }
+                                });
 
                                 let recent_files: Vec<PathBuf> = self
                                     .recent_files
                                     .iter()
-                                    .filter(|path| path.exists())
+                                    .filter(|path| should_show_recent_file(path, &self.tabs))
                                     .cloned()
                                     .collect();
 
@@ -2108,6 +2741,11 @@ impl NativeEditorApp {
 
     fn hid_active(&self) -> bool {
         self.state.hid_active.load(Ordering::Acquire)
+    }
+
+    fn health_snapshot(&self) -> observability::HealthSnapshot {
+        let observability = self.state.observability.lock().unwrap().clone();
+        observability.health_snapshot(&self.state.integrity, self.hid_active())
     }
 
     fn error_modal(&mut self, ctx: &egui::Context) {
@@ -2309,6 +2947,51 @@ impl NativeEditorApp {
                         }
                     }
 
+                    let health = self.health_snapshot();
+                    let health_color = if health.healthy {
+                        dim_color
+                    } else {
+                        error_color
+                    };
+                    let mut health_tooltip = String::new();
+                    if !health.issues.is_empty() {
+                        health_tooltip.push_str("Issues:\n");
+                        for issue in &health.issues {
+                            health_tooltip.push_str("• ");
+                            health_tooltip.push_str(issue);
+                            health_tooltip.push('\n');
+                        }
+                    }
+                    if !health.notes.is_empty() {
+                        if !health_tooltip.is_empty() {
+                            health_tooltip.push('\n');
+                        }
+                        health_tooltip.push_str("Notes:\n");
+                        for note in &health.notes {
+                            health_tooltip.push_str("• ");
+                            health_tooltip.push_str(note);
+                            health_tooltip.push('\n');
+                        }
+                    }
+                    let health_label = if health.healthy {
+                        format!("Health: {}", health.headline)
+                    } else {
+                        let short_issue = health
+                            .issues
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| health.headline.clone());
+                        format!("Health: {} ({short_issue})", health.headline)
+                    };
+                    let health_response = ui.label(
+                        egui::RichText::new(health_label)
+                            .color(health_color)
+                            .small(),
+                    );
+                    if !health_tooltip.is_empty() {
+                        health_response.on_hover_text(health_tooltip);
+                    }
+
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Theme dropdown
                         let prev_theme = self.theme;
@@ -2326,6 +3009,10 @@ impl NativeEditorApp {
                             if let Some(tab) = self.active_tab_mut() {
                                 tab.theme = theme;
                             }
+                            set_theme_and_request_editor_focus(
+                                self.theme != prev_theme,
+                                &mut self.focus_editor_next_frame,
+                            );
                             self.set_info_status(format!("Theme: {}", self.theme.label()));
                         }
 
@@ -2346,31 +3033,47 @@ impl NativeEditorApp {
                             let doc_text = self.editor.to_markdown();
                             let replay_state = self.active_tab().map(|tab| {
                                 (
+                                    tab.path
+                                        .file_name()
+                                        .map(|name| name.to_string_lossy().to_string()),
                                     tab.replay_url.clone(),
                                     tab.published_history_len,
                                     tab.doc_history.clone(),
                                 )
                             });
-                            if let Some((replay_url, published_history_len, doc_history)) =
-                                replay_state
+                            if let Some((
+                                document_name,
+                                replay_url,
+                                published_history_len,
+                                doc_history,
+                            )) = replay_state
                             {
-                                if replay_upload_required(
+                                match replay_open_plan(
                                     replay_url.as_deref(),
                                     published_history_len,
                                     doc_history.len(),
                                 ) {
-                                    if let Some(tab_index) = self.active_tab {
-                                        self.spawn_replay_upload(
-                                            tab_index,
-                                            doc_text,
-                                            doc_history,
-                                            ctx,
-                                        );
+                                    ReplayOpenPlan::UploadAndOpenAfterReady => {
+                                        if let Some(tab_id) =
+                                            self.active_tab().map(|tab| tab.tab_id)
+                                        {
+                                            self.spawn_replay_upload(
+                                                tab_id,
+                                                document_name,
+                                                doc_text,
+                                                doc_history,
+                                                true,
+                                                ctx,
+                                            );
+                                        }
                                     }
-                                } else if let Some(url) =
-                                    self.active_tab().and_then(|tab| tab.replay_url.clone())
-                                {
-                                    ctx.open_url(egui::OpenUrl::new_tab(url));
+                                    ReplayOpenPlan::OpenCachedReplay => {
+                                        if let Some(url) =
+                                            self.active_tab().and_then(|tab| tab.replay_url.clone())
+                                        {
+                                            ctx.open_url(egui::OpenUrl::new_tab(url));
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2382,10 +3085,10 @@ impl NativeEditorApp {
                             })
                             .clicked()
                         {
-                            self.pane_mode = match self.pane_mode {
-                                PaneMode::Split => PaneMode::Source,
-                                PaneMode::Source => PaneMode::Split,
-                            };
+                            toggle_pane_mode_and_request_editor_focus(
+                                &mut self.pane_mode,
+                                &mut self.focus_editor_next_frame,
+                            );
                             let pane_mode = self.pane_mode;
                             if let Some(tab) = self.active_tab_mut() {
                                 tab.pane_mode = pane_mode;
@@ -2398,7 +3101,10 @@ impl NativeEditorApp {
                             "Vim Beta: OFF"
                         };
                         if ui.button(vim_label).clicked() {
-                            self.editor.vim_enabled = !self.editor.vim_enabled;
+                            toggle_vim_and_request_editor_focus(
+                                &mut self.editor.vim_enabled,
+                                &mut self.focus_editor_next_frame,
+                            );
                         }
                     });
                 });
@@ -2406,6 +3112,10 @@ impl NativeEditorApp {
     }
 
     fn editor_pane(&mut self, ui: &mut egui::Ui) {
+        if self.focus_editor_next_frame {
+            request_editor_focus(ui.ctx());
+            self.focus_editor_next_frame = false;
+        }
         let hid_ok = self.frame_input_allowed() && self.doc_is_writable;
         match self.editor.show(ui, hid_ok) {
             handtyped_lib::wysiwyg::EditorResponse::Changed => {
@@ -2513,6 +3223,12 @@ impl eframe::App for NativeEditorApp {
             return;
         }
 
+        if !self.hid_active() && !self.input_monitoring_prompt_dismissed {
+            self.prompt_for_input_monitoring_if_needed(ctx);
+            self.error_modal(ctx);
+            return;
+        }
+
         self.top_bar(ctx);
         self.prompt_for_input_monitoring_if_needed(ctx);
         self.error_modal(ctx);
@@ -2536,6 +3252,10 @@ impl eframe::App for NativeEditorApp {
                 self.editor_pane(ui);
             });
     }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.persist_before_exit();
+    }
 }
 
 // ── Preview renderer ──────────────────────────────────────────────────────────
@@ -2548,7 +3268,7 @@ fn render_markdown_preview(ui: &mut egui::Ui, markdown: &str) {
             ui.set_min_width(ui.available_width());
             for block in &blocks {
                 match block {
-                    PreviewBlock::Heading { level, segs } => {
+                    PreviewBlock::Heading { level, segs, quote } => {
                         let size = match level {
                             1 => 28.0,
                             2 => 22.0,
@@ -2558,17 +3278,22 @@ fn render_markdown_preview(ui: &mut egui::Ui, markdown: &str) {
                         };
                         ui.add_space(4.0);
                         ui.horizontal_wrapped(|ui| {
+                            if *quote {
+                                ui.colored_label(egui::Color32::GRAY, "▌ ");
+                            }
                             for seg in segs {
-                                if seg.text.is_empty() {
-                                    continue;
-                                }
-                                let mut rt = egui::RichText::new(&seg.text)
-                                    .size(size)
-                                    .family(egui::FontFamily::Name("Bold".into()));
-                                if seg.italic {
-                                    rt = rt.italics();
-                                }
-                                ui.label(rt);
+                                preview_seg_widget(
+                                    ui,
+                                    &PreviewBlockSegRef {
+                                        text: &seg.text,
+                                        link_url: seg.link_url.as_deref(),
+                                        bold: true,
+                                        italic: seg.italic,
+                                        code: seg.code,
+                                        strike: seg.strike,
+                                    },
+                                    size,
+                                );
                             }
                         });
                         ui.add_space(2.0);
@@ -2593,45 +3318,48 @@ fn render_markdown_preview(ui: &mut egui::Ui, markdown: &str) {
                                 }
                             }
                             for seg in segs {
-                                if seg.text.is_empty() {
-                                    continue;
-                                }
-                                let mut rt = if seg.code {
-                                    egui::RichText::new(&seg.text)
-                                        .monospace()
-                                        .size(13.0)
-                                        .background_color(ui.visuals().code_bg_color)
-                                } else {
-                                    egui::RichText::new(&seg.text).size(15.0)
-                                };
-                                if seg.bold {
-                                    rt = rt.family(egui::FontFamily::Name("Bold".into()));
-                                }
-                                if seg.italic {
-                                    rt = rt.italics();
-                                }
-                                if seg.strike {
-                                    rt = rt.strikethrough();
-                                }
-                                ui.label(rt);
+                                preview_seg_widget(
+                                    ui,
+                                    &PreviewBlockSegRef {
+                                        text: &seg.text,
+                                        link_url: seg.link_url.as_deref(),
+                                        bold: seg.bold,
+                                        italic: seg.italic,
+                                        code: seg.code,
+                                        strike: seg.strike,
+                                    },
+                                    15.0,
+                                );
                             }
                         });
                     }
-                    PreviewBlock::Code { text } => {
+                    PreviewBlock::Code {
+                        text,
+                        quote,
+                        indent,
+                    } => {
                         let code_bg = ui.visuals().code_bg_color;
                         let text_color = ui.visuals().text_color();
                         ui.add_space(2.0);
-                        egui::Frame::new()
-                            .fill(code_bg)
-                            .inner_margin(egui::Margin::same(8))
-                            .show(ui, |ui| {
-                                ui.set_min_width(ui.available_width());
-                                ui.label(
-                                    egui::RichText::new(text.as_str())
-                                        .monospace()
-                                        .color(text_color),
-                                );
-                            });
+                        ui.horizontal(|ui| {
+                            if *quote {
+                                ui.colored_label(egui::Color32::GRAY, "▌ ");
+                            }
+                            if *indent > 0 {
+                                ui.add_space(*indent as f32 * 12.0);
+                            }
+                            egui::Frame::new()
+                                .fill(code_bg)
+                                .inner_margin(egui::Margin::same(8))
+                                .show(ui, |ui| {
+                                    ui.set_min_width(ui.available_width());
+                                    ui.label(
+                                        egui::RichText::new(text.as_str())
+                                            .monospace()
+                                            .color(text_color),
+                                    );
+                                });
+                        });
                         ui.add_space(2.0);
                     }
                     PreviewBlock::Image { alt, url } => {
@@ -2655,6 +3383,66 @@ fn render_markdown_preview(ui: &mut egui::Ui, markdown: &str) {
                 }
             }
         });
+}
+
+fn preview_link_color() -> egui::Color32 {
+    egui::Color32::from_rgb(0x26, 0x8b, 0xd2)
+}
+
+fn preview_link_target(url: &str) -> egui::OpenUrl {
+    egui::OpenUrl::new_tab(url.to_string())
+}
+
+fn preview_segment_is_clickable(link_url: Option<&str>) -> bool {
+    link_url.is_some()
+}
+
+fn preview_seg_widget(ui: &mut egui::Ui, seg: &PreviewBlockSegRef<'_>, size: f32) {
+    if seg.text.is_empty() {
+        return;
+    }
+
+    let mut rt = if seg.code {
+        egui::RichText::new(seg.text)
+            .monospace()
+            .size((size - 2.0).max(13.0))
+            .background_color(ui.visuals().code_bg_color)
+    } else {
+        egui::RichText::new(seg.text).size(size)
+    };
+    if seg.bold {
+        rt = rt.family(egui::FontFamily::Name("Bold".into()));
+    }
+    if seg.italic {
+        rt = rt.italics();
+    }
+    if seg.strike {
+        rt = rt.strikethrough();
+    }
+
+    if preview_segment_is_clickable(seg.link_url) {
+        let url = seg
+            .link_url
+            .expect("clickable preview segments must carry a link url");
+        rt = rt.color(preview_link_color());
+        let response = ui
+            .add(egui::Hyperlink::from_label_and_url(rt, url))
+            .on_hover_text(url);
+        if response.clicked() {
+            ui.ctx().open_url(preview_link_target(url));
+        }
+    } else {
+        ui.label(rt);
+    }
+}
+
+struct PreviewBlockSegRef<'a> {
+    text: &'a str,
+    link_url: Option<&'a str>,
+    bold: bool,
+    italic: bool,
+    code: bool,
+    strike: bool,
 }
 
 fn preview_image_uri(url: &str) -> String {

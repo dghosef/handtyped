@@ -21,8 +21,11 @@ describe('landing page copy', () => {
     )
     expect(landingPageHtml).toContain("font-family: 'Open Sans', Arial, Helvetica, sans-serif;")
     expect(landingPageHtml).not.toContain('Oswald')
-    expect(landingPageHtml).toContain('p + p {')
-    expect(landingPageHtml).toContain('margin-top: 14px;')
+    expect(landingPageHtml).toContain('main {')
+    expect(landingPageHtml).toContain('gap: 36px;')
+    expect(landingPageHtml).toContain('.intro {')
+    expect(landingPageHtml).toContain('.section {')
+    expect(landingPageHtml).toContain('gap: 14px;')
   })
 
   it('contains the exact proof and replay copy', () => {

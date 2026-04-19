@@ -42,6 +42,12 @@
       margin: 0 auto;
     }
 
+    main {
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+
     .topbar {
       display: flex;
       align-items: center;
@@ -95,7 +101,10 @@
     }
 
     .intro {
-      margin: 28px 0 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 28px 0 0;
     }
 
     .actions {
@@ -103,11 +112,14 @@
     }
 
     .section {
-      margin: 0 0 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 0;
     }
 
     h2 {
-      margin: 0 0 12px;
+      margin: 0;
       font-size: 1.85rem;
       line-height: 1.15;
       letter-spacing: 0;
@@ -119,10 +131,6 @@
       margin: 0;
       font-size: 1.02rem;
       font-family: 'Open Sans', Arial, Helvetica, sans-serif;
-    }
-
-    p + p {
-      margin-top: 14px;
     }
 
     ul {

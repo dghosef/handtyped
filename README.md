@@ -1,1 +1,1 @@
-[Source for handtyped.app](https://handtyped.app)
+Source for [handtyped.app](https://handtyped.app)

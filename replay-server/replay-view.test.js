@@ -34,6 +34,9 @@ describe('replay history start state', () => {
     expect(replayPageHtml).toContain('.doc-page {')
     expect(replayPageHtml).toContain('.section-label {')
     expect(replayPageHtml).toContain('.keyboard-note p {')
+    expect(replayPageHtml).not.toContain('Session stats')
+    expect(replayPageHtml).not.toContain('stat-keystrokes')
+    expect(replayPageHtml).not.toContain('stat-words')
   })
 
   it('preserves the actual timestamp of the first parsed edit', () => {

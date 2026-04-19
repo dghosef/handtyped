@@ -265,10 +265,6 @@
       text-transform: uppercase;
     }
 
-    .stats-copy p {
-      font-size: 15px;
-    }
-
     .section-label {
       margin: 0 0 10px;
       font-size: 12px;
@@ -300,7 +296,7 @@
 
       .intro,
       p,
-      .stats-copy p {
+      .keyboard-note p {
         font-size: 16px;
       }
 
@@ -361,17 +357,6 @@
             <div class="doc-page"><span id="doc-content"></span><span class="cursor-blink" id="cursor"></span></div>
           </div>
         </div>
-      </div>
-
-      <div class="stats-copy" id="stats">
-        <div class="section-label">Session stats</div>
-        <p>
-          This record contains
-          <strong id="stat-keystrokes">--</strong>
-          keystrokes across
-          <strong id="stat-words">--</strong>
-          words
-        </p>
       </div>
 
       <div class="keyboard-note">
@@ -536,22 +521,6 @@
       statusMsgEl.textContent = status
     }
 
-    function populateStats() {
-      const finalText = session.doc_text || history[history.length - 1]?.text || ''
-      const words = finalText.trim() ? finalText.trim().split(/\s+/).filter(Boolean).length : 0
-      const totalMs = getTotalDuration()
-
-      document.getElementById('stat-words').textContent = words.toLocaleString()
-      document.getElementById('stat-keystrokes').textContent = (session.keystroke_count || keydowns.length || 0).toLocaleString()
-
-      const wpm = totalMs > 0 ? Math.round(words / (totalMs / 60000)) : 0
-
-      let corrections = 0
-      for (let i = 1; i < history.length; i++) {
-        if (history[i].text.length < history[i - 1].text.length) corrections++
-      }
-    }
-
     function formatOffsetSuffix(totalOffsetMinutes) {
       const sign = totalOffsetMinutes >= 0 ? '+' : '-'
       const absolute = Math.abs(totalOffsetMinutes)
@@ -639,7 +608,6 @@
         )
         headlineEl.textContent = currentDocumentName() || 'Writing Session Analysis'
 
-        populateStats()
         renderBlankState()
         startPlay()
       } catch (error) {

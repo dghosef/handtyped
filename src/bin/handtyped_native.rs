@@ -657,10 +657,14 @@ mod tests {
     }
 
     #[test]
-    fn startup_window_reveals_once_input_monitoring_is_known() {
-        assert!(NativeEditorApp::should_reveal_startup_window_for_access(
+    fn startup_window_stays_hidden_when_input_monitoring_is_denied() {
+        assert!(!NativeEditorApp::should_reveal_startup_window_for_access(
             hid::InputMonitoringAccess::Denied
         ));
+    }
+
+    #[test]
+    fn startup_window_reveals_only_when_input_monitoring_is_granted() {
         assert!(NativeEditorApp::should_reveal_startup_window_for_access(
             hid::InputMonitoringAccess::Granted
         ));
@@ -2481,7 +2485,7 @@ impl NativeEditorApp {
     }
 
     fn should_reveal_startup_window_for_access(access: hid::InputMonitoringAccess) -> bool {
-        !matches!(access, hid::InputMonitoringAccess::Unknown)
+        matches!(access, hid::InputMonitoringAccess::Granted)
     }
 
     fn sync_startup_window_visibility(&mut self, ctx: &egui::Context) {

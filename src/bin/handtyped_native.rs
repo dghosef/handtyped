@@ -624,6 +624,22 @@ mod tests {
     }
 
     #[test]
+    fn missing_theme_defaults_to_gruvbox_instead_of_weird_fallback() {
+        assert!(matches!(
+            Theme::from_storage_key(None),
+            Theme::Gruvbox
+        ));
+    }
+
+    #[test]
+    fn unknown_theme_defaults_to_gruvbox_instead_of_weird_fallback() {
+        assert!(matches!(
+            Theme::from_storage_key(Some("totally_not_a_real_theme")),
+            Theme::Gruvbox
+        ));
+    }
+
+    #[test]
     fn schedule_editor_focus_marks_next_frame() {
         let mut focus_editor_next_frame = false;
         schedule_editor_focus(&mut focus_editor_next_frame);
@@ -667,6 +683,26 @@ mod tests {
     fn startup_window_reveals_only_when_input_monitoring_is_granted() {
         assert!(NativeEditorApp::should_reveal_startup_window_for_access(
             hid::InputMonitoringAccess::Granted
+        ));
+    }
+
+    #[test]
+    fn startup_hidden_blocks_input_monitoring_ui_until_granted() {
+        assert!(NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+            true,
+            hid::InputMonitoringAccess::Unknown,
+        ));
+        assert!(NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+            true,
+            hid::InputMonitoringAccess::Denied,
+        ));
+        assert!(!NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+            true,
+            hid::InputMonitoringAccess::Granted,
+        ));
+        assert!(!NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+            false,
+            hid::InputMonitoringAccess::Unknown,
         ));
     }
 
@@ -2488,21 +2524,33 @@ impl NativeEditorApp {
         matches!(access, hid::InputMonitoringAccess::Granted)
     }
 
-    fn sync_startup_window_visibility(&mut self, ctx: &egui::Context) {
+    fn should_block_startup_ui_until_permission_resolves(
+        startup_window_hidden_until_permission_resolves: bool,
+        access: hid::InputMonitoringAccess,
+    ) -> bool {
+        startup_window_hidden_until_permission_resolves
+            && !Self::should_reveal_startup_window_for_access(access)
+    }
+
+    fn sync_startup_window_visibility(&mut self, ctx: &egui::Context) -> bool {
         if !self.startup_window_hidden_until_permission_resolves {
-            return;
+            return false;
         }
 
-        match unsafe { hid::input_monitoring_access() } {
-            access if !Self::should_reveal_startup_window_for_access(access) => {
-                ctx.request_repaint();
-            }
-            _ => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-                self.startup_window_hidden_until_permission_resolves = false;
-            }
+        let access = unsafe { hid::input_monitoring_access() };
+        if Self::should_block_startup_ui_until_permission_resolves(
+            self.startup_window_hidden_until_permission_resolves,
+            access,
+        ) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            ctx.request_repaint();
+            return true;
         }
+
+        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        self.startup_window_hidden_until_permission_resolves = false;
+        false
     }
 
     fn document_display_name(&self) -> String {
@@ -3194,7 +3242,10 @@ impl eframe::App for NativeEditorApp {
         self.drain_background_results(ctx);
         self.sync_active_tab_from_editor();
         self.update_window_title(ctx);
-        self.sync_startup_window_visibility(ctx);
+        let startup_window_blocking = self.sync_startup_window_visibility(ctx);
+        if startup_window_blocking {
+            return;
+        }
 
         // Apply theme if changed outside of the top-bar dropdown (e.g. file open).
         if self.needs_theme_apply {
@@ -3264,7 +3315,6 @@ impl eframe::App for NativeEditorApp {
                 self.top_bar(ctx);
             }
             self.start_screen(ctx);
-            self.prompt_for_input_monitoring_if_needed(ctx);
             self.error_modal(ctx);
             return;
         }

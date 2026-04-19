@@ -25,8 +25,15 @@ describe('replay history start state', () => {
       "fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap",
     )
     expect(replayPageHtml).toContain("font-family: 'Open Sans', Arial, Helvetica, sans-serif;")
+    expect(replayPageHtml).not.toContain('Georgia, "Times New Roman", Times, serif')
     expect(replayPageHtml).toContain('.brand-name {')
     expect(replayPageHtml).toContain('h1 {')
+    expect(replayPageHtml).toContain('.share-btn,')
+    expect(replayPageHtml).toContain('.play-btn,')
+    expect(replayPageHtml).toContain('.speed-select {')
+    expect(replayPageHtml).toContain('.doc-page {')
+    expect(replayPageHtml).toContain('.section-label {')
+    expect(replayPageHtml).toContain('.keyboard-note p {')
   })
 
   it('preserves the actual timestamp of the first parsed edit', () => {

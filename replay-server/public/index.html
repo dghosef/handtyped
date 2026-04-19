@@ -1,21 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Handtyped</title>
-  <style>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Handtyped</title>
+    <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
+    <style>
     :root {
-      --bg: #f6f2ea;
-      --paper: #fbf8f2;
-      --ink: #201d1a;
-      --muted: #6f675e;
-      --line: #d8d0c4;
-      --accent: #2d6a73;
-      --accent-soft: #d9e8ea;
-      --button: #1f2528;
-      --button-text: #f6f2ea;
-      --max: 1120px;
+      --paper: #ffffff;
+      --ink: #222222;
+      --muted: #555555;
+      --line: #dedede;
+      --accent: #c94f45;
+      --accent-dark: #a53d35;
     }
 
     * {
@@ -23,23 +20,25 @@
     }
 
     html {
-      background: var(--bg);
+      background: var(--paper);
       color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
       line-height: 1.5;
     }
 
     body {
       margin: 0;
+      padding: 0 20px 64px;
     }
 
     a {
-      color: inherit;
-      text-decoration: none;
+      color: #2c6ab6;
+      text-decoration: underline;
+      text-underline-offset: 0.12em;
     }
 
-    .shell {
-      width: min(var(--max), calc(100vw - 40px));
+    .page {
+      max-width: 860px;
       margin: 0 auto;
     }
 
@@ -48,418 +47,133 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 20px 0;
-      border-bottom: 1px solid var(--line);
+      padding: 20px 0 14px;
     }
 
     .brand {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
+      gap: 0;
+      color: inherit;
+      text-decoration: none;
     }
 
     .brand img {
       width: 42px;
       height: 42px;
-      border-radius: 10px;
       display: block;
+      border-radius: 10px;
     }
 
-    .brand-name {
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 1.6rem;
-      letter-spacing: -0.03em;
-    }
-
-    .nav {
-      display: flex;
-      gap: 20px;
-      color: var(--muted);
-      font-size: 0.96rem;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-      gap: 48px;
-      padding: 72px 0 56px;
-      align-items: start;
-    }
-
-    .eyebrow {
-      color: var(--accent);
-      font-size: 0.84rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin: 0 0 18px;
-    }
-
-    h1 {
-      margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(3rem, 6vw, 5.2rem);
-      line-height: 0.97;
-      letter-spacing: -0.06em;
-      max-width: 11ch;
-    }
-
-    .lede {
-      max-width: 58ch;
-      font-size: 1.1rem;
-      color: var(--muted);
-      margin: 22px 0 0;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 28px;
-    }
-
-    .button {
+    .button,
+    .button:visited {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 46px;
+      min-height: 40px;
       padding: 0 18px;
-      border-radius: 12px;
-      border: 1px solid transparent;
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.96rem;
       font-weight: 600;
+      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+      text-decoration: none;
+      cursor: pointer;
     }
 
-    .button.primary {
-      background: var(--button);
-      color: var(--button-text);
+    .button:hover {
+      background: var(--accent-dark);
     }
 
-    .button.secondary {
-      background: transparent;
-      border-color: var(--line);
-      color: var(--ink);
+    .intro {
+      margin: 28px 0 36px;
     }
 
-    .hero-note {
-      margin-top: 16px;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    .preview {
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 20px;
-    }
-
-    .preview-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      font-size: 0.92rem;
-      color: var(--muted);
-      margin-bottom: 18px;
-    }
-
-    .preview-pill {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .preview-doc {
-      background: white;
-      border: 1px solid #e4ddd1;
-      border-radius: 18px;
-      padding: 26px 24px;
-      min-height: 380px;
-    }
-
-    .doc-kicker {
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 0.76rem;
-      margin-bottom: 12px;
-    }
-
-    .preview-doc h2 {
-      margin: 0 0 14px;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 1.9rem;
-      letter-spacing: -0.04em;
-    }
-
-    .preview-doc p {
-      margin: 0 0 14px;
-      color: #4a433d;
-    }
-
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 20px;
-    }
-
-    .metric {
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
-    }
-
-    .metric-value {
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 1.6rem;
-      letter-spacing: -0.04em;
-    }
-
-    .metric-label {
-      font-size: 0.87rem;
-      color: var(--muted);
-      margin-top: 4px;
+    .actions {
+      margin: 24px 0 34px;
     }
 
     .section {
-      padding: 28px 0 52px;
-      border-top: 1px solid var(--line);
+      margin: 0 0 36px;
     }
 
-    .section-head {
-      display: grid;
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      gap: 32px;
-      align-items: start;
-      margin-bottom: 24px;
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.85rem;
+      line-height: 1.15;
+      letter-spacing: 0;
+      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+      font-weight: 700;
     }
 
-    .section-head h2 {
+    p {
       margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(2rem, 3.2vw, 3rem);
-      letter-spacing: -0.04em;
-      line-height: 1.02;
+      font-size: 1.02rem;
+      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
     }
 
-    .section-head p {
+    p + p {
+      margin-top: 14px;
+    }
+
+    ul {
       margin: 0;
-      color: var(--muted);
-      max-width: 58ch;
+      padding-left: 1.3rem;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 24px;
-    }
-
-    .item h3 {
-      margin: 0 0 10px;
-      font-size: 1rem;
-    }
-
-    .item p {
-      margin: 0;
-      color: var(--muted);
-    }
-
-    .quote {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 24px;
-      align-items: end;
-      padding: 34px 0 12px;
-    }
-
-    blockquote {
-      margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(1.8rem, 3vw, 2.7rem);
-      letter-spacing: -0.03em;
-      line-height: 1.08;
-      max-width: 18ch;
+    li {
+      margin: 0 0 14px;
+      font-size: 1.04rem;
     }
 
     .footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 24px 0 56px;
-      border-top: 1px solid var(--line);
+      margin-top: 44px;
+      padding-top: 16px;
+      border-top: 1px solid #e1e1da;
       color: var(--muted);
-      font-size: 0.92rem;
+      font-size: 0.94rem;
     }
 
-    @media (max-width: 960px) {
-      .hero,
-      .section-head,
-      .quote {
-        grid-template-columns: 1fr;
+    @media (max-width: 720px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
       }
 
-      .grid,
-      .metrics {
-        grid-template-columns: 1fr;
-      }
-
-      .nav {
-        display: none;
+      .brand-name {
+        font-size: 1.7rem;
       }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
+  <div class="page">
     <header class="topbar">
       <a class="brand" href="/">
         <img src="/handtyped-icon.png" alt="Handtyped" />
-        <div class="brand-name">Handtyped</div>
       </a>
-      <nav class="nav" aria-label="Primary">
-        <a href="#product">Product</a>
-        <a href="#how-it-works">How it works</a>
-        <a href="#examples">Examples</a>
-        <a href="https://replay.handtyped.app">Replay</a>
-      </nav>
+      <a class="button" id="download-button" href="/downloads/Handtyped-macos.zip" download="Handtyped-macos.zip">Download for macOS</a>
     </header>
 
     <main>
-      <section class="hero">
-        <div>
-          <p class="eyebrow">Typed writing, with receipts</p>
-          <h1>Higher-friction writing that keeps a typing record.</h1>
-          <p class="lede">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-          </p>
-          <div class="actions">
-            <a class="button primary" href="#product">Download for macOS</a>
-            <a class="button secondary" href="https://replay.handtyped.app">View a replay</a>
-          </div>
-          <p class="hero-note">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.
-          </p>
-        </div>
-
-        <aside class="preview" aria-label="Product preview">
-          <div class="preview-top">
-            <span>Physical keyboard only</span>
-            <span class="preview-pill">Replay ready</span>
-          </div>
-          <div class="preview-doc">
-            <div class="doc-kicker">Example session</div>
-            <h2>Lorem ipsum dolor sit amet.</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas interdum, sapien vel luctus suscipit, velit lorem finibus magna, sed hendrerit urna sem sed augue.
-            </p>
-            <p>
-              Curabitur non nibh vitae risus feugiat efficitur. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae.
-            </p>
-            <div class="metrics">
-              <div class="metric">
-                <div class="metric-value">74</div>
-                <div class="metric-label">Lorem words per minute</div>
-              </div>
-              <div class="metric">
-                <div class="metric-value">18m</div>
-                <div class="metric-label">Ipsum session length</div>
-              </div>
-              <div class="metric">
-                <div class="metric-value">2.1k</div>
-                <div class="metric-label">Dolor key events</div>
-              </div>
-            </div>
-          </div>
-        </aside>
-      </section>
-
-      <section class="section" id="product">
-        <div class="section-head">
-          <h2>A homepage skeleton you can write into later.</h2>
-          <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis risus eget urna mollis ornare vel eu leo. Donec sed odio dui. Cras mattis consectetur purus sit amet fermentum.
-          </p>
-        </div>
-        <div class="grid">
-          <div class="item">
-            <h3>Lorem ipsum feature</h3>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean lacinia bibendum nulla sed consectetur.</p>
-          </div>
-          <div class="item">
-            <h3>Dolor sit amet</h3>
-            <p>Integer posuere erat a ante venenatis dapibus posuere velit aliquet. Nulla vitae elit libero, a pharetra augue.</p>
-          </div>
-          <div class="item">
-            <h3>Consectetur adipiscing</h3>
-            <p>Etiam porta sem malesuada magna mollis euismod. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor.</p>
-          </div>
-        </div>
+      <section class="intro">
+        <h2>Proof of work for writing</h2>
+        <p>With Handtyped, you can prove to the world that your work was human-written. For bloggers, Redditors, students, journalists, and everyone in between.</p>
       </section>
 
       <section class="section" id="how-it-works">
-        <div class="section-head">
-          <h2>Explain the trust model here, once you are ready.</h2>
-          <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Sed posuere consectetur est at lobortis.
-          </p>
-        </div>
-        <div class="grid">
-          <div class="item">
-            <h3>01. Lorem</h3>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla.</p>
-          </div>
-          <div class="item">
-            <h3>02. Ipsum</h3>
-            <p>Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Sed posuere consectetur est at lobortis.</p>
-          </div>
-          <div class="item">
-            <h3>03. Dolor</h3>
-            <p>Cras justo odio, dapibus ac facilisis in, egestas eget quam. Morbi leo risus, porta ac consectetur ac, vestibulum at eros.</p>
-          </div>
-        </div>
+        <h2>How it works:</h2>
+        <p>Handtyped is a markdown editor that only allows input from your physical keyboard. No copy and paste, no AI agents, and no <a href="https://chromewebstore.google.com/detail/natural-typist-human-typi/mfdeophbahbbbonmgbdhchlcjmenhlfd">human typing pattern simulators</a>. Anything written in Handtyped must truly be typed by hand.</p>
+        <p>Once you finish writing, Handtyped generates and publishes a millisecond-accurate replay of your writing process, keystroke by keystroke. Readers will be able to see every deletion, pause, and rewrite.</p>
+        <p>For example, <a href="https://replay.handtyped.app/3LSdIFnmo1B373qD">here</a> is the replay for the text of this website.</p>
       </section>
 
-      <section class="section" id="examples">
-        <div class="section-head">
-          <h2>Swap these blocks for real use cases later.</h2>
-          <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed posuere consectetur est at lobortis. Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum.
-          </p>
-        </div>
-        <div class="grid">
-          <div class="item">
-            <h3>Hiring</h3>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum id ligula porta felis euismod semper.</p>
-          </div>
-          <div class="item">
-            <h3>Admissions</h3>
-            <p>Donec sed odio dui. Aenean lacinia bibendum nulla sed consectetur. Maecenas sed diam eget risus varius blandit.</p>
-          </div>
-          <div class="item">
-            <h3>Publishing</h3>
-            <p>Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Nullam id dolor id nibh ultricies vehicula ut id elit.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="quote">
-        <blockquote>
-          “Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.”
-        </blockquote>
-        <div class="actions">
-          <a class="button primary" href="#product">Get started</a>
-          <a class="button secondary" href="https://replay.handtyped.app">Open replay</a>
-        </div>
+      <section class="section" id="limitations">
+        <p>You could in theory build a robot to type on the keyboard, modify the client to produce fake logs, or copy from another screen and manually mimic believable typing patterns.</p>
+        <p>At that point, however, faking it is as much work as writing it.</p>
       </section>
     </main>
-
-    <footer class="footer">
-      <div>Handtyped</div>
-      <div>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
-    </footer>
   </div>
 </body>
 </html>

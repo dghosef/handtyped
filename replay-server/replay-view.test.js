@@ -11,8 +11,24 @@ import {
   findHistoryIndex,
   parseHistory,
 } from './public/replay-view.js'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const replayPageHtml = fs.readFileSync(
+  path.join(process.cwd(), 'public', 'replay.html'),
+  'utf8',
+)
 
 describe('replay history start state', () => {
+  it('uses the homepage header font for the replay title', () => {
+    expect(replayPageHtml).toContain(
+      "fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap",
+    )
+    expect(replayPageHtml).toContain("font-family: 'Open Sans', Arial, Helvetica, sans-serif;")
+    expect(replayPageHtml).toContain('.brand-name {')
+    expect(replayPageHtml).toContain('h1 {')
+  })
+
   it('preserves the actual timestamp of the first parsed edit', () => {
     const history = parseHistory(
       {

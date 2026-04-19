@@ -22,7 +22,7 @@ describe('landing page copy', () => {
     expect(landingPageHtml).toContain("font-family: 'Open Sans', Arial, Helvetica, sans-serif;")
     expect(landingPageHtml).not.toContain('Oswald')
     expect(landingPageHtml).toContain('main {')
-    expect(landingPageHtml).toContain('gap: 36px;')
+    expect(landingPageHtml).toContain('gap: 28px;')
     expect(landingPageHtml).toContain('.intro {')
     expect(landingPageHtml).toContain('.section {')
     expect(landingPageHtml).toContain('gap: 14px;')
@@ -41,6 +41,8 @@ describe('landing page copy', () => {
     expect(landingPageHtml).toContain(
       'For example, <a href="https://replay.handtyped.app/B5HKW61AIFZ1Hb2y">here</a> is the replay for the text of this website.',
     )
+    expect(landingPageHtml).not.toContain('id="limitations"')
+    expect((landingPageHtml.match(/<section class="section" id="how-it-works">/g) || []).length).toBe(1)
   })
 
   it('contains the limitations text and a download button', () => {

@@ -212,6 +212,26 @@ const K_IOHID_ACCESS_TYPE_GRANTED: u32 = 0;
 const K_IOHID_ACCESS_TYPE_DENIED: u32 = 1;
 const K_IOHID_ACCESS_TYPE_UNKNOWN: u32 = 2;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputMonitoringAccess {
+    Granted,
+    Denied,
+    Unknown,
+}
+
+pub fn input_monitoring_access_from_raw(access: u32) -> InputMonitoringAccess {
+    match access {
+        K_IOHID_ACCESS_TYPE_GRANTED => InputMonitoringAccess::Granted,
+        K_IOHID_ACCESS_TYPE_DENIED => InputMonitoringAccess::Denied,
+        K_IOHID_ACCESS_TYPE_UNKNOWN => InputMonitoringAccess::Unknown,
+        _ => InputMonitoringAccess::Unknown,
+    }
+}
+
+pub unsafe fn input_monitoring_access() -> InputMonitoringAccess {
+    input_monitoring_access_from_raw(IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT))
+}
+
 struct CallbackContext {
     state: Arc<AppState>,
     start_mach: u64,
@@ -430,12 +450,12 @@ fn make_matching_array() -> CFArray<core_foundation::dictionary::CFDictionary<CF
 
 /// Must be called from the main thread. Checks and requests Input Monitoring access.
 pub unsafe fn request_input_monitoring_access() {
-    let access = IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT);
+    let access = input_monitoring_access();
     hid_log(&format!(
-        "IOHIDCheckAccess: {} (0=granted,1=denied,2=unknown)",
+        "IOHIDCheckAccess: {:?} (granted/denied/unknown)",
         access
     ));
-    if access != K_IOHID_ACCESS_TYPE_GRANTED {
+    if access != InputMonitoringAccess::Granted {
         let result = IOHIDRequestAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT);
         hid_log(&format!("IOHIDRequestAccess: {}", result));
     }
@@ -446,8 +466,8 @@ pub unsafe fn request_input_monitoring_access() {
 /// Only matches Apple keyboards (VendorID 0x05AC) to exclude HID injection devices.
 pub fn start_hid_capture(state: Arc<AppState>) {
     unsafe {
-        let access = IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT);
-        if access == K_IOHID_ACCESS_TYPE_DENIED {
+        let access = input_monitoring_access();
+        if access == InputMonitoringAccess::Denied {
             hid_log("Input Monitoring denied; skipping HID capture startup until relaunch");
             return;
         }
@@ -501,13 +521,13 @@ pub fn start_hid_capture(state: Arc<AppState>) {
             std::thread::sleep(std::time::Duration::from_secs(2));
 
             unsafe {
-                let a = IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT);
-                hid_log(&format!("retry IOHIDCheckAccess: {}", a));
-                if a == K_IOHID_ACCESS_TYPE_DENIED {
+                let a = input_monitoring_access();
+                hid_log(&format!("retry IOHIDCheckAccess: {:?}", a));
+                if a == InputMonitoringAccess::Denied {
                     hid_log("Input Monitoring denied during retry; stopping HID retry loop");
                     return;
                 }
-                if a == K_IOHID_ACCESS_TYPE_UNKNOWN {
+                if a == InputMonitoringAccess::Unknown {
                     continue;
                 }
 
@@ -642,6 +662,26 @@ mod tests {
         assert_eq!(usage_page, K_HID_PAGE_GENERIC_DESKTOP);
         assert_eq!(usage, K_HID_USAGE_GD_KEYBOARD);
         assert_eq!(vendor, K_APPLE_VENDOR_ID);
+    }
+
+    #[test]
+    fn test_input_monitoring_access_from_raw_maps_known_states() {
+        assert_eq!(
+            input_monitoring_access_from_raw(K_IOHID_ACCESS_TYPE_GRANTED),
+            InputMonitoringAccess::Granted
+        );
+        assert_eq!(
+            input_monitoring_access_from_raw(K_IOHID_ACCESS_TYPE_DENIED),
+            InputMonitoringAccess::Denied
+        );
+        assert_eq!(
+            input_monitoring_access_from_raw(K_IOHID_ACCESS_TYPE_UNKNOWN),
+            InputMonitoringAccess::Unknown
+        );
+        assert_eq!(
+            input_monitoring_access_from_raw(99),
+            InputMonitoringAccess::Unknown
+        );
     }
 
     /// Test that software-injected keystrokes (no HID callback) cannot bypass filtering.

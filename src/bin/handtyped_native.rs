@@ -51,6 +51,7 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 780.0])
             .with_title("Handtyped")
+            .with_visible(false)
             .with_icon(std::sync::Arc::new(icon)),
         ..Default::default()
     };
@@ -646,6 +647,23 @@ mod tests {
             ctx.memory(|mem| mem.has_focus(egui::Id::new(EDITOR_WIDGET_ID))),
             "the editor must receive focus on the first frame after opening a document"
         );
+    }
+
+    #[test]
+    fn startup_window_stays_hidden_while_input_monitoring_is_unknown() {
+        assert!(!NativeEditorApp::should_reveal_startup_window_for_access(
+            hid::InputMonitoringAccess::Unknown
+        ));
+    }
+
+    #[test]
+    fn startup_window_reveals_once_input_monitoring_is_known() {
+        assert!(NativeEditorApp::should_reveal_startup_window_for_access(
+            hid::InputMonitoringAccess::Denied
+        ));
+        assert!(NativeEditorApp::should_reveal_startup_window_for_access(
+            hid::InputMonitoringAccess::Granted
+        ));
     }
 
     #[test]
@@ -1347,6 +1365,7 @@ struct NativeEditorApp {
     input_monitoring_prompt_dismissed: bool,
     focus_editor_next_frame: bool,
     launcher_return_tab_index: Option<usize>,
+    startup_window_hidden_until_permission_resolves: bool,
     background_tx: Sender<BackgroundResult>,
     background_rx: Receiver<BackgroundResult>,
     saving_paths: HashSet<PathBuf>,
@@ -2385,6 +2404,7 @@ impl NativeEditorApp {
             input_monitoring_prompt_dismissed: false,
             focus_editor_next_frame: false,
             launcher_return_tab_index: None,
+            startup_window_hidden_until_permission_resolves: true,
             background_tx,
             background_rx,
             saving_paths: HashSet::new(),
@@ -2458,6 +2478,27 @@ impl NativeEditorApp {
             });
 
         ctx.request_repaint();
+    }
+
+    fn should_reveal_startup_window_for_access(access: hid::InputMonitoringAccess) -> bool {
+        !matches!(access, hid::InputMonitoringAccess::Unknown)
+    }
+
+    fn sync_startup_window_visibility(&mut self, ctx: &egui::Context) {
+        if !self.startup_window_hidden_until_permission_resolves {
+            return;
+        }
+
+        match unsafe { hid::input_monitoring_access() } {
+            access if !Self::should_reveal_startup_window_for_access(access) => {
+                ctx.request_repaint();
+            }
+            _ => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                self.startup_window_hidden_until_permission_resolves = false;
+            }
+        }
     }
 
     fn document_display_name(&self) -> String {
@@ -3149,6 +3190,7 @@ impl eframe::App for NativeEditorApp {
         self.drain_background_results(ctx);
         self.sync_active_tab_from_editor();
         self.update_window_title(ctx);
+        self.sync_startup_window_visibility(ctx);
 
         // Apply theme if changed outside of the top-bar dropdown (e.g. file open).
         if self.needs_theme_apply {

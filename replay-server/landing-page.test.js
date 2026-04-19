@@ -36,7 +36,7 @@ describe('landing page copy', () => {
       'Once you finish writing, Handtyped generates and publishes a millisecond-accurate replay of your writing process, keystroke by keystroke. Readers will be able to see every deletion, pause, and rewrite.',
     )
     expect(landingPageHtml).toContain(
-      'For example, <a href="https://replay.handtyped.app/3LSdIFnmo1B373qD">here</a> is the replay for the text of this website.',
+      'For example, <a href="https://replay.handtyped.app/B5HKW61AIFZ1Hb2y">here</a> is the replay for the text of this website.',
     )
   })
 

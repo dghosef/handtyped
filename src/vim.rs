@@ -1721,14 +1721,23 @@ impl VimState {
                     if action == PendingAction::TillBackward && target < c_idx {
                         target += 1;
                     }
-                    self.set_motion_target(te_state, target);
                     let shift = if self.mode == VimMode::Visual || self.pending_operator.is_some() {
                         Modifiers::SHIFT
                     } else {
                         Modifiers::NONE
                     };
-                    for _ in 0..(c_idx - target) {
-                        out.push(Self::key_event(Key::ArrowLeft, shift));
+                    if self.pending_operator.is_some() {
+                        let len = text.chars().count();
+                        let end = c_idx.saturating_add(1).min(len);
+                        Self::set_selection(te_state, target, end);
+                        for _ in 0..(end - target) {
+                            out.push(Self::key_event(Key::ArrowLeft, shift));
+                        }
+                    } else {
+                        self.set_motion_target(te_state, target);
+                        for _ in 0..(c_idx - target) {
+                            out.push(Self::key_event(Key::ArrowLeft, shift));
+                        }
                     }
                     if let Some(op) = self.pending_operator {
                         out.extend(self.apply_operator(op, text, te_state));
@@ -4099,6 +4108,61 @@ mod tests {
         )));
         assert_eq!(vim.mode, VimMode::Insert);
         assert_eq!(selection(&te), Some((0, 4)));
+    }
+
+    #[test]
+    fn test_df_uses_correct_backward_find_semantics() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc,def".to_string();
+        set_cursor(&mut te, 6);
+        let evs = send(&mut vim, &mut text, &mut te, "dF,");
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+        assert_eq!(
+            vim.last_find,
+            Some((PendingAction::FindBackward, ','))
+        );
+        assert_eq!(selection(&te), Some((3, 7)));
+    }
+
+    #[test]
+    fn test_dt_uses_correct_backward_till_semantics() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc,def".to_string();
+        set_cursor(&mut te, 6);
+        let evs = send(&mut vim, &mut text, &mut te, "dT,");
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+        assert_eq!(
+            vim.last_find,
+            Some((PendingAction::TillBackward, ','))
+        );
+        assert_eq!(selection(&te), Some((4, 7)));
+    }
+
+    #[test]
+    fn test_yf_uses_correct_backward_find_semantics() {
+        let mut vim = VimState::new();
+        let mut te = TextEditState::default();
+        let mut text = "abc,def".to_string();
+        set_cursor(&mut te, 6);
+        let evs = send(&mut vim, &mut text, &mut te, "yF,");
+        assert!(evs.iter().any(|e| matches!(e, Event::Copy)));
+        assert_eq!(vim.yank_buffer, ",def");
+        assert_eq!(vim.last_find, Some((PendingAction::FindBackward, ',')));
+        assert_eq!(selection(&te), Some((3, 7)));
     }
 
     #[test]

@@ -1,5 +1,13 @@
+# Handtyped
+
 Source for [handtyped.app](https://handtyped.app)
 
-Ironically, most of the coding was done by Codex. 
+hehe this repo was vibe coded
 
-To build, run the `native-dev.sh` script
+## Build instructions
+
+- `npm run dev:native`
+
+## Notes
+
+- No Windows support yet, but would welcome PRs.

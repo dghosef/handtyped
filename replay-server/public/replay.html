@@ -41,7 +41,6 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 16px;
       margin-bottom: 20px;
     }
 
@@ -50,16 +49,6 @@
       height: 72px;
       object-fit: contain;
       flex: 0 0 auto;
-    }
-
-    .brand-name {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
-      margin-bottom: 4px;
     }
 
     h1 {
@@ -144,7 +133,7 @@
       align-items: center;
       gap: 12px;
       padding: 0 0 12px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       font-size: 14px;
       color: var(--muted);
     }
@@ -178,6 +167,7 @@
       cursor: pointer;
       border-radius: 999px;
       overflow: hidden;
+      touch-action: none;
     }
 
     .progress-fill {
@@ -285,6 +275,81 @@
       color: var(--muted);
     }
 
+    body.embed {
+      background: transparent;
+      overflow: hidden;
+    }
+
+    body.embed .page {
+      max-width: none;
+      padding: 0;
+      margin: 0;
+      height: 100vh;
+    }
+
+    body.embed .content {
+      max-width: none;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    body.embed .brand,
+    body.embed .intro,
+    body.embed .share-row,
+    body.embed .keyboard-note,
+    body.embed .time-meta,
+    body.embed .replay-status,
+    body.embed .section-label {
+      display: none;
+    }
+
+    body.embed .page {
+      margin: 0;
+    }
+
+    body.embed .replay-shell {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    body.embed .replay-controls {
+      padding: 0 0 8px;
+      flex-wrap: nowrap;
+    }
+
+    body.embed .replay-stage {
+      padding: 0;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    body.embed .replay-stage-scroll {
+      max-height: none;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 0;
+    }
+
+    body.embed .doc-page {
+      min-height: 100%;
+      box-shadow: none;
+      border: 0;
+      padding: 0;
+      font-size: 16px;
+      line-height: 1.6;
+      height: 100%;
+    }
+
+    body.embed .time-meta,
+    body.embed .replay-status {
+      display: none;
+    }
+
     @media (max-width: 840px) {
       .page {
         padding-inline: 14px;
@@ -313,10 +378,7 @@
     <div class="content">
       <div class="brand">
         <img class="brand-mark" src="/handtyped-icon.png" alt="Handtyped" />
-        <div>
-          <div class="brand-name">Handtyped</div>
-          <h1 id="headline">Writing Session Analysis</h1>
-        </div>
+        <h1 id="headline">Writing Session Analysis</h1>
       </div>
 
       <div class="intro" id="session-date">Loading session…</div>
@@ -383,8 +445,13 @@
     } from '/replay-view.js'
 
     const sessionId = location.pathname.split('/').pop()
+    const isEmbed = new URLSearchParams(location.search).has('embed')
     const shareUrl = location.href
     const headlineEl = document.getElementById('headline')
+
+    if (isEmbed) {
+      document.body.classList.add('embed')
+    }
 
     let session = null
     let history = []
@@ -451,9 +518,6 @@
       const text = idx >= 0 ? history[idx]?.text || '' : ''
       docContentEl.textContent = text
       cursorEl.style.display = currentElapsedMs >= total ? 'none' : ''
-      if (replayStageScrollEl) {
-        replayStageScrollEl.scrollTop = replayStageScrollEl.scrollHeight
-      }
 
       if (currentElapsedMs >= total) {
         playing = false
@@ -660,12 +724,49 @@
       statusMsgEl.textContent = notice
     }
 
-    document.getElementById('progress-track').addEventListener('click', event => {
-      const rect = event.currentTarget.getBoundingClientRect()
-      const pct = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-      const total = getTotalDuration()
-      seekTo(pct * total, 'Replay position updated from the timeline.')
-    })
+    const progressTrackEl = document.getElementById('progress-track')
+    let isDraggingTimeline = false
+    let resumeAfterDrag = false
+
+    function elapsedFromClientX(clientX) {
+      const rect = progressTrackEl.getBoundingClientRect()
+      const pct = rect.width > 0 ? (clientX - rect.left) / rect.width : 0
+      return Math.max(0, Math.min(1, pct)) * getTotalDuration()
+    }
+
+    function beginTimelineDrag(event) {
+      if (event.button !== 0 && event.pointerType !== 'touch') return
+      isDraggingTimeline = true
+      resumeAfterDrag = playing
+      pausePlay('Timeline scrubbed')
+      if (progressTrackEl.setPointerCapture) {
+        progressTrackEl.setPointerCapture(event.pointerId)
+      }
+      seekTo(elapsedFromClientX(event.clientX), 'Replay position updated from the timeline.')
+    }
+
+    function updateTimelineDrag(event) {
+      if (!isDraggingTimeline) return
+      seekTo(elapsedFromClientX(event.clientX), 'Replay position updated from the timeline.')
+    }
+
+    function endTimelineDrag(event) {
+      if (!isDraggingTimeline) return
+      isDraggingTimeline = false
+      if (progressTrackEl.releasePointerCapture) {
+        try {
+          progressTrackEl.releasePointerCapture(event.pointerId)
+        } catch {}
+      }
+      if (currentElapsedMs < getTotalDuration() && resumeAfterDrag) {
+        startPlay()
+      }
+    }
+
+    progressTrackEl.addEventListener('pointerdown', beginTimelineDrag)
+    progressTrackEl.addEventListener('pointermove', updateTimelineDrag)
+    progressTrackEl.addEventListener('pointerup', endTimelineDrag)
+    progressTrackEl.addEventListener('pointercancel', endTimelineDrag)
 
     document.getElementById('btn-copy-link').addEventListener('click', async () => {
       const copied = await copyText(shareUrl)

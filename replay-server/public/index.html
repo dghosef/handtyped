@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Handtyped</title>
-    <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
-    <style>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Handtyped</title>
+  <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
+  <style>
     :root {
       --paper: #ffffff;
       --ink: #222222;
@@ -13,6 +13,7 @@
       --line: #dedede;
       --accent: #c94f45;
       --accent-dark: #a53d35;
+      --blue: #2f6fed;
     }
 
     * {
@@ -28,7 +29,7 @@
 
     body {
       margin: 0;
-      padding: 0 20px 64px;
+      padding: 28px 24px 64px;
     }
 
     a {
@@ -38,14 +39,8 @@
     }
 
     .page {
-      max-width: 860px;
+      max-width: 1180px;
       margin: 0 auto;
-    }
-
-    main {
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
     }
 
     .topbar {
@@ -53,30 +48,21 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 20px 0 14px;
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+      padding: 0 0 44px;
     }
 
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 0;
       color: inherit;
       text-decoration: none;
     }
 
     .brand img {
-      width: 42px;
-      height: 42px;
+      width: 76px;
+      height: 76px;
       display: block;
-      border-radius: 10px;
+      object-fit: contain;
     }
 
     .button,
@@ -84,8 +70,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 40px;
-      padding: 0 18px;
+      min-height: 44px;
+      padding: 0 20px;
       border: 0;
       background: var(--accent);
       color: #fff;
@@ -100,69 +86,177 @@
       background: var(--accent-dark);
     }
 
-    .intro {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      margin: 28px 0 0;
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(420px, 0.9fr);
+      gap: 64px;
+      align-items: start;
+      padding: 0 0 42px;
     }
 
-    .actions {
-      margin: 24px 0 34px;
-    }
-
-    .section {
+    .hero-copy {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 28px;
+    }
+
+    h1,
+    h2 {
       margin: 0;
+      letter-spacing: 0;
+      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+    }
+
+    h1 {
+      font-size: 2.75rem;
+      line-height: 1.14;
+      font-weight: 700;
     }
 
     h2 {
-      margin: 0;
-      font-size: 1.85rem;
-      line-height: 1.15;
-      letter-spacing: 0;
-      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+      font-size: 1.45rem;
+      line-height: 1.2;
       font-weight: 700;
     }
 
     p {
       margin: 0;
-      font-size: 1.02rem;
+      font-size: 1.12rem;
+      line-height: 1.55;
       font-family: 'Open Sans', Arial, Helvetica, sans-serif;
     }
 
-    ul {
-      margin: 0;
-      padding-left: 1.3rem;
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
-    li {
-      margin: 0 0 14px;
-      font-size: 1.04rem;
+    .mini-replay {
+      height: 360px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: transparent;
     }
 
-    .footer {
-      margin-top: 44px;
-      padding-top: 16px;
-      border-top: 1px solid #e1e1da;
+    .mini-replay-controls {
+      display: grid;
+      grid-template-columns: auto minmax(120px, 1fr) auto auto;
+      align-items: center;
+      gap: 14px;
+      padding: 0 0 14px;
       color: var(--muted);
-      font-size: 0.94rem;
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
     }
 
-    @media (max-width: 720px) {
+    .mini-play,
+    .mini-speed {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .mini-play {
+      width: 58px;
+      height: 44px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .mini-speed {
+      width: 66px;
+      height: 44px;
+      padding: 0 8px;
+    }
+
+    .mini-track {
+      height: 10px;
+      background: #e5e5e5;
+      border-radius: 999px;
+      overflow: hidden;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    .mini-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--blue);
+    }
+
+    .mini-document {
+      flex: 1;
+      min-height: 0;
+      border-top: 1px solid var(--line);
+      background: #fff;
+      padding: 20px 24px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.96rem;
+      line-height: 1.58;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-width: 860px;
+    }
+
+    .section h2 {
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 940px) {
       .topbar {
-        align-items: flex-start;
-        flex-direction: column;
+        padding-bottom: 30px;
       }
 
-      .topbar-actions {
-        justify-content: flex-start;
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 36px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 18px 16px 48px;
       }
 
-      .brand-name {
-        font-size: 1.7rem;
+      .brand img {
+        width: 58px;
+        height: 58px;
+      }
+
+      h1 {
+        font-size: 2.05rem;
+      }
+
+      p {
+        font-size: 1rem;
+      }
+
+      .mini-replay {
+        height: 320px;
+      }
+
+      .mini-replay-controls {
+        grid-template-columns: auto minmax(80px, 1fr) auto auto;
+        gap: 8px;
+        font-size: 0.88rem;
+      }
+
+      .mini-play {
+        width: 48px;
+      }
+
+      .mini-speed {
+        width: 58px;
       }
     }
   </style>
@@ -170,30 +264,204 @@
 <body>
   <div class="page">
     <header class="topbar">
-      <a class="brand" href="/">
-        <img src="/handtyped-icon.png" alt="Handtyped" />
+      <a class="brand" href="/" aria-label="Handtyped home">
+        <img src="./handtyped-icon.png" alt="" />
       </a>
-      <div class="topbar-actions">
-        <a class="button" id="download-button" href="/downloads/Handtyped-macos.dmg" download="Handtyped-macos.dmg">Download for macOS</a>
-        <a class="button" id="github-button" href="https://github.com/dghosef/handtyped">GitHub</a>
-      </div>
+      <a class="button" id="github-button" href="https://github.com/dghosef/handtyped">GitHub</a>
     </header>
 
     <main>
-      <section class="intro">
-        <h2>Proof of work for writing</h2>
-        <p>With Handtyped, you can prove to the world that your work was human-written. For bloggers, Redditors, students, journalists, and everyone in between.</p>
+      <section class="hero">
+        <div class="hero-copy">
+          <h1>Proof of work for writing</h1>
+          <p>With Handtyped, you can show the world that your work was human-written. For bloggers, Redditors, students, journalists, and everyone in between.</p>
+          <div class="hero-actions">
+            <a class="button" id="download-button" href="/downloads/Handtyped-macos.dmg" download="Handtyped-macos.dmg">Download for macOS</a>
+          </div>
+        </div>
+
+        <div class="mini-replay" id="mini-replay" data-session-id="1seeSaZBfpjwiF8P" data-session-url="./landing-replay.json" aria-label="Replay preview of the landing page text">
+          <div class="mini-replay-controls">
+            <button class="mini-play" id="mini-play" type="button" aria-label="Pause replay">&#10074;&#10074;</button>
+            <div class="mini-track" id="mini-track" aria-label="Replay timeline">
+              <div class="mini-fill" id="mini-fill"></div>
+            </div>
+            <div class="mini-time" id="mini-time">0:00 / 0:00</div>
+            <select class="mini-speed" id="mini-speed" aria-label="Replay speed">
+              <option value="0.5">0.5x</option>
+              <option value="1">1x</option>
+              <option value="2">2x</option>
+              <option value="5">5x</option>
+              <option value="10" selected>10x</option>
+            </select>
+          </div>
+          <div class="mini-document" id="mini-document">Loading replay...</div>
+        </div>
       </section>
 
       <section class="section" id="how-it-works">
-        <h2>How it works:</h2>
+        <h2>How it works</h2>
         <p>Handtyped is a markdown editor that only allows input from your physical keyboard. No copy and paste, no AI agents, and no <a href="https://chromewebstore.google.com/detail/natural-typist-human-typi/mfdeophbahbbbonmgbdhchlcjmenhlfd">human typing pattern simulators</a>. Anything written in Handtyped must truly be typed by hand.</p>
         <p>Once you finish writing, Handtyped generates and publishes a millisecond-accurate replay of your writing process, keystroke by keystroke. Readers will be able to see every deletion, pause, and rewrite.</p>
-        <p>For example, <a href="https://replay.handtyped.app/B5HKW61AIFZ1Hb2y">here</a> is the replay for the text of this website.</p>
+        <p>For example, <a href="https://replay.handtyped.app/1seeSaZBfpjwiF8P">here</a> is the replay for the text of this website.</p>
         <p>You could in theory build a robot to type on the keyboard, modify the client to produce fake logs, or copy from another screen and manually mimic believable typing patterns.</p>
         <p>At that point, however, faking it is as much work as writing it.</p>
       </section>
     </main>
   </div>
+
+  <script type="module">
+    import {
+      compressIdleGaps,
+      findHistoryIndex,
+      getDurationFromHistory,
+      parseHistory,
+      parseKeydowns,
+    } from './replay-view.js'
+
+    const replayEl = document.getElementById('mini-replay')
+    const playEl = document.getElementById('mini-play')
+    const trackEl = document.getElementById('mini-track')
+    const fillEl = document.getElementById('mini-fill')
+    const timeEl = document.getElementById('mini-time')
+    const speedEl = document.getElementById('mini-speed')
+    const documentEl = document.getElementById('mini-document')
+
+    let history = []
+    let playing = true
+    let speed = Number(speedEl.value)
+    let elapsedMs = 0
+    let startedAt = 0
+    let baseElapsed = 0
+    let animationHandle = null
+    let isDraggingTimeline = false
+    let resumeAfterDrag = false
+
+    function formatTime(ms) {
+      const seconds = Math.floor(ms / 1000)
+      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    function totalDuration() {
+      return Math.max(getDurationFromHistory(history), 1000)
+    }
+
+    function render(nextElapsed) {
+      const total = totalDuration()
+      elapsedMs = Math.max(0, Math.min(nextElapsed, total))
+      const index = findHistoryIndex(history, elapsedMs)
+      documentEl.textContent = index >= 0 ? history[index]?.text || '' : ''
+      fillEl.style.width = `${(elapsedMs / total) * 100}%`
+      timeEl.textContent = `${formatTime(elapsedMs)} / ${formatTime(total)}`
+
+      if (elapsedMs >= total) {
+        playing = false
+        playEl.innerHTML = '&#9654;'
+        playEl.setAttribute('aria-label', 'Play replay')
+      }
+    }
+
+    function tick(timestamp) {
+      if (!playing) return
+      if (!startedAt) startedAt = timestamp
+      render(baseElapsed + ((timestamp - startedAt) * speed))
+      animationHandle = requestAnimationFrame(tick)
+    }
+
+    function start() {
+      cancelAnimationFrame(animationHandle)
+      if (elapsedMs >= totalDuration()) elapsedMs = 0
+      playing = true
+      startedAt = 0
+      baseElapsed = elapsedMs
+      playEl.innerHTML = '&#10074;&#10074;'
+      playEl.setAttribute('aria-label', 'Pause replay')
+      animationHandle = requestAnimationFrame(tick)
+    }
+
+    function pause() {
+      playing = false
+      cancelAnimationFrame(animationHandle)
+      playEl.innerHTML = '&#9654;'
+      playEl.setAttribute('aria-label', 'Play replay')
+    }
+
+    function timelineElapsedFromClientX(clientX) {
+      const rect = trackEl.getBoundingClientRect()
+      const pct = rect.width > 0 ? (clientX - rect.left) / rect.width : 0
+      return Math.max(0, Math.min(1, pct)) * totalDuration()
+    }
+
+    function applyTimelinePosition(elapsed) {
+      const total = totalDuration()
+      elapsedMs = Math.max(0, Math.min(elapsed, total))
+      render(elapsedMs)
+    }
+
+    function beginTimelineDrag(event) {
+      if (event.button !== 0 && event.pointerType !== 'touch') return
+      isDraggingTimeline = true
+      resumeAfterDrag = playing
+      pause()
+      if (trackEl.setPointerCapture) {
+        trackEl.setPointerCapture(event.pointerId)
+      }
+      applyTimelinePosition(timelineElapsedFromClientX(event.clientX))
+    }
+
+    function updateTimelineDrag(event) {
+      if (!isDraggingTimeline) return
+      applyTimelinePosition(timelineElapsedFromClientX(event.clientX))
+    }
+
+    function endTimelineDrag(event) {
+      if (!isDraggingTimeline) return
+      isDraggingTimeline = false
+      if (trackEl.releasePointerCapture) {
+        try {
+          trackEl.releasePointerCapture(event.pointerId)
+        } catch {}
+      }
+      if (elapsedMs >= totalDuration()) {
+        playing = false
+        playEl.innerHTML = '&#9654;'
+        playEl.setAttribute('aria-label', 'Play replay')
+        return
+      }
+      if (resumeAfterDrag) start()
+    }
+
+    async function loadMiniReplay() {
+      const response = await fetch(replayEl.dataset.sessionUrl)
+      if (!response.ok) throw new Error('Replay unavailable')
+      const session = await response.json()
+      const keydowns = parseKeydowns(session.keystroke_log)
+      history = compressIdleGaps(parseHistory(session, keydowns))
+      render(0)
+      start()
+    }
+
+    playEl.addEventListener('click', () => {
+      if (playing) {
+        pause()
+      } else {
+        start()
+      }
+    })
+
+    speedEl.addEventListener('change', () => {
+      speed = Number(speedEl.value)
+      if (playing) start()
+    })
+
+    trackEl.addEventListener('pointerdown', beginTimelineDrag)
+    trackEl.addEventListener('pointermove', updateTimelineDrag)
+    trackEl.addEventListener('pointerup', endTimelineDrag)
+    trackEl.addEventListener('pointercancel', endTimelineDrag)
+
+    loadMiniReplay().catch((error) => {
+      documentEl.textContent = error.message
+    })
+  </script>
 </body>
 </html>

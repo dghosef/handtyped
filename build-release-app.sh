@@ -8,6 +8,7 @@ INFO_PLIST="$APP/Contents/Info.plist"
 ICON_SRC="$ROOT/icons/icon.png"
 ICONSET_DIR="/tmp/handtyped-release.iconset"
 ICNS_PATH="$APP/Contents/Resources/Handtyped.icns"
+PUBLIC_DOWNLOADS_DIR="${PUBLIC_DOWNLOADS_DIR:-$ROOT/replay-server/public/downloads}"
 
 VERSION="$(grep -m1 '^version = ' "$ROOT/Cargo.toml" | sed -E 's/version = "(.*)"/\1/')"
 SIGN_IDENTITY="${HANDTYPED_SIGN_IDENTITY:-Developer ID Application: Joseph Tan (JJJL5W8N9N)}"
@@ -27,6 +28,27 @@ create_notary_archive() {
 
   echo "Creating notarization archive at $archive_path..."
   ditto -c -k --keepParent "$app_path" "$archive_path"
+}
+
+create_release_zip() {
+  local app_path="$1"
+  local zip_path="$2"
+
+  echo "Creating release zip at $zip_path..."
+  ditto -c -k --keepParent "$app_path" "$zip_path"
+}
+
+create_release_dmg() {
+  local app_path="$1"
+  local dmg_path="$2"
+
+  echo "Creating release DMG at $dmg_path..."
+  hdiutil create \
+    -quiet \
+    -format UDZO \
+    -volname "Handtyped" \
+    -srcfolder "$app_path" \
+    "$dmg_path"
 }
 
 submit_for_notarization() {
@@ -58,6 +80,17 @@ submit_for_notarization() {
 
   echo "Validating stapled notarization..."
   xcrun stapler validate "$app_path"
+}
+
+publish_release_artifacts() {
+  local app_path="$1"
+  local dmg_path="$2"
+  local zip_path="$3"
+
+  echo "Publishing release artifacts to $PUBLIC_DOWNLOADS_DIR..."
+  mkdir -p "$PUBLIC_DOWNLOADS_DIR"
+  cp "$dmg_path" "$PUBLIC_DOWNLOADS_DIR/Handtyped-macos.dmg"
+  cp "$zip_path" "$PUBLIC_DOWNLOADS_DIR/Handtyped-macos.zip"
 }
 
 main() {
@@ -127,8 +160,13 @@ PLIST
 
   NOTARY_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/handtyped-notary.XXXXXX")"
   local notary_archive="$NOTARY_TMP_DIR/Handtyped.zip"
+  local release_zip="$NOTARY_TMP_DIR/Handtyped-macos.zip"
+  local release_dmg="$NOTARY_TMP_DIR/Handtyped-macos.dmg"
   create_notary_archive "$APP" "$notary_archive"
   submit_for_notarization "$notary_archive" "$APP"
+  create_release_dmg "$APP" "$release_dmg"
+  create_release_zip "$APP" "$release_zip"
+  publish_release_artifacts "$APP" "$release_dmg" "$release_zip"
 
   echo "Assessing stapled app for Gatekeeper compatibility..."
   spctl --assess --type execute --verbose=4 "$APP"

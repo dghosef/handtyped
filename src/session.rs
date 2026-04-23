@@ -5,7 +5,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::{
-    atomic::{AtomicBool, AtomicI32, AtomicU64},
+    atomic::{AtomicBool, AtomicU64},
     Mutex,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -58,6 +58,14 @@ pub struct ExtraEvent {
     /// SHA-256 hex of clipboard content at paste time.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FocusEvent {
+    /// Elapsed milliseconds since session start.
+    pub t: u64,
+    /// "active" or "inactive".
+    pub state: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -151,6 +159,38 @@ impl SessionState {
             .collect::<Vec<_>>()
             .join("\n")
     }
+
+    pub fn focus_events(&self) -> Vec<FocusEvent> {
+        self.focus_events_since_wall_ms(self.start_wall_ns / 1_000_000)
+    }
+
+    pub fn focus_events_since_wall_ms(&self, origin_wall_ms: u64) -> Vec<FocusEvent> {
+        self.log
+            .iter()
+            .filter_map(|entry| {
+                let event = match entry {
+                    LogEntry::Extra(event) => event,
+                    LogEntry::Key(_) => return None,
+                };
+
+                let state = match event.kind.as_str() {
+                    "focus_active" => "active",
+                    "focus_inactive" => "inactive",
+                    _ => return None,
+                };
+
+                let event_wall_ms = event.t / 1_000_000;
+                if event_wall_ms < origin_wall_ms {
+                    return None;
+                }
+
+                Some(FocusEvent {
+                    t: event_wall_ms.saturating_sub(origin_wall_ms),
+                    state: state.to_string(),
+                })
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -176,16 +216,15 @@ pub struct AppState {
     pub editor_state: Mutex<EditorDocumentState>,
     /// Set to true only after IOHIDManagerOpen succeeds.
     pub hid_active: AtomicBool,
-    /// Counter incremented each time a built-in keyboard keydown event fires.
-    /// JS calls consume_builtin_keydown to atomically decrement and check; if
-    /// it returns false the keystroke did NOT come from the built-in keyboard.
-    pub pending_builtin_keydowns: AtomicI32,
+    /// Timestamp (ns) of the most recent built-in keyboard keydown
+    pub builtin_keydown_timestamp: AtomicU64,
     /// Integrity check results captured at startup.
     pub integrity: IntegrityReport,
     /// Matched keyboard device info; populated on first device-matched callback.
     pub keyboard_info: Mutex<Option<KeyboardInfo>>,
     /// Wall-clock ns of the most recent keydown, used to detect synthetic bursts.
     pub last_keydown_ns: AtomicU64,
+
     /// Runtime observability state used for crash and upload health summaries.
     pub observability: Mutex<RuntimeObservability>,
 }
@@ -252,6 +291,75 @@ mod tests {
         };
         let json = serde_json::to_string(&e).unwrap();
         assert!(json.contains("\"content_hash\":\"abc123\""));
+    }
+
+    #[test]
+    fn test_focus_events_derive_elapsed_ms_from_session_log() {
+        let mut s = SessionState::new(0);
+        let start = s.start_wall_ns;
+        s.append_extra(ExtraEvent {
+            t: start + 250_000_000,
+            kind: "focus_inactive".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+        s.append_extra(ExtraEvent {
+            t: start + 1_000_000_000,
+            kind: "focus_active".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+        s.append_extra(ExtraEvent {
+            t: start + 1_500_000_000,
+            kind: "paste".into(),
+            char_count: Some(4),
+            duration_ms: None,
+            content_hash: None,
+        });
+
+        assert_eq!(
+            s.focus_events(),
+            vec![
+                FocusEvent {
+                    t: 250,
+                    state: "inactive".into(),
+                },
+                FocusEvent {
+                    t: 1000,
+                    state: "active".into(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_focus_events_can_be_rebased_to_document_replay_origin() {
+        let mut s = SessionState::new(0);
+        let start = s.start_wall_ns;
+        s.append_extra(ExtraEvent {
+            t: start + 1_000_000_000,
+            kind: "focus_inactive".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+        s.append_extra(ExtraEvent {
+            t: start + 2_500_000_000,
+            kind: "focus_active".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+
+        assert_eq!(
+            s.focus_events_since_wall_ms((start / 1_000_000) + 2_000),
+            vec![FocusEvent {
+                t: 500,
+                state: "active".into(),
+            }]
+        );
     }
 
     #[test]

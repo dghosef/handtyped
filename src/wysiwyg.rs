@@ -985,16 +985,9 @@ impl MarkdownEditor {
                                 unhandled.push(ev);
                             }
                         }
-                    } else {
-                        // Still swallow undo/redo key events so the read-only editor
-                        // can't be modified via egui shortcuts.
-                        for ev in produced.drain(..) {
-                            if Self::undo_cmd_from_event(&ev).is_some() {
-                                continue;
-                            }
-                            unhandled.push(ev);
-                        }
                     }
+                    // When hid_ok is false, all key events are swallowed (only undo/redo
+                    // would be consumed but we've already handled those above).
                 }
                 i.events = unhandled;
                 // Consume Escape so egui's TextEdit never sees it and cannot
@@ -1027,6 +1020,10 @@ impl MarkdownEditor {
                             }
                         }
                         continue; // swallow key event
+                    }
+                    // Block events if no pending builtin keydown
+                    if !hid_ok {
+                        continue;
                     }
                     unhandled.push(event);
                 }

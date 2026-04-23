@@ -12,6 +12,7 @@ const MAX_DOC_TEXT_BYTES = 1 * 1024 * 1024
 const MAX_DOC_HTML_BYTES = 1 * 1024 * 1024
 const MAX_KEYSTROKE_LOG_BYTES = 4 * 1024 * 1024
 const MAX_DOC_HISTORY_ENTRIES = 50_000
+const MAX_FOCUS_EVENTS = 10_000
 const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 const SHORT_ID_LENGTH = 16
 
@@ -115,6 +116,17 @@ function requireFiniteNumber(payload, key) {
   return value
 }
 
+function optionalFiniteNumber(payload, key) {
+  const value = payload[key]
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Expected numeric field "${key}"`)
+  }
+  return value
+}
+
 function requireArray(payload, key, { maxLength } = {}) {
   const value = payload[key]
   if (!Array.isArray(value)) {
@@ -124,6 +136,41 @@ function requireArray(payload, key, { maxLength } = {}) {
     throw new Error(`Field "${key}" exceeds size limit`)
   }
   return value
+}
+
+function optionalArray(payload, key, { maxLength } = {}) {
+  const value = payload[key]
+  if (value === undefined || value === null) {
+    return []
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`Expected array field "${key}"`)
+  }
+  if (maxLength && value.length > maxLength) {
+    throw new Error(`Field "${key}" exceeds size limit`)
+  }
+  return value
+}
+
+function normalizeFocusEvents(payload) {
+  return optionalArray(payload, 'focus_events', { maxLength: MAX_FOCUS_EVENTS })
+    .map((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new Error(`Invalid focus event at index ${index}`)
+      }
+
+      const t = entry.t
+      if (typeof t !== 'number' || !Number.isFinite(t) || t < 0) {
+        throw new Error(`Invalid focus event timestamp at index ${index}`)
+      }
+
+      const state = entry.state
+      if (state !== 'active' && state !== 'inactive') {
+        throw new Error(`Invalid focus event state at index ${index}`)
+      }
+
+      return { t, state }
+    })
 }
 
 function buildEd25519Spki(rawPublicKey) {
@@ -173,6 +220,8 @@ function normalizeVerifiedPayload(payload) {
   const doc_text = requireString(payload, 'doc_text', { maxBytes: MAX_DOC_TEXT_BYTES })
   const doc_html = requireString(payload, 'doc_html', { maxBytes: MAX_DOC_HTML_BYTES })
   const doc_history = requireArray(payload, 'doc_history', { maxLength: MAX_DOC_HISTORY_ENTRIES })
+  const focus_events = normalizeFocusEvents(payload)
+  const replay_origin_wall_ms = optionalFiniteNumber(payload, 'replay_origin_wall_ms')
   const keystroke_log = requireString(payload, 'keystroke_log', {
     maxBytes: MAX_KEYSTROKE_LOG_BYTES,
   })
@@ -212,6 +261,8 @@ function normalizeVerifiedPayload(payload) {
     doc_text,
     doc_html,
     doc_history,
+    focus_events,
+    replay_origin_wall_ms,
     keystroke_log,
     keystroke_count,
     start_wall_ns,

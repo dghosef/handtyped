@@ -5,7 +5,7 @@ use handtyped_lib::hid;
 use handtyped_lib::integrity;
 use handtyped_lib::observability;
 use handtyped_lib::preview::{parse_markdown_for_preview, PreviewBlock};
-use handtyped_lib::session::{AppState, SessionState};
+use handtyped_lib::session::{AppState, ExtraEvent, SessionState};
 use handtyped_lib::signing;
 use handtyped_lib::wysiwyg::{MarkdownEditor, ModeColors};
 use muda::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -34,7 +34,7 @@ fn main() -> eframe::Result<()> {
                 .unwrap_or_default(),
         ),
         hid_active: std::sync::atomic::AtomicBool::new(false),
-        pending_builtin_keydowns: std::sync::atomic::AtomicI32::new(0),
+        builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
         integrity: report,
         keyboard_info: Mutex::new(None),
         last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
@@ -625,10 +625,7 @@ mod tests {
 
     #[test]
     fn missing_theme_defaults_to_gruvbox_instead_of_weird_fallback() {
-        assert!(matches!(
-            Theme::from_storage_key(None),
-            Theme::Gruvbox
-        ));
+        assert!(matches!(Theme::from_storage_key(None), Theme::Gruvbox));
     }
 
     #[test]
@@ -688,22 +685,96 @@ mod tests {
 
     #[test]
     fn startup_hidden_blocks_input_monitoring_ui_until_granted() {
-        assert!(NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+        assert!(
+            NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+                true,
+                hid::InputMonitoringAccess::Unknown,
+            )
+        );
+        assert!(
+            NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+                true,
+                hid::InputMonitoringAccess::Denied,
+            )
+        );
+        assert!(
+            !NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+                true,
+                hid::InputMonitoringAccess::Granted,
+            )
+        );
+        assert!(
+            !NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+                false,
+                hid::InputMonitoringAccess::Unknown,
+            )
+        );
+    }
+
+    #[test]
+    fn focus_transition_initializes_without_logging() {
+        let state = AppState {
+            session: Mutex::new(SessionState::new(0)),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: std::sync::atomic::AtomicBool::new(false),
+            builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
+        let mut last_focus = None;
+
+        assert!(!record_focus_transition(&state, &mut last_focus, true, 10));
+        assert_eq!(state.session.lock().unwrap().focus_events(), Vec::new());
+    }
+
+    #[test]
+    fn focus_transition_logs_only_when_active_state_changes() {
+        let state = AppState {
+            session: Mutex::new(SessionState::new(0)),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: std::sync::atomic::AtomicBool::new(false),
+            builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
+        let start = state.session.lock().unwrap().start_wall_ns;
+        let mut last_focus = Some(true);
+
+        assert!(!record_focus_transition(
+            &state,
+            &mut last_focus,
             true,
-            hid::InputMonitoringAccess::Unknown,
+            start + 1_000_000
         ));
-        assert!(NativeEditorApp::should_block_startup_ui_until_permission_resolves(
-            true,
-            hid::InputMonitoringAccess::Denied,
-        ));
-        assert!(!NativeEditorApp::should_block_startup_ui_until_permission_resolves(
-            true,
-            hid::InputMonitoringAccess::Granted,
-        ));
-        assert!(!NativeEditorApp::should_block_startup_ui_until_permission_resolves(
+        assert!(record_focus_transition(
+            &state,
+            &mut last_focus,
             false,
-            hid::InputMonitoringAccess::Unknown,
+            start + 2_000_000
         ));
+        assert!(!record_focus_transition(
+            &state,
+            &mut last_focus,
+            false,
+            start + 3_000_000
+        ));
+        assert!(record_focus_transition(
+            &state,
+            &mut last_focus,
+            true,
+            start + 5_000_000
+        ));
+
+        let focus_events = state.session.lock().unwrap().focus_events();
+        assert_eq!(focus_events.len(), 2);
+        assert_eq!(focus_events[0].state, "inactive");
+        assert_eq!(focus_events[0].t, 2);
+        assert_eq!(focus_events[1].state, "active");
+        assert_eq!(focus_events[1].t, 5);
     }
 
     #[test]
@@ -1412,6 +1483,7 @@ struct NativeEditorApp {
     opening_paths: HashSet<PathBuf>,
     uploading_tabs: HashSet<u64>,
     modal_error: Option<String>,
+    last_window_focus_active: Option<bool>,
 }
 
 #[derive(Clone)]
@@ -1604,6 +1676,38 @@ fn now_wall_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+fn now_wall_ns() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64
+}
+
+fn record_focus_transition(
+    state: &AppState,
+    last_window_focus_active: &mut Option<bool>,
+    current_active: bool,
+    timestamp_ns: u64,
+) -> bool {
+    let previous = last_window_focus_active.replace(current_active);
+    if previous.is_none() || previous == Some(current_active) {
+        return false;
+    }
+
+    state.session.lock().unwrap().append_extra(ExtraEvent {
+        t: timestamp_ns,
+        kind: if current_active {
+            "focus_active".into()
+        } else {
+            "focus_inactive".into()
+        },
+        char_count: None,
+        duration_ms: None,
+        content_hash: None,
+    });
+    true
 }
 
 fn next_tab_id() -> u64 {
@@ -2080,6 +2184,7 @@ impl NativeEditorApp {
         document_name: Option<String>,
         doc_text: String,
         doc_history: Vec<serde_json::Value>,
+        replay_origin_wall_ms: u64,
         open_when_ready: bool,
         ctx: &egui::Context,
     ) {
@@ -2094,19 +2199,21 @@ impl NativeEditorApp {
         let published_history_len = doc_history.len();
         std::thread::spawn(move || {
             let tx_for_progress = tx.clone();
-            let result = handtyped_lib::upload::upload_replay_session_native_with_progress(
-                &state,
-                document_name.as_deref(),
-                &doc_text,
-                &doc_history,
-                |stage| {
-                    let _ = tx_for_progress.send(BackgroundResult::Status {
-                        message: stage.to_string(),
-                        is_error: false,
-                    });
-                    repaint.request_repaint();
-                },
-            );
+            let result =
+                handtyped_lib::upload::upload_replay_session_native_with_progress_and_focus_origin(
+                    &state,
+                    document_name.as_deref(),
+                    &doc_text,
+                    &doc_history,
+                    Some(replay_origin_wall_ms),
+                    |stage| {
+                        let _ = tx_for_progress.send(BackgroundResult::Status {
+                            message: stage.to_string(),
+                            is_error: false,
+                        });
+                        repaint.request_repaint();
+                    },
+                );
             let _ = tx.send(BackgroundResult::ReplayUpload {
                 tab_id,
                 published_history_len,
@@ -2451,6 +2558,7 @@ impl NativeEditorApp {
             opening_paths: HashSet::new(),
             uploading_tabs: HashSet::new(),
             modal_error: None,
+            last_window_focus_active: None,
         };
 
         app.restore_recent_document_if_available();
@@ -2862,11 +2970,23 @@ impl NativeEditorApp {
     }
 
     fn frame_input_allowed(&self) -> bool {
-        if !self.hid_active() {
+        let active = self.hid_active();
+        if !active {
             return false;
         }
-        let pending = self.state.pending_builtin_keydowns.load(Ordering::Acquire);
-        pending > 0
+        // Check if there's a recent SPI keydown (within last 200ms)
+        let last_keydown = self.state.builtin_keydown_timestamp.load(Ordering::Acquire);
+        if last_keydown == 0 {
+            return false;
+        }
+        // Get current time
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        // Allow if keydown was within last 200ms
+        let elapsed = now.saturating_sub(last_keydown);
+        elapsed < 200_000_000 // 200ms in ns
     }
 
     fn record_history_snapshot(&mut self) {
@@ -3132,6 +3252,7 @@ impl NativeEditorApp {
                                     tab.replay_url.clone(),
                                     tab.published_history_len,
                                     tab.doc_history.clone(),
+                                    tab.replay_origin_wall_ms,
                                 )
                             });
                             if let Some((
@@ -3139,6 +3260,7 @@ impl NativeEditorApp {
                                 replay_url,
                                 published_history_len,
                                 doc_history,
+                                replay_origin_wall_ms,
                             )) = replay_state
                             {
                                 match replay_open_plan(
@@ -3155,6 +3277,7 @@ impl NativeEditorApp {
                                                 document_name,
                                                 doc_text,
                                                 doc_history,
+                                                replay_origin_wall_ms,
                                                 true,
                                                 ctx,
                                             );
@@ -3246,6 +3369,13 @@ impl eframe::App for NativeEditorApp {
         if startup_window_blocking {
             return;
         }
+        let window_focused = ctx.input(|input| input.focused);
+        record_focus_transition(
+            &self.state,
+            &mut self.last_window_focus_active,
+            window_focused,
+            now_wall_ns(),
+        );
 
         // Apply theme if changed outside of the top-bar dropdown (e.g. file open).
         if self.needs_theme_apply {

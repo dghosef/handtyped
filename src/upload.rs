@@ -1,5 +1,5 @@
 use crate::observability;
-use crate::session::AppState;
+use crate::session::{AppState, FocusEvent};
 use crate::signing;
 use base64::Engine as _;
 use chrono::Local;
@@ -25,6 +25,10 @@ pub struct ReplayAttestationPayload {
     pub doc_text: String,
     pub doc_html: String,
     pub doc_history: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub focus_events: Vec<FocusEvent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_origin_wall_ms: Option<u64>,
     pub keystroke_log: String,
     pub keystroke_count: usize,
     pub start_wall_ns: u64,
@@ -71,13 +75,25 @@ fn build_replay_attestation_payload(
     document_name: Option<&str>,
     doc_text: &str,
     doc_history: &[serde_json::Value],
+    focus_origin_wall_ms: Option<u64>,
 ) -> ReplayAttestationPayload {
-    let (session_id, session_nonce, log_jsonl, keystroke_count, start_wall_ns, log_chain_hash) = {
+    let (
+        session_id,
+        session_nonce,
+        log_jsonl,
+        focus_events,
+        keystroke_count,
+        start_wall_ns,
+        log_chain_hash,
+    ) = {
         let s = state.session.lock().unwrap();
         (
             s.session_id.clone(),
             s.session_nonce.clone(),
             s.to_jsonl(),
+            focus_origin_wall_ms
+                .map(|origin| s.focus_events_since_wall_ms(origin))
+                .unwrap_or_else(|| s.focus_events()),
             s.keystroke_count(),
             s.start_wall_ns,
             s.log_chain_hash(),
@@ -100,6 +116,8 @@ fn build_replay_attestation_payload(
         doc_text: doc_text.to_string(),
         doc_html: String::new(),
         doc_history: doc_history.to_vec(),
+        focus_events,
+        replay_origin_wall_ms: focus_origin_wall_ms,
         keystroke_log: log_jsonl,
         keystroke_count,
         start_wall_ns,
@@ -244,7 +262,31 @@ pub fn upload_replay_session_native_with_progress<F: FnMut(&'static str)>(
     doc_history: &[serde_json::Value],
     mut progress: F,
 ) -> Result<String, String> {
-    let payload = build_replay_attestation_payload(state, document_name, doc_text, doc_history);
+    upload_replay_session_native_with_progress_and_focus_origin(
+        state,
+        document_name,
+        doc_text,
+        doc_history,
+        None,
+        &mut progress,
+    )
+}
+
+pub fn upload_replay_session_native_with_progress_and_focus_origin<F: FnMut(&'static str)>(
+    state: &AppState,
+    document_name: Option<&str>,
+    doc_text: &str,
+    doc_history: &[serde_json::Value],
+    focus_origin_wall_ms: Option<u64>,
+    mut progress: F,
+) -> Result<String, String> {
+    let payload = build_replay_attestation_payload(
+        state,
+        document_name,
+        doc_text,
+        doc_history,
+        focus_origin_wall_ms,
+    );
     let session_id = payload.session_id.clone();
     let document_name_owned = payload.document_name.clone();
     let envelope = build_replay_attestation_envelope(&payload, &mut progress)?;
@@ -327,7 +369,7 @@ mod tests {
         doc_text: &str,
         doc_history: &[serde_json::Value],
     ) -> Result<String, String> {
-        let payload = build_replay_attestation_payload(state, None, doc_text, doc_history);
+        let payload = build_replay_attestation_payload(state, None, doc_text, doc_history, None);
         let envelope = build_replay_attestation_envelope(&payload, &mut |_| {})?;
         let body = encode_envelope_body(&envelope)?;
 
@@ -348,14 +390,14 @@ mod tests {
     fn upload_fails_gracefully_when_server_down() {
         use crate::editor::EditorDocumentState;
         use crate::session::SessionState;
-        use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
         use std::sync::Mutex;
 
         let state = AppState {
             session: Mutex::new(SessionState::new(0)),
             editor_state: Mutex::new(EditorDocumentState::default()),
             hid_active: AtomicBool::new(false),
-            pending_builtin_keydowns: AtomicI32::new(0),
+            builtin_keydown_timestamp: AtomicU64::new(0),
             integrity: Default::default(),
             keyboard_info: Mutex::new(None),
             last_keydown_ns: AtomicU64::new(0),
@@ -375,21 +417,22 @@ mod tests {
     fn replay_attestation_envelope_contains_signed_payload() {
         use crate::editor::EditorDocumentState;
         use crate::session::SessionState;
-        use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
         use std::sync::Mutex;
 
         let state = AppState {
             session: Mutex::new(SessionState::new(0)),
             editor_state: Mutex::new(EditorDocumentState::default()),
             hid_active: AtomicBool::new(false),
-            pending_builtin_keydowns: AtomicI32::new(0),
+            builtin_keydown_timestamp: AtomicU64::new(0),
             integrity: Default::default(),
             keyboard_info: Mutex::new(None),
             last_keydown_ns: AtomicU64::new(0),
             observability: Mutex::new(observability::RuntimeObservability::default()),
         };
 
-        let payload = build_replay_attestation_payload(&state, Some("document.ht"), "hello", &[]);
+        let payload =
+            build_replay_attestation_payload(&state, Some("document.ht"), "hello", &[], None);
         let envelope = build_replay_attestation_envelope(&payload, &mut |_| {}).unwrap();
         assert_eq!(envelope.version, 2);
         assert_eq!(envelope.format, REPLAY_ATTESTATION_FORMAT_V2);
@@ -404,20 +447,122 @@ mod tests {
         assert_eq!(payload.document_name.as_deref(), Some("document.ht"));
         assert_eq!(payload.doc_text, "hello");
         assert!(!payload.session_nonce.is_empty());
+        assert!(payload.focus_events.is_empty());
+        assert_eq!(payload.replay_origin_wall_ms, None);
+    }
+
+    #[test]
+    fn replay_attestation_payload_includes_focus_events() {
+        use crate::editor::EditorDocumentState;
+        use crate::session::{ExtraEvent, SessionState};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
+
+        let mut session = SessionState::new(0);
+        let start = session.start_wall_ns;
+        session.append_extra(ExtraEvent {
+            t: start + 2_000_000,
+            kind: "focus_inactive".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+        session.append_extra(ExtraEvent {
+            t: start + 9_000_000,
+            kind: "focus_active".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+
+        let state = AppState {
+            session: Mutex::new(session),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
+
+        let payload = build_replay_attestation_payload(&state, None, "hello", &[], None);
+
+        assert_eq!(
+            payload.focus_events,
+            vec![
+                FocusEvent {
+                    t: 2,
+                    state: "inactive".into(),
+                },
+                FocusEvent {
+                    t: 9,
+                    state: "active".into(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn replay_attestation_payload_rebases_focus_events_to_document_origin() {
+        use crate::editor::EditorDocumentState;
+        use crate::session::{ExtraEvent, SessionState};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
+
+        let mut session = SessionState::new(0);
+        let start = session.start_wall_ns;
+        session.append_extra(ExtraEvent {
+            t: start + 1_000_000_000,
+            kind: "focus_inactive".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+        session.append_extra(ExtraEvent {
+            t: start + 2_500_000_000,
+            kind: "focus_active".into(),
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
+
+        let state = AppState {
+            session: Mutex::new(session),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
+        let origin = (start / 1_000_000) + 2_000;
+
+        let payload = build_replay_attestation_payload(&state, None, "hello", &[], Some(origin));
+
+        assert_eq!(
+            payload.focus_events,
+            vec![FocusEvent {
+                t: 500,
+                state: "active".into(),
+            }]
+        );
+        assert_eq!(payload.replay_origin_wall_ms, Some(origin));
     }
 
     #[test]
     fn replay_upload_emits_progress_stages_before_connect() {
         use crate::editor::EditorDocumentState;
         use crate::session::SessionState;
-        use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
         use std::sync::Mutex;
 
         let state = AppState {
             session: Mutex::new(SessionState::new(0)),
             editor_state: Mutex::new(EditorDocumentState::default()),
             hid_active: AtomicBool::new(false),
-            pending_builtin_keydowns: AtomicI32::new(0),
+            builtin_keydown_timestamp: AtomicU64::new(0),
             integrity: Default::default(),
             keyboard_info: Mutex::new(None),
             last_keydown_ns: AtomicU64::new(0),

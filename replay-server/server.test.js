@@ -60,6 +60,8 @@ function basePayload(overrides = {}) {
     doc_text: 'Hello world',
     doc_html: '<p>Hello world</p>',
     doc_history: [{ t: 0, text: 'H' }],
+    focus_events: [],
+    replay_origin_wall_ms: 1_700_000_000_000,
     keystroke_log: '{"t":1,"kind":"down","key":4}\n',
     keystroke_count: 1,
     start_wall_ns: 1_700_000_000_000_000_000,
@@ -303,6 +305,20 @@ describe('POST /api/sessions', () => {
     expect(stored.verification.format).toBe(REPLAY_ATTESTATION_FORMAT_V2)
   })
 
+  it('stores Handtyped active and inactive focus transitions', async () => {
+    const focus_events = [
+      { t: 1200, state: 'inactive' },
+      { t: 5200, state: 'active' },
+    ]
+    const replay_origin_wall_ms = 1_700_000_100_000
+    const envelope = signedEnvelope({ focus_events, replay_origin_wall_ms })
+    const { body } = await request('POST', '/api/sessions', envelope)
+    const stored = JSON.parse(readFileSync(join(sessionsDir, `${body.id}.json`), 'utf8'))
+
+    expect(stored.focus_events).toEqual(focus_events)
+    expect(stored.replay_origin_wall_ms).toBe(replay_origin_wall_ms)
+  })
+
   it('reuses the same replay id for repeat uploads from one session', async () => {
     const session_id = shortId()
     const firstEnvelope = signedEnvelope({ session_id, doc_text: 'first version' })
@@ -366,6 +382,16 @@ describe('POST /api/sessions', () => {
 
     expect(status).toBe(400)
     expect(body.error).toContain('tampering indicators')
+  })
+
+  it('rejects malformed focus transitions even with a valid signature', async () => {
+    const envelope = signedEnvelope({
+      focus_events: [{ t: 1200, state: 'background-tab' }],
+    })
+    const { status, body } = await request('POST', '/api/sessions', envelope)
+
+    expect(status).toBe(400)
+    expect(body.error).toContain('Invalid focus event state')
   })
 })
 

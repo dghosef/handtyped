@@ -4,10 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Handtyped</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
   <style>
     :root {
       --paper: #ffffff;
+      --page: #f5f5f5;
       --ink: #222222;
       --muted: #555555;
       --line: #dedede;
@@ -48,7 +50,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 0 0 44px;
+      padding: 0 0 34px;
     }
 
     .brand {
@@ -86,18 +88,31 @@
       background: var(--accent-dark);
     }
 
+    .button-secondary,
+    .button-secondary:visited {
+      background: var(--page);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .button-secondary:hover {
+      background: #eaeaea;
+    }
+
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(420px, 0.9fr);
+      grid-template-columns: minmax(0, 0.95fr) minmax(440px, 1fr);
       gap: 64px;
-      align-items: start;
-      padding: 0 0 42px;
+      align-items: stretch;
+      padding: 0 0 76px;
     }
 
     .hero-copy {
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      justify-content: center;
+      gap: 18px;
+      min-height: 280px;
     }
 
     h1,
@@ -132,26 +147,42 @@
       gap: 12px;
     }
 
-    .mini-replay {
+    .mini-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+.mini-replay {
       height: 360px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background: transparent;
+      background: var(--page);
+      padding: 16px;
+      border-radius: 0;
+      border: 1px solid #e7e7e7;
     }
 
-    .mini-replay-controls {
-      display: grid;
-      grid-template-columns: auto minmax(120px, 1fr) auto auto;
-      align-items: center;
-      gap: 14px;
-      padding: 0 0 14px;
-      color: var(--muted);
-      font-size: 1rem;
-      font-variant-numeric: tabular-nums;
+    .mini-track {
+      height: 10px;
+      background: #e5e5e5;
+      border-radius: 999px;
+      overflow: hidden;
+      cursor: pointer;
+      touch-action: none;
+      position: relative;
     }
 
-    .mini-play,
+    .mini-fill {
+      position: relative;
+      z-index: 1;
+      width: 0%;
+      height: 100%;
+background: var(--blue);
+    }
+
     .mini-speed {
       appearance: none;
       border: 1px solid var(--line);
@@ -175,17 +206,20 @@
 
     .mini-track {
       height: 10px;
-      background: #e5e5e5;
+      background: #f0f0f0;
       border-radius: 999px;
       overflow: hidden;
       cursor: pointer;
       touch-action: none;
+      position: relative;
     }
 
     .mini-fill {
+      position: relative;
+      z-index: 1;
       width: 0%;
       height: 100%;
-      background: var(--blue);
+      background: #1a5bb8;
     }
 
     .mini-document {
@@ -195,8 +229,32 @@
       background: #fff;
       padding: 20px 24px;
       overflow: auto;
-      white-space: pre-wrap;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       word-break: break-word;
+      line-height: 1.5;
+    }
+
+    .mini-document p {
+      margin: 0 0 8px;
+    }
+
+    .mini-document ul, .mini-document ol {
+      margin: 0 0 8px;
+      padding-left: 24px;
+    }
+
+    .mini-document li {
+      margin-bottom: 4px;
+    }
+
+    .mini-document h1, .mini-document h2, .mini-document h3 {
+      margin: 16px 0 8px;
+    }
+
+    .mini-document a {
+      color: var(--blue);
+    }
       font-size: 0.96rem;
       line-height: 1.58;
     }
@@ -205,11 +263,20 @@
       display: flex;
       flex-direction: column;
       gap: 18px;
-      max-width: 860px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
     }
 
     .section h2 {
       margin-bottom: 4px;
+    }
+
+    .section p {
+      margin: 0 0 16px;
+    }
+
+    .section p:last-child {
+      margin-bottom: 0;
     }
 
     @media (max-width: 940px) {
@@ -220,6 +287,12 @@
       .hero {
         grid-template-columns: 1fr;
         gap: 36px;
+        padding-bottom: 56px;
+      }
+
+      .hero-copy {
+        min-height: auto;
+        justify-content: flex-start;
       }
     }
 
@@ -267,7 +340,6 @@
       <a class="brand" href="/" aria-label="Handtyped home">
         <img src="./handtyped-icon.png" alt="" />
       </a>
-      <a class="button" id="github-button" href="https://github.com/dghosef/handtyped">GitHub</a>
     </header>
 
     <main>
@@ -277,25 +349,29 @@
           <p>With Handtyped, you can show the world that your work was human-written. For bloggers, Redditors, students, journalists, and everyone in between.</p>
           <div class="hero-actions">
             <a class="button" id="download-button" href="/downloads/Handtyped-macos.dmg" download="Handtyped-macos.dmg">Download for macOS</a>
+            <a class="button button-secondary" id="github-button" href="https://github.com/dghosef/handtyped">GitHub</a>
           </div>
         </div>
 
-        <div class="mini-replay" id="mini-replay" data-session-id="1seeSaZBfpjwiF8P" data-session-url="./landing-replay.json" aria-label="Replay preview of the landing page text">
-          <div class="mini-replay-controls">
-            <button class="mini-play" id="mini-play" type="button" aria-label="Pause replay">&#10074;&#10074;</button>
-            <div class="mini-track" id="mini-track" aria-label="Replay timeline">
-              <div class="mini-fill" id="mini-fill"></div>
+        <div class="mini-stack">
+          <div class="mini-replay" id="mini-replay" data-session-id="1seeSaZBfpjwiF8P" data-session-url="./landing-replay.json" aria-label="Replay preview of the landing page text">
+            <div class="mini-replay-controls">
+              <button class="mini-play" id="mini-play" type="button" aria-label="Pause replay">&#10074;&#10074;</button>
+              <div class="mini-track" id="mini-track" aria-label="Replay timeline">
+                <div class="mini-fill" id="mini-fill"></div>
+              </div>
+              <div class="mini-time" id="mini-time">0:00 / 0:00</div>
+              <select class="mini-speed" id="mini-speed" aria-label="Replay speed">
+                <option value="0.5">0.5x</option>
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="5">5x</option>
+                <option value="10" selected>10x</option>
+              </select>
             </div>
-            <div class="mini-time" id="mini-time">0:00 / 0:00</div>
-            <select class="mini-speed" id="mini-speed" aria-label="Replay speed">
-              <option value="0.5">0.5x</option>
-              <option value="1">1x</option>
-              <option value="2">2x</option>
-              <option value="5">5x</option>
-              <option value="10" selected>10x</option>
-            </select>
+            <div class="mini-document" id="mini-document">Loading replay...</div>
           </div>
-          <div class="mini-document" id="mini-document">Loading replay...</div>
+          <div class="mini-caption">Watch exactly how this page was written</div>
         </div>
       </section>
 
@@ -336,6 +412,8 @@
     let animationHandle = null
     let isDraggingTimeline = false
     let resumeAfterDrag = false
+    let dragMoveHandler = null
+    let dragUpHandler = null
 
     function formatTime(ms) {
       const seconds = Math.floor(ms / 1000)
@@ -350,7 +428,12 @@
       const total = totalDuration()
       elapsedMs = Math.max(0, Math.min(nextElapsed, total))
       const index = findHistoryIndex(history, elapsedMs)
-      documentEl.textContent = index >= 0 ? history[index]?.text || '' : ''
+      const scrollTop = documentEl.scrollTop
+      const scrollLeft = documentEl.scrollLeft
+      const rawText = index >= 0 ? history[index]?.text || '' : ''
+      documentEl.innerHTML = marked.parse(rawText)
+      documentEl.scrollTop = scrollTop
+      documentEl.scrollLeft = scrollLeft
       fillEl.style.width = `${(elapsedMs / total) * 100}%`
       timeEl.textContent = `${formatTime(elapsedMs)} / ${formatTime(total)}`
 
@@ -399,36 +482,33 @@
     }
 
     function beginTimelineDrag(event) {
-      if (event.button !== 0 && event.pointerType !== 'touch') return
+      if (event.button !== 0) return
       isDraggingTimeline = true
       resumeAfterDrag = playing
       pause()
-      if (trackEl.setPointerCapture) {
-        trackEl.setPointerCapture(event.pointerId)
+      document.body.style.userSelect = 'none'
+      document.body.style.cursor = 'grabbing'
+      dragMoveHandler = moveEvent => {
+        applyTimelinePosition(timelineElapsedFromClientX(moveEvent.clientX))
       }
+      dragUpHandler = () => {
+        if (!isDraggingTimeline) return
+        isDraggingTimeline = false
+        window.removeEventListener('mousemove', dragMoveHandler)
+        window.removeEventListener('mouseup', dragUpHandler)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+        if (elapsedMs >= totalDuration()) {
+          playing = false
+          playEl.innerHTML = '&#9654;'
+          playEl.setAttribute('aria-label', 'Play replay')
+          return
+        }
+        if (resumeAfterDrag) start()
+      }
+      window.addEventListener('mousemove', dragMoveHandler)
+      window.addEventListener('mouseup', dragUpHandler)
       applyTimelinePosition(timelineElapsedFromClientX(event.clientX))
-    }
-
-    function updateTimelineDrag(event) {
-      if (!isDraggingTimeline) return
-      applyTimelinePosition(timelineElapsedFromClientX(event.clientX))
-    }
-
-    function endTimelineDrag(event) {
-      if (!isDraggingTimeline) return
-      isDraggingTimeline = false
-      if (trackEl.releasePointerCapture) {
-        try {
-          trackEl.releasePointerCapture(event.pointerId)
-        } catch {}
-      }
-      if (elapsedMs >= totalDuration()) {
-        playing = false
-        playEl.innerHTML = '&#9654;'
-        playEl.setAttribute('aria-label', 'Play replay')
-        return
-      }
-      if (resumeAfterDrag) start()
     }
 
     async function loadMiniReplay() {
@@ -454,10 +534,12 @@
       if (playing) start()
     })
 
-    trackEl.addEventListener('pointerdown', beginTimelineDrag)
-    trackEl.addEventListener('pointermove', updateTimelineDrag)
-    trackEl.addEventListener('pointerup', endTimelineDrag)
-    trackEl.addEventListener('pointercancel', endTimelineDrag)
+    trackEl.addEventListener('mousedown', beginTimelineDrag)
+    trackEl.addEventListener('click', event => {
+      if (isDraggingTimeline) return
+      applyTimelinePosition(timelineElapsedFromClientX(event.clientX))
+      if (playing) start()
+    })
 
     loadMiniReplay().catch((error) => {
       documentEl.textContent = error.message

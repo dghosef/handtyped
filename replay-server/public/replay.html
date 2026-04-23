@@ -15,6 +15,11 @@
       --muted: #666666;
       --accent: #2f6fed;
       --accent-dark: #2558bb;
+      --timeline-inactive: #b94d46;
+      --timeline-inactive-dark: #923631;
+      --timeline-inactive-bg: #efe5e1;
+      --timeline-jump: #d39a21;
+      --timeline-jump-dark: #8b6400;
       --line: #dddddd;
       --panel: #ffffff;
       --panel-strong: #f3f3f3;
@@ -42,6 +47,7 @@
       display: flex;
       align-items: center;
       margin-bottom: 20px;
+      gap: 16px;
     }
 
     .brand-mark {
@@ -128,6 +134,28 @@
       margin: 18px 0 28px;
     }
 
+    .replay-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 16px;
+      margin: 0 0 8px;
+      color: var(--muted);
+    }
+
+    .replay-time {
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .replay-caption {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
     .replay-controls {
       display: flex;
       align-items: center;
@@ -158,6 +186,7 @@
     .progress-wrap {
       flex: 1;
       min-width: 220px;
+      position: relative;
     }
 
     .progress-track {
@@ -170,10 +199,90 @@
       touch-action: none;
     }
 
+    .progress-track.inactive {
+      background: var(--timeline-inactive-bg);
+    }
+
+    .progress-track.inactive::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        135deg,
+        rgba(185, 77, 70, 0.16) 0,
+        rgba(185, 77, 70, 0.16) 7px,
+        rgba(255, 255, 255, 0.06) 7px,
+        rgba(255, 255, 255, 0.06) 14px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .progress-track.inactive .progress-fill {
+      background: var(--timeline-inactive);
+    }
+
+    .progress-track.inactive .progress-thumb {
+      background: var(--timeline-inactive-dark);
+    }
+
+    .progress-inactive-spans {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .progress-inactive-span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, rgba(185, 77, 70, 0.52), rgba(146, 54, 49, 0.72));
+      border-radius: 0;
+      box-shadow: inset 0 0 0 1px rgba(255, 221, 208, 0.12);
+    }
+
+    .timeline-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .timeline-key-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .timeline-key-swatch {
+      display: inline-block;
+      width: 14px;
+      height: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      flex: 0 0 auto;
+    }
+
+    .timeline-key-swatch.inactive {
+      background: linear-gradient(180deg, rgba(185, 77, 70, 0.55), rgba(146, 54, 49, 0.72));
+    }
+
+    .timeline-key-swatch.jump {
+      background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
+      border-color: var(--timeline-jump-dark);
+    }
+
     .progress-fill {
       height: 100%;
       width: 0%;
       background: var(--accent);
+      position: relative;
+      z-index: 0;
     }
 
     .progress-thumb {
@@ -185,17 +294,53 @@
       background: var(--accent-dark);
       border-radius: 999px;
       transform: translate(-50%, -50%);
+      z-index: 2;
+    }
+
+    .progress-gap-markers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .progress-gap-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
+      border: 1px solid var(--timeline-jump-dark);
+      border-radius: 999px;
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.72),
+        0 0 8px rgba(211, 154, 33, 0.2);
+    }
+
+    .progress-tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: #333;
+      color: #fff;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+      margin-bottom: 6px;
+      transform: translateX(-50%);
+    }
+
+    .progress-tooltip.visible {
+      opacity: 1;
     }
 
     .time-display {
       white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .time-meta {
-      font-size: 13px;
-      color: var(--muted);
-      padding: 0 0 10px;
       font-variant-numeric: tabular-nums;
     }
 
@@ -299,7 +444,6 @@
     body.embed .intro,
     body.embed .share-row,
     body.embed .keyboard-note,
-    body.embed .time-meta,
     body.embed .replay-status,
     body.embed .section-label {
       display: none;
@@ -333,6 +477,7 @@
       height: 100%;
       overflow: hidden;
       border-radius: 0;
+      overscroll-behavior: contain;
     }
 
     body.embed .doc-page {
@@ -345,7 +490,6 @@
       height: 100%;
     }
 
-    body.embed .time-meta,
     body.embed .replay-status {
       display: none;
     }
@@ -377,7 +521,9 @@
   <div class="page">
     <div class="content">
       <div class="brand">
-        <img class="brand-mark" src="/handtyped-icon.png" alt="Handtyped" />
+        <a href="https://handtyped.app">
+          <img class="brand-mark" src="/handtyped-icon.png" alt="Handtyped" />
+        </a>
         <h1 id="headline">Writing Session Analysis</h1>
       </div>
 
@@ -389,15 +535,26 @@
         <button class="share-btn" id="btn-copy-document">Copy Document Text</button>
       </div>
 
+      <div class="replay-meta">
+        <div class="timeline-key" aria-label="Timeline legend">
+          <span class="timeline-key-item"><span class="timeline-key-swatch inactive" aria-hidden="true"></span>Inactive focus</span>
+          <span class="timeline-key-item"><span class="timeline-key-swatch jump" aria-hidden="true"></span>Time jump</span>
+        </div>
+      </div>
+      <div class="replay-caption">Replay of this page being written.</div>
+      <div class="replay-time" id="replay-time">PST</div>
 
       <div class="replay-shell">
         <div class="replay-controls">
           <button class="play-btn" id="btn-play">&#9654;</button>
           <div class="progress-wrap">
             <div class="progress-track" id="progress-track">
+              <div class="progress-inactive-spans" id="progress-inactive-spans"></div>
+              <div class="progress-gap-markers" id="progress-gap-markers"></div>
               <div class="progress-fill" id="progress-fill"></div>
               <div class="progress-thumb" id="progress-thumb"></div>
             </div>
+            <div class="progress-tooltip" id="progress-tooltip"></div>
           </div>
           <div class="time-display" id="time-display">0:00 / 0:00</div>
           <select class="speed-select" id="speed-select">
@@ -412,7 +569,6 @@
             <option value="5000">5000×</option>
           </select>
         </div>
-        <div class="time-meta" id="time-meta">Recorded span: 0:00 / 0:00</div>
         <div class="replay-status" id="status-msg">Loading session…</div>
         <div class="replay-stage">
           <div class="replay-stage-scroll" id="replay-stage-scroll">
@@ -433,13 +589,18 @@
   <script type="module">
     import {
       compressIdleGaps,
+      compressedTimeForRawMs,
       documentWithAttribution,
       downloadFilenameForDocument,
       findHistoryIndex,
-      getElapsedRawTime,
       getDurationFromHistory,
-      getRawDurationFromHistory,
       getDurationFromKeydowns,
+      getElapsedRawTime,
+      buildInactiveSpans,
+      buildTimelineGapMarkers,
+      formatAbsoluteReplayTime,
+      getFocusStateAtElapsedMs,
+      parseFocusEvents,
       parseHistory,
       parseKeydowns,
     } from '/replay-view.js'
@@ -455,6 +616,10 @@
 
     let session = null
     let history = []
+    let focusEvents = []
+    let replayFocusEvents = []
+    let inactiveSpans = []
+    let gapMarkers = []
     let keydowns = []
     let playing = false
     let speed = 1
@@ -466,7 +631,10 @@
     const cursorEl = document.getElementById('cursor')
     const statusMsgEl = document.getElementById('status-msg')
     const playBtnEl = document.getElementById('btn-play')
-    const replayStageScrollEl = document.getElementById('replay-stage-scroll')
+    const replayTimeEl = document.getElementById('replay-time')
+    const progressTrackEl = document.getElementById('progress-track')
+    const progressInactiveSpansEl = document.getElementById('progress-inactive-spans')
+    const progressGapMarkersEl = document.getElementById('progress-gap-markers')
 
     function currentDocumentName() {
       return session?.document_name || ''
@@ -511,6 +679,85 @@
       return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
     }
 
+    function getRawElapsedForCompressedElapsed(elapsedMs) {
+      const idx = findHistoryIndex(history, elapsedMs)
+      return idx >= 0 ? getElapsedRawTime(history, idx) : 0
+    }
+
+    function formatWriterTimezone(sessionData) {
+      const timezone = String(sessionData?.recorded_timezone || '').trim()
+      if (timezone) {
+        if (/^[A-Za-z]{2,5}$/.test(timezone)) {
+          return timezone.toUpperCase()
+        }
+
+        const createdAt = new Date(sessionData?.created_at || '')
+        if (!Number.isNaN(createdAt.getTime()) && Intl?.DateTimeFormat) {
+          try {
+            const zoneParts = new Intl.DateTimeFormat('en-US', {
+              timeZone: timezone,
+              timeZoneName: 'short',
+            }).formatToParts(createdAt)
+            const shortZone = zoneParts.find((part) => part.type === 'timeZoneName')?.value
+            if (shortZone) {
+              return shortZone.toUpperCase()
+            }
+          } catch {}
+        }
+
+        return timezone.toUpperCase()
+      }
+
+      const offsetMinutes = Number(sessionData?.recorded_timezone_offset_minutes)
+      if (Number.isFinite(offsetMinutes)) {
+        const sign = offsetMinutes >= 0 ? '+' : '-'
+        const absolute = Math.abs(offsetMinutes)
+        const hours = String(Math.floor(absolute / 60)).padStart(2, '0')
+        const minutes = String(absolute % 60).padStart(2, '0')
+        return `UTC${sign}${hours}:${minutes}`
+      }
+
+      return 'Local time'
+    }
+
+    function renderGapMarkers() {
+      if (!progressGapMarkersEl) return
+      progressGapMarkersEl.innerHTML = ''
+
+      const total = getTotalDuration()
+      if (total <= 0 || !gapMarkers.length) return
+
+      for (const marker of gapMarkers) {
+        const left = Math.max(0, Math.min(100, (marker.end / total) * 100))
+        const el = document.createElement('span')
+        el.className = 'progress-gap-marker'
+        el.style.left = `${left}%`
+        el.title = `Time jump: ${formatAbsoluteReplayTime(session, marker.rawStart)} to ${formatAbsoluteReplayTime(session, marker.rawEnd)}`
+        progressGapMarkersEl.appendChild(el)
+      }
+    }
+
+    function renderInactiveSpans() {
+      if (!progressInactiveSpansEl) return
+      progressInactiveSpansEl.innerHTML = ''
+
+      const total = getTotalDuration()
+      if (total <= 0 || !inactiveSpans.length) return
+
+      for (const span of inactiveSpans) {
+        const left = Math.max(0, Math.min(100, (span.start / total) * 100))
+        const width = Math.max(0, ((span.end - span.start) / total) * 100)
+        if (width <= 0) continue
+
+        const el = document.createElement('span')
+        el.className = 'progress-inactive-span'
+        el.style.left = `${left}%`
+        el.style.width = `${width}%`
+        el.title = `Inactive from ${formatAbsoluteReplayTime(session, span.rawStart)} to ${formatAbsoluteReplayTime(session, span.rawEnd)}`
+        progressInactiveSpansEl.appendChild(el)
+      }
+    }
+
     function renderAt(elapsedMs) {
       const total = getTotalDuration()
       currentElapsedMs = Math.max(0, Math.min(elapsedMs, total))
@@ -519,9 +766,13 @@
       docContentEl.textContent = text
       cursorEl.style.display = currentElapsedMs >= total ? 'none' : ''
 
+      const focusState = getFocusStateAtElapsedMs(replayFocusEvents, currentElapsedMs)
+      progressTrackEl.classList.toggle('inactive', focusState === 'inactive')
+      replayTimeEl.textContent = formatWriterTimezone(session)
+
       if (currentElapsedMs >= total) {
         playing = false
-        playBtnEl.textContent = '↺'
+        playBtnEl.textContent = '▶'
         statusMsgEl.textContent = 'Replay complete'
       }
 
@@ -539,13 +790,10 @@
     function updateProgress(elapsedMs) {
       const total = getTotalDuration()
       const pct = total > 0 ? (elapsedMs / total) * 100 : 0
-      const idx = findHistoryIndex(history, elapsedMs)
-      const rawElapsed = idx >= 0 ? getElapsedRawTime(history, idx) : 0
-      const rawTotal = getRawDurationFromHistory(history)
       document.getElementById('progress-fill').style.width = pct + '%'
       document.getElementById('progress-thumb').style.left = pct + '%'
       document.getElementById('time-display').textContent = `${formatTime(elapsedMs)} / ${formatTime(total)}`
-      document.getElementById('time-meta').textContent = `Recorded span: ${formatTime(rawElapsed)} / ${formatTime(rawTotal)}`
+      replayTimeEl.textContent = formatWriterTimezone(session)
     }
 
     function startPlay() {
@@ -568,7 +816,7 @@
         renderAt(elapsed)
         if (elapsed >= getTotalDuration()) {
           playing = false
-          playBtnEl.textContent = '↺'
+          playBtnEl.textContent = '▶'
           return
         }
         animationHandle = requestAnimationFrame(tick)
@@ -664,6 +912,15 @@
         history = compressIdleGaps(
           buildReplayHistoryWithAttribution(parseHistory(session, keydowns))
         )
+        focusEvents = parseFocusEvents(session)
+        replayFocusEvents = focusEvents.map((event) => ({
+          ...event,
+          t: compressedTimeForRawMs(history, event.t),
+        }))
+        inactiveSpans = buildInactiveSpans(focusEvents, history, getDurationFromHistory(history))
+        renderInactiveSpans()
+        gapMarkers = buildTimelineGapMarkers(history)
+        renderGapMarkers()
 
         document.getElementById('session-date').textContent = formatRecordedDateTime(
           session.created_at,
@@ -671,6 +928,7 @@
           Number(session.recorded_timezone_offset_minutes || 0),
         )
         headlineEl.textContent = currentDocumentName() || 'Writing Session Analysis'
+        replayTimeEl.textContent = formatWriterTimezone(session)
 
         renderBlankState()
         startPlay()
@@ -680,12 +938,6 @@
     }
 
     playBtnEl.addEventListener('click', () => {
-      if (playBtnEl.textContent === '↺') {
-        currentElapsedMs = 0
-        renderAt(0)
-        startPlay()
-        return
-      }
       if (playing) {
         pausePlay()
       } else {
@@ -716,7 +968,7 @@
         startPlay()
       } else if (currentElapsedMs >= total) {
         playing = false
-        playBtnEl.textContent = '↺'
+        playBtnEl.textContent = '▶'
       } else {
         playBtnEl.textContent = '▶'
       }
@@ -724,7 +976,6 @@
       statusMsgEl.textContent = notice
     }
 
-    const progressTrackEl = document.getElementById('progress-track')
     let isDraggingTimeline = false
     let resumeAfterDrag = false
 
@@ -767,6 +1018,21 @@
     progressTrackEl.addEventListener('pointermove', updateTimelineDrag)
     progressTrackEl.addEventListener('pointerup', endTimelineDrag)
     progressTrackEl.addEventListener('pointercancel', endTimelineDrag)
+
+    progressTrackEl.addEventListener('pointerenter', () => {
+      document.getElementById('progress-tooltip').classList.add('visible')
+    })
+    progressTrackEl.addEventListener('pointerleave', () => {
+      document.getElementById('progress-tooltip').classList.remove('visible')
+    })
+    progressTrackEl.addEventListener('pointermove', (event) => {
+      const tooltip = document.getElementById('progress-tooltip')
+      const elapsedMs = elapsedFromClientX(event.clientX)
+      const total = getTotalDuration()
+      const pct = total > 0 ? (elapsedMs / total) * 100 : 0
+      tooltip.textContent = formatAbsoluteReplayTime(session, getRawElapsedForCompressedElapsed(elapsedMs))
+      tooltip.style.left = pct + '%'
+    })
 
     document.getElementById('btn-copy-link').addEventListener('click', async () => {
       const copied = await copyText(shareUrl)

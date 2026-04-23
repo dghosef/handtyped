@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildInactiveSpans,
+  buildTimelineGapMarkers,
   buildSyntheticHistory,
   buildRhythmSamples,
+  compressedTimeForRawMs,
   compressIdleGaps,
   documentWithAttribution,
   downloadFilenameForDocument,
+  formatAbsoluteReplayTime,
   getDurationFromHistory,
   getElapsedRawTime,
+  getFocusStateAtElapsedMs,
   getRawDurationFromHistory,
+  getReplayOriginWallMs,
   findHistoryIndex,
+  parseFocusEvents,
   parseHistory,
 } from './public/replay-view.js'
 import fs from 'node:fs'
@@ -26,7 +33,7 @@ describe('replay history start state', () => {
     )
     expect(replayPageHtml).toContain("font-family: 'Open Sans', Arial, Helvetica, sans-serif;")
     expect(replayPageHtml).not.toContain('Georgia, "Times New Roman", Times, serif')
-    expect(replayPageHtml).toContain('.brand-name {')
+    expect(replayPageHtml).toContain('.brand-mark {')
     expect(replayPageHtml).toContain('h1 {')
     expect(replayPageHtml).toContain('.share-btn,')
     expect(replayPageHtml).toContain('.play-btn,')
@@ -227,6 +234,101 @@ describe('replay history start state', () => {
 
     expect(getElapsedRawTime(history, 1)).toBe(2500)
     expect(getElapsedRawTime(history, 2)).toBe(90_000)
+  })
+
+  it('parses focus events, sorting valid active and inactive transitions only', () => {
+    const focusEvents = parseFocusEvents({
+      focus_events: [
+        { t: 3000, state: 'active' },
+        { t: -1, state: 'inactive' },
+        { t: 1000, state: 'inactive' },
+        { t: 2000, state: 'hidden' },
+        null,
+      ],
+    })
+
+    expect(focusEvents).toEqual([
+      { t: 1000, state: 'inactive' },
+      { t: 3000, state: 'active' },
+    ])
+  })
+
+  it('maps focus event timestamps onto the compressed replay timeline', () => {
+    const history = compressIdleGaps([
+      { t: 0, text: '' },
+      { t: 1000, text: 'a' },
+      { t: 120_000, text: 'ab' },
+    ], 5000)
+
+    expect(compressedTimeForRawMs(history, 0)).toBe(0)
+    expect(compressedTimeForRawMs(history, 1000)).toBe(1000)
+    expect(compressedTimeForRawMs(history, 120_000)).toBe(6000)
+    expect(compressedTimeForRawMs(history, 2000)).toBeCloseTo(1042.02, 1)
+  })
+
+  it('reports the focus state for the current replay position', () => {
+    const focusEvents = parseFocusEvents({
+      focus_events: [
+        { t: 250, state: 'inactive' },
+        { t: 900, state: 'active' },
+      ],
+    })
+
+    expect(getFocusStateAtElapsedMs(focusEvents, 0)).toBe('active')
+    expect(getFocusStateAtElapsedMs(focusEvents, 500)).toBe('inactive')
+    expect(getFocusStateAtElapsedMs(focusEvents, 901)).toBe('active')
+  })
+
+  it('marks large timeline jumps as scrubber gaps', () => {
+    const history = compressIdleGaps([
+      { t: 0, text: '' },
+      { t: 1000, text: 'a' },
+      { t: 120_000, text: 'ab' },
+      { t: 121_000, text: 'abc' },
+    ], 5000)
+
+    expect(buildTimelineGapMarkers(history)).toEqual([
+      { start: 1000, end: 6000, rawStart: 1000, rawEnd: 120_000 },
+    ])
+  })
+
+  it('builds closed and open-ended inactive spans for timeline overlays', () => {
+    const history = compressIdleGaps([
+      { t: 0, text: '' },
+      { t: 1000, text: 'a' },
+      { t: 2000, text: 'ab' },
+      { t: 4000, text: 'abc' },
+    ], 5000)
+
+    const spans = buildInactiveSpans([
+      { t: 500, state: 'inactive' },
+      { t: 1500, state: 'active' },
+      { t: 3000, state: 'inactive' },
+    ], history, getDurationFromHistory(history))
+
+    expect(spans).toEqual([
+      { start: 500, end: 1500, rawStart: 500, rawEnd: 1500 },
+      { start: 3000, end: 4000, rawStart: 3000, rawEnd: 4000 },
+    ])
+  })
+
+  it('formats absolute replay times from explicit replay origin and timezone offset', () => {
+    const session = {
+      replay_origin_wall_ms: Date.UTC(2026, 3, 22, 21, 0, 0),
+      recorded_timezone: 'AST',
+      recorded_timezone_offset_minutes: -240,
+    }
+
+    expect(getReplayOriginWallMs(session)).toBe(Date.UTC(2026, 3, 22, 21, 0, 0))
+    expect(formatAbsoluteReplayTime(session, 90_000)).toBe(
+      'Apr 22, 2026, 5:01:30 PM AST (UTC-04:00)',
+    )
+  })
+
+  it('falls back to session start_wall_ns when older replays lack replay origin', () => {
+    expect(getReplayOriginWallMs({ start_wall_ns: 1_700_000_000_000_000_000 })).toBe(
+      1_700_000_000_000,
+    )
   })
 
   it('parseHistory reconstructs string-based deletions correctly', () => {

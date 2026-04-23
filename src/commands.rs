@@ -6,7 +6,7 @@ use crate::session::{AppState, ExtraEvent};
 use crate::signing;
 use base64::Engine as _;
 use std::fs;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
@@ -31,12 +31,12 @@ fn document_store_path() -> std::path::PathBuf {
     path
 }
 
-fn consume_pending_builtin_keydown(counter: &AtomicI32) -> bool {
-    let prev = counter.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-    if prev <= 0 {
-        counter.store(0, std::sync::atomic::Ordering::SeqCst);
+fn consume_pending_builtin_keydown(timestamp: &AtomicU64) -> bool {
+    let prev = timestamp.load(std::sync::atomic::Ordering::Acquire);
+    if prev == 0 {
         return false;
     }
+    timestamp.store(0, std::sync::atomic::Ordering::Release);
     true
 }
 
@@ -97,7 +97,7 @@ pub fn get_hid_status(state: State<Arc<AppState>>) -> bool {
 
 #[tauri::command]
 pub fn consume_builtin_keydown(state: State<Arc<AppState>>) -> bool {
-    consume_pending_builtin_keydown(&state.pending_builtin_keydowns)
+    consume_pending_builtin_keydown(&state.builtin_keydown_timestamp)
 }
 
 #[tauri::command]
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_consume_pending_builtin_keydown_rejects_without_hid_credit() {
-        let pending = AtomicI32::new(0);
+        let pending = AtomicU64::new(0);
 
         assert!(!consume_pending_builtin_keydown(&pending));
         assert_eq!(pending.load(Ordering::SeqCst), 0);
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn test_consume_pending_builtin_keydown_accepts_hid_credit_once() {
-        let pending = AtomicI32::new(1);
+        let pending = AtomicU64::new(1);
 
         assert!(consume_pending_builtin_keydown(&pending));
         assert_eq!(pending.load(Ordering::SeqCst), 0);
@@ -419,7 +419,7 @@ mod tests {
     #[test]
     #[ignore = "requires macOS System Events permission and a focused app window"]
     fn test_osascript_keystroke_does_not_create_builtin_hid_credit() {
-        let pending = AtomicI32::new(0);
+        let pending = AtomicU64::new(0);
 
         let _ = Command::new("osascript")
             .arg("-e")

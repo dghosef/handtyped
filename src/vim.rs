@@ -156,7 +156,9 @@ impl VimState {
 
         if out.iter().any(|event| match event {
             Event::Text(_) | Event::Paste(_) => true,
-            Event::Key { key, pressed: true, .. } => matches!(key, Key::Backspace | Key::Enter),
+            Event::Key {
+                key, pressed: true, ..
+            } => matches!(key, Key::Backspace | Key::Enter),
             _ => false,
         }) {
             self.last_change_dirty = true;
@@ -2742,9 +2744,19 @@ mod tests {
         send(&mut vim, &mut text, &mut te, "yy");
         let evs = send(&mut vim, &mut text, &mut te, "p");
 
-        assert!(evs.iter().any(|e| matches!(e, Event::Key { key: Key::End, .. })));
-        assert!(evs.iter().any(|e| matches!(e, Event::Key { key: Key::Enter, .. })));
-        assert!(evs.iter().any(|e| matches!(e, Event::Paste(s) if s == "hello")));
+        assert!(evs
+            .iter()
+            .any(|e| matches!(e, Event::Key { key: Key::End, .. })));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Enter,
+                ..
+            }
+        )));
+        assert!(evs
+            .iter()
+            .any(|e| matches!(e, Event::Paste(s) if s == "hello")));
     }
 
     #[test]
@@ -2756,8 +2768,20 @@ mod tests {
         let first = send(&mut vim, &mut text, &mut te, "x");
         let repeated = send(&mut vim, &mut text, &mut te, ".");
 
-        assert!(first.iter().any(|e| matches!(e, Event::Key { key: Key::Backspace, .. })));
-        assert!(repeated.iter().any(|e| matches!(e, Event::Key { key: Key::Backspace, .. })));
+        assert!(first.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
+        assert!(repeated.iter().any(|e| matches!(
+            e,
+            Event::Key {
+                key: Key::Backspace,
+                ..
+            }
+        )));
     }
 
     #[test]
@@ -4124,10 +4148,7 @@ mod tests {
                 ..
             }
         )));
-        assert_eq!(
-            vim.last_find,
-            Some((PendingAction::FindBackward, ','))
-        );
+        assert_eq!(vim.last_find, Some((PendingAction::FindBackward, ',')));
         assert_eq!(selection(&te), Some((3, 7)));
     }
 
@@ -4145,10 +4166,7 @@ mod tests {
                 ..
             }
         )));
-        assert_eq!(
-            vim.last_find,
-            Some((PendingAction::TillBackward, ','))
-        );
+        assert_eq!(vim.last_find, Some((PendingAction::TillBackward, ',')));
         assert_eq!(selection(&te), Some((4, 7)));
     }
 

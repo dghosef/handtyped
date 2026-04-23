@@ -81,6 +81,214 @@ export function getElapsedRawTime(entries, index) {
   return Math.max(0, Number(entries[index]?.t) || 0)
 }
 
+export function getReplayOriginWallMs(session) {
+  const explicitOrigin = Number(session?.replay_origin_wall_ms)
+  if (Number.isFinite(explicitOrigin) && explicitOrigin > 0) {
+    return explicitOrigin
+  }
+
+  const startWallNs = Number(session?.start_wall_ns)
+  if (Number.isFinite(startWallNs) && startWallNs > 0) {
+    return Math.floor(startWallNs / 1e6)
+  }
+
+  const createdAt = Date.parse(session?.created_at || '')
+  return Number.isFinite(createdAt) ? createdAt : null
+}
+
+export function formatAbsoluteReplayTime(session, elapsedMs) {
+  const origin = getReplayOriginWallMs(session)
+  if (!Number.isFinite(origin)) {
+    return 'Unknown time'
+  }
+
+  const offsetMinutes = Number(session?.recorded_timezone_offset_minutes)
+  const normalizedOffset = Number.isFinite(offsetMinutes) ? offsetMinutes : 0
+  const shifted = new Date(origin + Math.max(0, Number(elapsedMs) || 0) + normalizedOffset * 60_000)
+  const month = shifted.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
+  const day = shifted.getUTCDate()
+  const year = shifted.getUTCFullYear()
+  let hours = shifted.getUTCHours()
+  const minutes = String(shifted.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(shifted.getUTCSeconds()).padStart(2, '0')
+  const meridiem = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+
+  const offsetSign = normalizedOffset >= 0 ? '+' : '-'
+  const absoluteOffset = Math.abs(normalizedOffset)
+  const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
+  const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
+  const timezone = session?.recorded_timezone
+    ? `${session.recorded_timezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
+    : `UTC${offsetSign}${offsetHours}:${offsetMins}`
+
+  return `${month} ${day}, ${year}, ${hours}:${minutes}:${seconds} ${meridiem} ${timezone}`
+}
+
+export function getFocusStateAtElapsedMs(focusEvents, elapsedMs) {
+  const events = Array.isArray(focusEvents)
+    ? focusEvents.slice().sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
+    : []
+  const target = Math.max(0, Number(elapsedMs) || 0)
+  let state = 'active'
+
+  for (const event of events) {
+    const t = Math.max(0, Number(event?.t) || 0)
+    if (t > target) break
+    if (event?.state === 'active' || event?.state === 'inactive') {
+      state = event.state
+    }
+  }
+
+  return state
+}
+
+export function parseFocusEvents(session) {
+  const raw = Array.isArray(session?.focus_events) ? session.focus_events : []
+
+  return raw
+    .map((entry) => {
+      const t = Number(entry?.t)
+      const state = entry?.state
+      if (!Number.isFinite(t) || t < 0 || (state !== 'active' && state !== 'inactive')) {
+        return null
+      }
+      return { t, state }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.t - b.t)
+}
+
+export function compressedTimeForRawMs(history, rawMs) {
+  const rawTarget = Math.max(0, Number(rawMs) || 0)
+  if (!Array.isArray(history) || history.length === 0) {
+    return rawTarget
+  }
+
+  let previousRaw = 0
+  let previousCompressed = 0
+
+  for (const entry of history) {
+    const entryRawCandidate = Number(entry?.raw_t)
+    const entryRaw = Number.isFinite(entryRawCandidate)
+      ? Math.max(0, entryRawCandidate)
+      : Math.max(0, Number(entry?.t) || 0)
+    const entryCompressed = Math.max(0, Number(entry?.t) || 0)
+
+    if (rawTarget <= entryRaw) {
+      const rawSpan = Math.max(0, entryRaw - previousRaw)
+      const compressedSpan = Math.max(0, entryCompressed - previousCompressed)
+      if (rawSpan === 0) {
+        return previousCompressed
+      }
+      const pct = Math.max(0, Math.min(1, (rawTarget - previousRaw) / rawSpan))
+      return previousCompressed + compressedSpan * pct
+    }
+
+    previousRaw = entryRaw
+    previousCompressed = entryCompressed
+  }
+
+  return previousCompressed + Math.max(0, rawTarget - previousRaw)
+}
+
+export function buildInactiveSpans(focusEvents, history, totalDuration) {
+  const total = Math.max(0, Number(totalDuration) || 0)
+  const rawTotal = getRawDurationFromHistory(history)
+  const events = Array.isArray(focusEvents)
+    ? focusEvents.slice().sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
+    : []
+  const spans = []
+  let inactiveStart = null
+
+  for (const event of events) {
+    if (event.state === 'inactive') {
+      inactiveStart = inactiveStart ?? event.t
+      continue
+    }
+
+    if (event.state === 'active' && inactiveStart !== null) {
+      const start = Math.max(0, Math.min(total, compressedTimeForRawMs(history, inactiveStart)))
+      const end = Math.max(0, Math.min(total, compressedTimeForRawMs(history, event.t)))
+      if (end > start) {
+        spans.push({ start, end, rawStart: inactiveStart, rawEnd: event.t })
+      }
+      inactiveStart = null
+    }
+  }
+
+  if (inactiveStart !== null) {
+    const start = Math.max(0, Math.min(total, compressedTimeForRawMs(history, inactiveStart)))
+    if (total > start) {
+      spans.push({ start, end: total, rawStart: inactiveStart, rawEnd: rawTotal })
+    }
+  }
+
+  return spans
+}
+
+export function buildTimelineGapMarkers(history, maxGapMs = 5000) {
+  const normalizedMaxGap = Math.max(1, Number(maxGapMs) || 0)
+  if (!Array.isArray(history) || history.length < 2) {
+    return []
+  }
+
+  const markers = []
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1]
+    const next = history[i]
+    const prevRaw = getElapsedRawTime(history, i - 1)
+    const nextRaw = getElapsedRawTime(history, i)
+    const rawGap = Math.max(0, nextRaw - prevRaw)
+    if (rawGap > normalizedMaxGap) {
+      markers.push({
+        start: Math.max(0, Number(prev?.t) || 0),
+        end: Math.max(0, Number(next?.t) || 0),
+        rawStart: prevRaw,
+        rawEnd: nextRaw,
+      })
+    }
+  }
+
+  return markers
+}
+
+export function buildFocusSegments(focusEvents, history, totalDuration) {
+  const total = Math.max(0, Number(totalDuration) || 0)
+  const rawTotal = getRawDurationFromHistory(history)
+  const events = Array.isArray(focusEvents)
+    ? focusEvents.slice().sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
+    : []
+  const segments = []
+  let state = 'active'
+  let rawStart = 0
+
+  for (const event of events) {
+    const rawEnd = Math.max(0, Math.min(rawTotal, Number(event?.t) || 0))
+    if (rawEnd > rawStart) {
+      const start = Math.max(0, Math.min(total, compressedTimeForRawMs(history, rawStart)))
+      const end = Math.max(0, Math.min(total, compressedTimeForRawMs(history, rawEnd)))
+      if (end > start) {
+        segments.push({ state, start, end, rawStart, rawEnd })
+      }
+    }
+    if (event?.state === 'active' || event?.state === 'inactive') {
+      state = event.state
+      rawStart = rawEnd
+    }
+  }
+
+  if (rawTotal > rawStart) {
+    const start = Math.max(0, Math.min(total, compressedTimeForRawMs(history, rawStart)))
+    const end = total
+    if (end > start) {
+      segments.push({ state, start, end, rawStart, rawEnd: rawTotal })
+    }
+  }
+
+  return segments
+}
+
 export function compressIdleGaps(history, maxGapMs = 5000) {
   if (!Array.isArray(history) || history.length === 0) return []
 

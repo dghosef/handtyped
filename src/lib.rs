@@ -152,7 +152,7 @@ pub fn run() {
                 .unwrap_or_default(),
         ),
         hid_active: std::sync::atomic::AtomicBool::new(false),
-        pending_builtin_keydowns: std::sync::atomic::AtomicI32::new(0),
+        builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
         integrity: report,
         keyboard_info: Mutex::new(None),
         last_keydown_ns: std::sync::atomic::AtomicU64::new(0),

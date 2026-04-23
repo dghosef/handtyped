@@ -326,12 +326,11 @@ unsafe extern "C" fn hid_input_callback(
         false
     };
 
-    // For each keydown from the built-in keyboard, increment the pending counter
-    // so JS can verify the keystroke originated here.
+    // For each keydown from the built-in keyboard, record timestamp
     if int_val != 0 {
         ctx.state
-            .pending_builtin_keydowns
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            .builtin_keydown_timestamp
+            .store(wall_ns, std::sync::atomic::Ordering::Release);
     }
 
     let event = KeyEvent {

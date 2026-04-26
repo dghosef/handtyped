@@ -50,6 +50,12 @@ describe('replay history start state', () => {
     expect(eduAppJs).not.toContain('href="/replay/${escapeHtml(')
   })
 
+  it('hides numeric risk scores from teacher student cards', () => {
+    expect(eduAppJs).not.toContain('Risk ${risk.score}')
+    expect(eduAppJs).toContain('student-card-risk-${risk.score')
+    expect(eduAppJs).toContain("risk.reasons.join(' • ')")
+  })
+
   it('uses the homepage header font for the replay title', () => {
     expect(replayPageHtml).toContain('cdn.jsdelivr.net/npm/marked/marked.min.js')
     expect(replayPageHtml).toContain(

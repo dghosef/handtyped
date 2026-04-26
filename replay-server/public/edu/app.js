@@ -376,7 +376,6 @@ function renderStudentCards() {
         : ''
       const badges = [
         badge(sessionStatusLabel(session, now), risk.active ? (session.focused ? 'good' : 'warn') : 'danger'),
-        badge(`Risk ${risk.score}`, risk.score >= 45 ? 'danger' : risk.score >= 20 ? 'warn' : 'neutral'),
       ]
       if (risk.violationCount > 0) {
         badges.push(badge(`${risk.violationCount} violation${risk.violationCount === 1 ? '' : 's'}`, 'danger'))

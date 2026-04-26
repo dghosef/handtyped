@@ -86,7 +86,7 @@ fn build_replay_attestation_payload(
         start_wall_ns,
         log_chain_hash,
     ) = {
-        let s = state.capture.session.lock().unwrap();
+        let s = state.session.lock().unwrap();
         (
             s.session_id.clone(),
             s.session_nonce.clone(),
@@ -101,11 +101,8 @@ fn build_replay_attestation_payload(
     };
 
     let integrity = state.integrity.clone();
-    let keyboard = state.capture.keyboard_info.lock().unwrap().clone();
-    let hid_active = state
-        .capture
-        .hid_active
-        .load(std::sync::atomic::Ordering::Acquire);
+    let keyboard = state.keyboard_info.lock().unwrap().clone();
+    let hid_active = state.hid_active.load(std::sync::atomic::Ordering::Acquire);
     let (recorded_timezone, recorded_timezone_offset_minutes) = recorded_timezone_payload();
     let keyboard_transport = keyboard
         .as_ref()
@@ -391,7 +388,21 @@ mod tests {
 
     #[test]
     fn upload_fails_gracefully_when_server_down() {
-        let state = AppState::test_default();
+        use crate::editor::EditorDocumentState;
+        use crate::session::SessionState;
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
+
+        let state = AppState {
+            session: Mutex::new(SessionState::new(0)),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
 
         let result = upload_with_dead_port(&state, "test doc", &[]);
         assert!(result.is_err());
@@ -404,7 +415,21 @@ mod tests {
 
     #[test]
     fn replay_attestation_envelope_contains_signed_payload() {
-        let state = AppState::test_default();
+        use crate::editor::EditorDocumentState;
+        use crate::session::SessionState;
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
+
+        let state = AppState {
+            session: Mutex::new(SessionState::new(0)),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
 
         let payload =
             build_replay_attestation_payload(&state, Some("document.ht"), "hello", &[], None);
@@ -428,7 +453,10 @@ mod tests {
 
     #[test]
     fn replay_attestation_payload_includes_focus_events() {
+        use crate::editor::EditorDocumentState;
         use crate::session::{ExtraEvent, SessionState};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
 
         let mut session = SessionState::new(0);
         let start = session.start_wall_ns;
@@ -447,7 +475,16 @@ mod tests {
             content_hash: None,
         });
 
-        let state = AppState::test_with_session(session);
+        let state = AppState {
+            session: Mutex::new(session),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
 
         let payload = build_replay_attestation_payload(&state, None, "hello", &[], None);
 
@@ -468,7 +505,10 @@ mod tests {
 
     #[test]
     fn replay_attestation_payload_rebases_focus_events_to_document_origin() {
+        use crate::editor::EditorDocumentState;
         use crate::session::{ExtraEvent, SessionState};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
 
         let mut session = SessionState::new(0);
         let start = session.start_wall_ns;
@@ -487,7 +527,16 @@ mod tests {
             content_hash: None,
         });
 
-        let state = AppState::test_with_session(session);
+        let state = AppState {
+            session: Mutex::new(session),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
         let origin = (start / 1_000_000) + 2_000;
 
         let payload = build_replay_attestation_payload(&state, None, "hello", &[], Some(origin));
@@ -504,7 +553,21 @@ mod tests {
 
     #[test]
     fn replay_upload_emits_progress_stages_before_connect() {
-        let state = AppState::test_default();
+        use crate::editor::EditorDocumentState;
+        use crate::session::SessionState;
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        use std::sync::Mutex;
+
+        let state = AppState {
+            session: Mutex::new(SessionState::new(0)),
+            editor_state: Mutex::new(EditorDocumentState::default()),
+            hid_active: AtomicBool::new(false),
+            builtin_keydown_timestamp: AtomicU64::new(0),
+            integrity: Default::default(),
+            keyboard_info: Mutex::new(None),
+            last_keydown_ns: AtomicU64::new(0),
+            observability: Mutex::new(observability::RuntimeObservability::default()),
+        };
 
         let mut stages = Vec::new();
         let _ = upload_replay_session_native_with_progress(&state, None, "test", &[], |stage| {

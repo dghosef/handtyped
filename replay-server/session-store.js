@@ -247,8 +247,8 @@ function normalizeVerifiedPayload(payload) {
     'recorded_timezone_offset_minutes',
   )
 
-  if (keyboard_transport !== 'SPI') {
-    throw new Error('Replay uploads require SPI keyboard transport')
+  if (keyboard_transport !== 'SPI' && keyboard_transport !== 'FIFO') {
+    throw new Error('Replay uploads require trusted built-in keyboard transport (SPI or FIFO)')
   }
   if (frida_detected || dylib_injection_detected || dyld_env_injection) {
     throw new Error('Replay uploads rejected due to runtime tampering indicators')

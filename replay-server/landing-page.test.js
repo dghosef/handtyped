@@ -69,12 +69,14 @@ describe('landing page', () => {
     expect(landingPageHtml).toContain("import {\n      buildInactiveSpans")
     expect(landingPageHtml).toContain('parseFocusEvents')
     expect(landingPageHtml).toContain('buildInactiveSpans')
+    expect(landingPageHtml).toContain('renderMarkdownInto')
     expect(landingPageHtml).toContain("from './replay-view.js'")
     expect(landingPageHtml).toContain('fetch(replayEl.dataset.sessionUrl)')
     expect(landingPageHtml).toContain("addEventListener('mousedown', beginTimelineDrag)")
     expect(landingPageHtml).toContain("window.addEventListener('mousemove', dragMoveHandler)")
     expect(landingPageHtml).toContain("window.addEventListener('mouseup', dragUpHandler)")
     expect(landingPageHtml).not.toContain('<iframe')
+    expect(landingPageHtml).not.toContain('documentEl.innerHTML = marked.parse(rawText)')
   })
 
   it('keeps download, education, and GitHub entry points', () => {

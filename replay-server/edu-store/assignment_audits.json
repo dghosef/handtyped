@@ -1,0 +1,978 @@
+[
+  {
+    "id": "assignment_audit_eb15993d810d4101",
+    "assignment_id": "assignment_32490408b1e14eb4",
+    "classroom_id": "classroom_a03131336fc64a8b",
+    "assignment_title": "Hamlet timed write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Hamlet timed write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Hamlet timed write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_32490408b1e14eb4",
+      "title": "Hamlet timed write",
+      "course": "AP Literature",
+      "classroom_id": "classroom_a03131336fc64a8b",
+      "classroom_name": "AP Literature",
+      "prompt": "Write about indecision in Hamlet.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T04:19:01.153Z",
+      "updated_at": "2026-04-26T04:19:01.153Z"
+    },
+    "created_at": "2026-04-26T04:19:01.154Z",
+    "updated_at": "2026-04-26T04:19:01.154Z"
+  },
+  {
+    "id": "assignment_audit_0d3c0b8db6e44dc5",
+    "assignment_id": "assignment_c360118889ef4c55",
+    "classroom_id": "classroom_9b4891dad3334256",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_c360118889ef4c55",
+      "title": "Draft one",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_9b4891dad3334256",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Start with a quick draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T04:19:01.168Z",
+      "updated_at": "2026-04-26T04:19:01.168Z"
+    },
+    "created_at": "2026-04-26T04:19:01.168Z",
+    "updated_at": "2026-04-26T04:19:01.168Z"
+  },
+  {
+    "id": "assignment_audit_8abda83ac7a1484f",
+    "assignment_id": "assignment_c360118889ef4c55",
+    "classroom_id": "classroom_9b4891dad3334256",
+    "assignment_title": "Draft two",
+    "action": "updated",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Updated 3 settings",
+    "changes": [
+      {
+        "label": "Title",
+        "before": "Draft one",
+        "after": "Draft two"
+      },
+      {
+        "label": "Prompt",
+        "before": "Start with a quick draft.",
+        "after": "Revised prompt for the same class."
+      },
+      {
+        "label": "Writing windows",
+        "before": [
+          {
+            "label": "Writing window",
+            "days": {
+              "monday": true,
+              "tuesday": true,
+              "wednesday": true,
+              "thursday": true,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": null,
+            "start_hour": 10,
+            "start_minute": 0,
+            "end_hour": 11,
+            "end_minute": 0
+          }
+        ],
+        "after": [
+          {
+            "label": "Updated window",
+            "days": {
+              "monday": true,
+              "tuesday": false,
+              "wednesday": true,
+              "thursday": false,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": "2026-05-30",
+            "start_hour": 9,
+            "start_minute": 15,
+            "end_hour": 10,
+            "end_minute": 45
+          }
+        ]
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_c360118889ef4c55",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_9b4891dad3334256",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T04:19:01.168Z",
+      "updated_at": "2026-04-26T04:19:01.172Z"
+    },
+    "created_at": "2026-04-26T04:19:01.172Z",
+    "updated_at": "2026-04-26T04:19:01.172Z"
+  },
+  {
+    "id": "assignment_audit_2d249764d5ce4e7f",
+    "assignment_id": "assignment_e7f4ac02665e413b",
+    "classroom_id": "classroom_af78713b33314080",
+    "assignment_title": "Hamlet timed write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Hamlet timed write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Hamlet timed write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_e7f4ac02665e413b",
+      "title": "Hamlet timed write",
+      "course": "AP Literature",
+      "classroom_id": "classroom_af78713b33314080",
+      "classroom_name": "AP Literature",
+      "prompt": "Write about indecision in Hamlet.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T04:21:42.557Z",
+      "updated_at": "2026-04-26T04:21:42.557Z"
+    },
+    "created_at": "2026-04-26T04:21:42.558Z",
+    "updated_at": "2026-04-26T04:21:42.558Z"
+  },
+  {
+    "id": "assignment_audit_7cda72e3373e4eb8",
+    "assignment_id": "assignment_6c5300d20f194252",
+    "classroom_id": "classroom_d7484f5db0b0429c",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_6c5300d20f194252",
+      "title": "Draft one",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d7484f5db0b0429c",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Start with a quick draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T04:21:42.570Z",
+      "updated_at": "2026-04-26T04:21:42.570Z"
+    },
+    "created_at": "2026-04-26T04:21:42.570Z",
+    "updated_at": "2026-04-26T04:21:42.570Z"
+  },
+  {
+    "id": "assignment_audit_8c2f12ec55774511",
+    "assignment_id": "assignment_6c5300d20f194252",
+    "classroom_id": "classroom_d7484f5db0b0429c",
+    "assignment_title": "Draft two",
+    "action": "updated",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Updated 3 settings",
+    "changes": [
+      {
+        "label": "Title",
+        "before": "Draft one",
+        "after": "Draft two"
+      },
+      {
+        "label": "Prompt",
+        "before": "Start with a quick draft.",
+        "after": "Revised prompt for the same class."
+      },
+      {
+        "label": "Writing windows",
+        "before": [
+          {
+            "label": "Writing window",
+            "days": {
+              "monday": true,
+              "tuesday": true,
+              "wednesday": true,
+              "thursday": true,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": null,
+            "start_hour": 10,
+            "start_minute": 0,
+            "end_hour": 11,
+            "end_minute": 0
+          }
+        ],
+        "after": [
+          {
+            "label": "Updated window",
+            "days": {
+              "monday": true,
+              "tuesday": false,
+              "wednesday": true,
+              "thursday": false,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": "2026-05-30",
+            "start_hour": 9,
+            "start_minute": 15,
+            "end_hour": 10,
+            "end_minute": 45
+          }
+        ]
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_6c5300d20f194252",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d7484f5db0b0429c",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T04:21:42.570Z",
+      "updated_at": "2026-04-26T04:21:42.572Z"
+    },
+    "created_at": "2026-04-26T04:21:42.572Z",
+    "updated_at": "2026-04-26T04:21:42.572Z"
+  },
+  {
+    "id": "assignment_audit_c95c9295d1194f52",
+    "assignment_id": "assignment_1c4ea8753f1a452b",
+    "classroom_id": "classroom_38eb91590cb84f52",
+    "assignment_title": "Hamlet timed write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Hamlet timed write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Hamlet timed write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_1c4ea8753f1a452b",
+      "title": "Hamlet timed write",
+      "course": "AP Literature",
+      "classroom_id": "classroom_38eb91590cb84f52",
+      "classroom_name": "AP Literature",
+      "prompt": "Write about indecision in Hamlet.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T11:58:55.049Z",
+      "updated_at": "2026-04-26T11:58:55.049Z"
+    },
+    "created_at": "2026-04-26T11:58:55.049Z",
+    "updated_at": "2026-04-26T11:58:55.049Z"
+  },
+  {
+    "id": "assignment_audit_a20fda67ac824390",
+    "assignment_id": "assignment_af8422c639444adf",
+    "classroom_id": "classroom_933e69b5a07242f6",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_af8422c639444adf",
+      "title": "Draft one",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_933e69b5a07242f6",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Start with a quick draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T11:58:55.066Z",
+      "updated_at": "2026-04-26T11:58:55.066Z"
+    },
+    "created_at": "2026-04-26T11:58:55.067Z",
+    "updated_at": "2026-04-26T11:58:55.067Z"
+  },
+  {
+    "id": "assignment_audit_12560b5cc648423d",
+    "assignment_id": "assignment_af8422c639444adf",
+    "classroom_id": "classroom_933e69b5a07242f6",
+    "assignment_title": "Draft two",
+    "action": "updated",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Updated 3 settings",
+    "changes": [
+      {
+        "label": "Title",
+        "before": "Draft one",
+        "after": "Draft two"
+      },
+      {
+        "label": "Prompt",
+        "before": "Start with a quick draft.",
+        "after": "Revised prompt for the same class."
+      },
+      {
+        "label": "Writing windows",
+        "before": [
+          {
+            "label": "Writing window",
+            "days": {
+              "monday": true,
+              "tuesday": true,
+              "wednesday": true,
+              "thursday": true,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": null,
+            "start_hour": 10,
+            "start_minute": 0,
+            "end_hour": 11,
+            "end_minute": 0
+          }
+        ],
+        "after": [
+          {
+            "label": "Updated window",
+            "days": {
+              "monday": true,
+              "tuesday": false,
+              "wednesday": true,
+              "thursday": false,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": "2026-05-30",
+            "start_hour": 9,
+            "start_minute": 15,
+            "end_hour": 10,
+            "end_minute": 45
+          }
+        ]
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_af8422c639444adf",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_933e69b5a07242f6",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T11:58:55.066Z",
+      "updated_at": "2026-04-26T11:58:55.069Z"
+    },
+    "created_at": "2026-04-26T11:58:55.069Z",
+    "updated_at": "2026-04-26T11:58:55.069Z"
+  },
+  {
+    "id": "assignment_audit_3832d72af2b54471",
+    "assignment_id": "assignment_482d7fe6eec94ee7",
+    "classroom_id": "classroom_ab4711ce012c4311",
+    "assignment_title": "Hamlet timed write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Hamlet timed write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Hamlet timed write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_482d7fe6eec94ee7",
+      "title": "Hamlet timed write",
+      "course": "AP Literature",
+      "classroom_id": "classroom_ab4711ce012c4311",
+      "classroom_name": "AP Literature",
+      "prompt": "Write about indecision in Hamlet.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T12:24:42.776Z",
+      "updated_at": "2026-04-26T12:24:42.776Z"
+    },
+    "created_at": "2026-04-26T12:24:42.777Z",
+    "updated_at": "2026-04-26T12:24:42.777Z"
+  },
+  {
+    "id": "assignment_audit_b49a682771d84f41",
+    "assignment_id": "assignment_5aea43b050ad486b",
+    "classroom_id": "classroom_eea0e6e3081e4897",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_5aea43b050ad486b",
+      "title": "Draft one",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_eea0e6e3081e4897",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Start with a quick draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T12:24:42.805Z",
+      "updated_at": "2026-04-26T12:24:42.805Z"
+    },
+    "created_at": "2026-04-26T12:24:42.806Z",
+    "updated_at": "2026-04-26T12:24:42.806Z"
+  },
+  {
+    "id": "assignment_audit_070fa53842464834",
+    "assignment_id": "assignment_5aea43b050ad486b",
+    "classroom_id": "classroom_eea0e6e3081e4897",
+    "assignment_title": "Draft two",
+    "action": "updated",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Updated 3 settings",
+    "changes": [
+      {
+        "label": "Title",
+        "before": "Draft one",
+        "after": "Draft two"
+      },
+      {
+        "label": "Prompt",
+        "before": "Start with a quick draft.",
+        "after": "Revised prompt for the same class."
+      },
+      {
+        "label": "Writing windows",
+        "before": [
+          {
+            "label": "Writing window",
+            "days": {
+              "monday": true,
+              "tuesday": true,
+              "wednesday": true,
+              "thursday": true,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": null,
+            "start_hour": 10,
+            "start_minute": 0,
+            "end_hour": 11,
+            "end_minute": 0
+          }
+        ],
+        "after": [
+          {
+            "label": "Updated window",
+            "days": {
+              "monday": true,
+              "tuesday": false,
+              "wednesday": true,
+              "thursday": false,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": "2026-05-30",
+            "start_hour": 9,
+            "start_minute": 15,
+            "end_hour": 10,
+            "end_minute": 45
+          }
+        ]
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_5aea43b050ad486b",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_eea0e6e3081e4897",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "temporary_access_until": null,
+      "created_at": "2026-04-26T12:24:42.805Z",
+      "updated_at": "2026-04-26T12:24:42.809Z"
+    },
+    "created_at": "2026-04-26T12:24:42.810Z",
+    "updated_at": "2026-04-26T12:24:42.810Z"
+  }
+]

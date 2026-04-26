@@ -9,6 +9,28 @@ function makeEnv() {
     REPLAY_TRUSTED_SIGNER_KEYS: '',
     REPLAY_UPLOAD_RATE_LIMIT_COUNT: '',
     REPLAY_UPLOAD_RATE_LIMIT_WINDOW_MS: '',
+    EDU_GOOGLE_CLIENT_ID: 'test-google-client-id',
+    __googleTokenVerifier: async (credential) => {
+      if (credential !== 'valid-google-credential') {
+        if (credential !== 'valid-google-credential-2') {
+          throw new Error('invalid google credential')
+        }
+        return {
+          sub: 'google-sub-2',
+          email: 'teacher@edu.handtyped.app',
+          email_verified: true,
+          aud: 'test-google-client-id',
+          name: 'Joseph Tan',
+        }
+      }
+      return {
+        sub: 'google-sub-1',
+        email: 'teacher@edu.handtyped.app',
+        email_verified: true,
+        aud: 'test-google-client-id',
+        name: 'Joseph Tan',
+      }
+    },
     ASSETS: {
       async fetch(requestOrUrl) {
         const url = requestOrUrl instanceof URL ? requestOrUrl : new URL(requestOrUrl.url)
@@ -42,8 +64,9 @@ async function loginTeacher(env) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        provider: 'password',
         email: 'teacher@edu.handtyped.app',
-        access_code: 'handtyped-edu',
+        password: 'handtyped-edu',
       }),
     }),
     env,
@@ -67,7 +90,7 @@ function publicKeyHex(keyPair) {
   return rawPublicKeyHexFromSpki(keyPair.publicKey.export({ format: 'der', type: 'spki' }))
 }
 
-function signedEnvelope(keyPair = generateKeyPairSync('ed25519')) {
+function signedEnvelope(keyPair = generateKeyPairSync('ed25519'), payloadOverrides = {}) {
   const payload = {
     session_id: randomUUID().replace(/-/g, '').slice(0, 16),
     session_nonce: randomUUID(),
@@ -93,6 +116,7 @@ function signedEnvelope(keyPair = generateKeyPairSync('ed25519')) {
     keyboard_transport: 'SPI',
     recorded_timezone: 'AST',
     recorded_timezone_offset_minutes: -240,
+    ...payloadOverrides,
   }
   const payloadJson = JSON.stringify(payload)
   const payloadGzip = gzipSync(Buffer.from(payloadJson, 'utf8'))
@@ -235,6 +259,22 @@ describe('worker host routing', () => {
     expect(await res.json()).toMatchObject({ authenticated: false })
   })
 
+  it('publishes Google auth config for the teacher login page', async () => {
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/config', { method: 'GET' }),
+      makeEnv(),
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      auth: {
+        password_enabled: true,
+        google_enabled: true,
+        google_client_id: 'test-google-client-id',
+      },
+    })
+  })
+
   it('signs in a teacher with email and access code', async () => {
     const env = makeEnv()
     const { res, cookie } = await loginTeacher(env)
@@ -244,6 +284,64 @@ describe('worker host routing', () => {
     expect(await res.json()).toMatchObject({
       authenticated: true,
       teacher_email: 'teacher@edu.handtyped.app',
+      provider: 'password',
+    })
+  })
+
+  it('signs in a teacher with Google', async () => {
+    const env = makeEnv()
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'google',
+          credential: 'valid-google-credential',
+        }),
+      }),
+      env,
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('set-cookie') || '').toContain('edu_teacher_session=')
+    expect(await res.json()).toMatchObject({
+      authenticated: true,
+      teacher_email: 'teacher@edu.handtyped.app',
+      provider: 'google',
+    })
+  })
+
+  it('rejects a different Google subject for the same teacher email once linked', async () => {
+    const env = makeEnv()
+    const first = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'google',
+          credential: 'valid-google-credential',
+        }),
+      }),
+      env,
+    )
+    expect(first.status).toBe(200)
+
+    const second = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'google',
+          credential: 'valid-google-credential-2',
+        }),
+      }),
+      env,
+    )
+
+    expect(second.status).toBe(401)
+    expect(await second.json()).toMatchObject({
+      authenticated: false,
+      error: 'Invalid teacher login',
     })
   })
 
@@ -261,6 +359,36 @@ describe('worker host routing', () => {
 
     expect(res.status).toBe(201)
     expect(await res.json()).toMatchObject({ name: 'AP Lit', teacher_name: 'Ms. Keating', join_code: 'APLIT1' })
+  })
+
+  it('rejects duplicate classroom join codes case-insensitively', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const first = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ name: 'AP Lit', teacher_name: 'Ms. Keating', join_code: 'APLIT1' }),
+      }),
+      env,
+    )
+    expect(first.status).toBe(201)
+
+    const duplicate = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ name: 'AP Lang', teacher_name: 'Ms. Keating', join_code: 'aplit1' }),
+      }),
+      env,
+    )
+
+    expect(duplicate.status).toBe(409)
+    expect(await duplicate.json()).toMatchObject({
+      error: 'Join code already in use',
+      join_code: 'APLIT1',
+    })
   })
 
   it('returns student config for a classroom join code', async () => {
@@ -371,6 +499,150 @@ describe('worker host routing', () => {
     })
   })
 
+  it('reflects assignment updates and classroom deletion in student config', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Realtime Period',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'REAL22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Initial response',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Write the first response.',
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    const initialConfig = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=REAL22', {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(initialConfig.status).toBe(200)
+    expect(await initialConfig.json()).toMatchObject({
+      classroom: { join_code: 'REAL22', name: 'Realtime Period' },
+      assignments: [
+        {
+          id: createdAssignment.id,
+          title: 'Initial response',
+          prompt: 'Write the first response.',
+        },
+      ],
+    })
+
+    const updatedWindows = [
+      {
+        label: 'Updated window',
+        days: {
+          monday: true,
+          tuesday: true,
+          wednesday: false,
+          thursday: false,
+          friday: true,
+          saturday: false,
+          sunday: false,
+        },
+        end_date: '2026-05-30',
+        start_hour: 13,
+        start_minute: 0,
+        end_hour: 14,
+        end_minute: 30,
+      },
+    ]
+
+    const updatedAssignment = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${createdAssignment.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Revised response',
+          prompt: 'Write the revised response.',
+          windows: updatedWindows,
+        }),
+      }),
+      env,
+    )
+    expect(updatedAssignment.status).toBe(200)
+    expect(await updatedAssignment.json()).toMatchObject({
+      id: createdAssignment.id,
+      title: 'Revised response',
+      prompt: 'Write the revised response.',
+      windows: updatedWindows,
+    })
+
+    const updatedConfig = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=REAL22', {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(updatedConfig.status).toBe(200)
+    expect(await updatedConfig.json()).toMatchObject({
+      classroom: { join_code: 'REAL22', name: 'Realtime Period' },
+      assignments: [
+        {
+          id: createdAssignment.id,
+          title: 'Revised response',
+          prompt: 'Write the revised response.',
+          windows: updatedWindows,
+        },
+      ],
+    })
+
+    const deletedClassroom = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/classrooms/${createdClassroom.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(deletedClassroom.status).toBe(200)
+
+    const deletedConfig = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=REAL22', {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(deletedConfig.status).toBe(200)
+    expect(await deletedConfig.json()).toMatchObject({
+      classroom: null,
+      assignments: [],
+    })
+  })
+
   it('deletes a class and its assignments for authenticated teachers', async () => {
     const env = makeEnv()
     const { cookie } = await loginTeacher(env)
@@ -469,6 +741,51 @@ describe('worker attestation compatibility', () => {
     )
 
     expect(res.status).toBe(200)
+  })
+
+  it('accepts FIFO keyboard transports for trusted signers', async () => {
+    const trustedSignerKeyPair = generateKeyPairSync('ed25519')
+    const trustedEnv = {
+      ...makeEnv(),
+      REPLAY_TRUSTED_SIGNER_KEYS: publicKeyHex(trustedSignerKeyPair),
+    }
+
+    const res = await worker.fetch(
+      new Request('https://replay.handtyped.app/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          signedEnvelope(trustedSignerKeyPair, { keyboard_transport: 'FIFO' }),
+        ),
+      }),
+      trustedEnv,
+    )
+
+    expect(res.status).toBe(200)
+  })
+
+  it('rejects non-built-in keyboard transports even for trusted signers', async () => {
+    const trustedSignerKeyPair = generateKeyPairSync('ed25519')
+    const trustedEnv = {
+      ...makeEnv(),
+      REPLAY_TRUSTED_SIGNER_KEYS: publicKeyHex(trustedSignerKeyPair),
+    }
+
+    const res = await worker.fetch(
+      new Request('https://replay.handtyped.app/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          signedEnvelope(trustedSignerKeyPair, { keyboard_transport: 'USB' }),
+        ),
+      }),
+      trustedEnv,
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({
+      error: 'Replay uploads require trusted built-in keyboard transport (SPI or FIFO)',
+    })
   })
 })
 

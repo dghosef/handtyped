@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
   buildAssignment,
+  buildAssignmentAudit,
   buildClassroom,
   buildEduReplay,
   buildLiveSession,
@@ -13,6 +14,7 @@ const CLASSROOM_PREFIX = 'edu:classrooms:'
 const ASSIGNMENT_PREFIX = 'edu:assignments:'
 const LIVE_PREFIX = 'edu:live_sessions:'
 const REPLAY_PREFIX = 'edu:replays:'
+const ASSIGNMENT_AUDIT_PREFIX = 'edu:assignment_audits:'
 const TEACHER_PREFIX = 'edu:teachers:'
 const TEACHER_SESSION_PREFIX = 'edu:teacher_sessions:'
 const D1_SCHEMA_STATEMENTS = [
@@ -160,6 +162,15 @@ export function createNodeEduStore(baseDir) {
     async getReplay(id) {
       return readCollection('replays').find((item) => item.id === id) || null
     },
+    async listAssignmentAudits() {
+      return sortByUpdatedDesc(readCollection('assignment_audits'))
+    },
+    async putAssignmentAudit(audit) {
+      const audits = readCollection('assignment_audits')
+      const next = audits.filter((item) => item.id !== audit.id)
+      next.push(audit)
+      writeCollection('assignment_audits', next)
+    },
   }
 }
 
@@ -242,6 +253,12 @@ export function createKvEduStore(kv) {
     async getReplay(id) {
       const raw = await kv.get(`${REPLAY_PREFIX}${id}`)
       return raw ? JSON.parse(raw) : null
+    },
+    async listAssignmentAudits() {
+      return sortByUpdatedDesc(await listByPrefix(ASSIGNMENT_AUDIT_PREFIX))
+    },
+    async putAssignmentAudit(audit) {
+      await kv.put(`${ASSIGNMENT_AUDIT_PREFIX}${audit.id}`, JSON.stringify(audit))
     },
   }
 }
@@ -382,6 +399,14 @@ export function createD1EduStore(db) {
     async getReplay(id) {
       return getByKindAndId('replay', id)
     },
+    async listAssignmentAudits() {
+      return listKind('assignment_audit')
+    },
+    async putAssignmentAudit(audit) {
+      await putRecord('assignment_audit', audit.id, audit, {
+        classroom_id: audit.assignment_id || null,
+      })
+    },
   }
 }
 
@@ -517,8 +542,10 @@ export async function buildEduDashboard(store) {
   const assignments = await store.listAssignments()
   const live_sessions = await store.listLiveSessions()
   const replays = await store.listReplays()
+  const assignment_audits = await store.listAssignmentAudits()
 
   return {
+    updated_at: nowIso(),
     product: {
       host: 'edu.handtyped.app',
       teacher_surface: 'web',
@@ -530,16 +557,101 @@ export async function buildEduDashboard(store) {
       assignments: assignments.length,
       live_sessions: live_sessions.length,
       replays_available: replays.length,
+      audits_recorded: assignment_audits.length,
     },
     classrooms,
     assignments,
     live_sessions,
+    assignment_audits,
     architecture: {
       teacher_web_origin: 'https://edu.handtyped.app',
       replay_origin: 'https://replay.handtyped.app',
       student_delivery: 'native desktop app',
     },
   }
+}
+
+export async function buildEduDashboardDelta(store, { since } = {}) {
+  const normalizedSince = String(since || '')
+  const classrooms = await store.listClassrooms()
+  const assignments = await store.listAssignments()
+  const live_sessions = await store.listLiveSessions()
+  const replays = await store.listReplays()
+  const assignment_audits = await store.listAssignmentAudits()
+
+  const changedSince = (items) =>
+    (items || []).filter((item) => String(item.updated_at || '') > normalizedSince)
+
+  return {
+    updated_at: nowIso(),
+    since: normalizedSince || null,
+    classrooms,
+    assignments,
+    live_sessions: changedSince(live_sessions),
+    replays: changedSince(replays),
+    assignment_audits: changedSince(assignment_audits),
+    summary: {
+      classrooms: classrooms.length,
+      assignments: assignments.length,
+      live_sessions: live_sessions.length,
+      replays_available: replays.length,
+      audits_recorded: assignment_audits.length,
+    },
+  }
+}
+
+export function buildAssignmentAuditRecord({
+  action,
+  assignment,
+  previousAssignment = null,
+  actor = null,
+}) {
+  const nextSnapshot = assignment ? buildAssignment(assignment) : null
+  const previousSnapshot = previousAssignment ? buildAssignment(previousAssignment) : null
+  const changes = []
+
+  function pushChange(label, before, after) {
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      return
+    }
+    changes.push({ label, before, after })
+  }
+
+  if (action === 'created' && nextSnapshot) {
+    changes.push({ label: 'Assignment created', before: null, after: nextSnapshot.title })
+  } else if (action === 'deleted' && previousSnapshot) {
+    changes.push({ label: 'Assignment deleted', before: previousSnapshot.title, after: null })
+  } else if (previousSnapshot && nextSnapshot) {
+    pushChange('Title', previousSnapshot.title, nextSnapshot.title)
+    pushChange('Prompt', previousSnapshot.prompt, nextSnapshot.prompt)
+    pushChange('Instructions', previousSnapshot.instructions, nextSnapshot.instructions)
+    pushChange('Writing windows', previousSnapshot.windows, nextSnapshot.windows)
+    pushChange('Temporary access until', previousSnapshot.temporary_access_until, nextSnapshot.temporary_access_until)
+    pushChange('Rules', previousSnapshot.policy, nextSnapshot.policy)
+    pushChange('Browser policy', previousSnapshot.browser_policy, nextSnapshot.browser_policy)
+  }
+
+  const summary =
+    action === 'created'
+      ? `Created assignment "${assignment?.title || previousAssignment?.title || 'Untitled assignment'}"`
+      : action === 'deleted'
+        ? `Deleted assignment "${previousAssignment?.title || assignment?.title || 'Untitled assignment'}"`
+        : changes.length
+          ? `Updated ${changes.length} setting${changes.length === 1 ? '' : 's'}`
+          : 'Reviewed assignment settings'
+
+  return buildAssignmentAudit({
+    assignment_id: assignment?.id || previousAssignment?.id || '',
+    classroom_id: assignment?.classroom_id || previousAssignment?.classroom_id || null,
+    assignment_title: assignment?.title || previousAssignment?.title || '',
+    action,
+    actor_id: actor?.teacher_id || null,
+    actor_name: actor?.teacher_name || null,
+    actor_email: actor?.teacher_email || null,
+    summary,
+    changes,
+    snapshot: nextSnapshot || previousSnapshot,
+  })
 }
 
 export async function buildStudentConfig(store, { joinCode }) {

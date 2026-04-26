@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Handtyped Replay</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -377,9 +378,109 @@
       line-height: 1.72;
       color: #222222;
       font-family: 'Open Sans', Arial, Helvetica, sans-serif;
-      white-space: pre-wrap;
-      word-break: break-word;
+      overflow-wrap: anywhere;
       box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
+    #doc-content {
+      min-height: 100%;
+    }
+
+    #doc-content > :first-child {
+      margin-top: 0;
+    }
+
+    #doc-content > :last-child {
+      margin-bottom: 0;
+    }
+
+    #doc-content p,
+    #doc-content ul,
+    #doc-content ol,
+    #doc-content blockquote,
+    #doc-content pre {
+      margin: 0 0 16px;
+    }
+
+    #doc-content ul,
+    #doc-content ol {
+      padding-left: 26px;
+    }
+
+    #doc-content li {
+      margin: 0 0 6px;
+    }
+
+    #doc-content h1,
+    #doc-content h2,
+    #doc-content h3,
+    #doc-content h4,
+    #doc-content h5,
+    #doc-content h6 {
+      margin: 28px 0 12px;
+      line-height: 1.18;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #161616;
+    }
+
+    #doc-content h1 {
+      font-size: 1.95em;
+    }
+
+    #doc-content h2 {
+      font-size: 1.55em;
+    }
+
+    #doc-content h3 {
+      font-size: 1.28em;
+    }
+
+    #doc-content a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 0.14em;
+    }
+
+    #doc-content blockquote {
+      padding-left: 16px;
+      border-left: 3px solid #dddddd;
+      color: #555555;
+    }
+
+    #doc-content code {
+      font-family: "Menlo", "SFMono-Regular", monospace;
+      font-size: 0.9em;
+      background: #f4f4f4;
+      padding: 0.12em 0.32em;
+      border-radius: 4px;
+    }
+
+    #doc-content pre {
+      overflow: auto;
+      padding: 14px 16px;
+      border: 1px solid #ededed;
+      background: #fafafa;
+      border-radius: 8px;
+      line-height: 1.55;
+    }
+
+    #doc-content pre code {
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      white-space: pre;
+    }
+
+    #doc-content hr {
+      margin: 22px 0;
+      border: 0;
+      border-top: 1px solid #e3e3e3;
+    }
+
+    #doc-content img {
+      max-width: 100%;
+      height: auto;
     }
 
     .cursor-blink {
@@ -573,7 +674,7 @@
         <div class="replay-status" id="status-msg">Loading session…</div>
         <div class="replay-stage">
           <div class="replay-stage-scroll" id="replay-stage-scroll">
-            <div class="doc-page"><span id="doc-content"></span><span class="cursor-blink" id="cursor"></span></div>
+            <div class="doc-page"><div id="doc-content"></div><span class="cursor-blink" id="cursor"></span></div>
           </div>
         </div>
       </div>
@@ -581,7 +682,7 @@
       <div class="keyboard-note">
         <div class="section-label">Input verification</div>
         <p>
-          This session was recorded from the built-in SPI keyboard, signed by Handtyped on the Mac, and verified by the replay server before storage. External USB keyboards, Bluetooth keyboards, and software-injected keystrokes are excluded.
+          This session was recorded from the Mac's trusted built-in keyboard transport, signed by Handtyped on the Mac, and verified by the replay server before storage. External USB keyboards, Bluetooth keyboards, and software-injected keystrokes are excluded.
         </p>
       </div>
     </div>
@@ -604,6 +705,7 @@
       parseFocusEvents,
       parseHistory,
       parseKeydowns,
+      renderMarkdownInto,
     } from '/replay-view.js'
 
     const sessionId = location.pathname.split('/').pop()
@@ -633,6 +735,15 @@
     const replayTimeEl = document.getElementById('replay-time')
     const progressReadoutEl = document.getElementById('progress-readout')
     const progressTrackEl = document.getElementById('progress-track')
+    const replayStageScrollEl = document.getElementById('replay-stage-scroll')
+    const speedSelectEl = document.getElementById('speed-select')
+
+    function readSelectedSpeed() {
+      const selectedSpeed = Number.parseFloat(speedSelectEl?.value)
+      return Number.isFinite(selectedSpeed) && selectedSpeed > 0 ? selectedSpeed : 1
+    }
+
+    speed = readSelectedSpeed()
 
     function currentDocumentName() {
       return session?.document_name || ''
@@ -723,7 +834,14 @@
       currentElapsedMs = Math.max(0, Math.min(elapsedMs, total))
       const idx = findHistoryIndex(history, currentElapsedMs)
       const text = idx >= 0 ? history[idx]?.text || '' : ''
-      docContentEl.textContent = text
+      const scrollTop = replayStageScrollEl.scrollTop
+      const scrollLeft = replayStageScrollEl.scrollLeft
+      renderMarkdownInto(docContentEl, text, {
+        cursorEl,
+        showCursor: currentElapsedMs < total,
+      })
+      replayStageScrollEl.scrollTop = scrollTop
+      replayStageScrollEl.scrollLeft = scrollLeft
       cursorEl.style.display = currentElapsedMs >= total ? 'none' : ''
 
       replayTimeEl.textContent = formatWriterTimezone(session)
@@ -738,7 +856,7 @@
     }
 
     function renderBlankState() {
-      docContentEl.textContent = ''
+      renderMarkdownInto(docContentEl, '', { cursorEl, showCursor: true })
       cursorEl.style.display = ''
       playBtnEl.textContent = '▶'
       statusMsgEl.textContent = 'Press ▶ to replay'
@@ -901,8 +1019,8 @@
       }
     })
 
-    document.getElementById('speed-select').addEventListener('change', event => {
-      speed = parseFloat(event.target.value)
+    speedSelectEl.addEventListener('change', () => {
+      speed = readSelectedSpeed()
       if (playing) {
         pausePlay('Playing…')
         startPlay()

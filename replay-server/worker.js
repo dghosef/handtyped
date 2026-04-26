@@ -1,16 +1,26 @@
 import { parseReplayAttestation, buildReplayUrl } from './session-store.js'
 import { parseTrustedSignerAllowlist } from './trusted-signers.js'
 import { createReplayGuardrails, resolveReplayUploadRateLimit } from './guardrails.js'
-import { buildEduDashboard, buildStudentConfig, createD1EduStore, createKvEduStore, ensureEduSeedData } from './edu-store.js'
+import {
+  buildAssignmentAuditRecord,
+  buildEduDashboard,
+  buildEduDashboardDelta,
+  buildStudentConfig,
+  createD1EduStore,
+  createKvEduStore,
+  ensureEduSeedData,
+} from './edu-store.js'
 import { buildAssignment, buildClassroom, buildEduReplay, nowIso } from './edu-schema.js'
 import {
   authenticateTeacher,
+  authenticateTeacherWithGoogle,
   clearTeacherSessionCookie,
   createTeacherSession,
   destroyTeacherSession,
   getTeacherSession,
   teacherSessionCookie,
 } from './edu-auth.js'
+import { verifyGoogleIdToken } from './edu-google-auth.js'
 
 const RESERVED_REPLAY_ROOTS = new Set(['api', 'replay'])
 const REPLAY_HOSTS = new Set(['replay.handtyped.app'])
@@ -128,8 +138,10 @@ async function buildSafeEduDashboard(store) {
   const assignments = await safeList(() => store.listAssignments())
   const live_sessions = await safeList(() => store.listLiveSessions())
   const replays = await safeList(() => store.listReplays())
+  const assignment_audits = await safeList(() => store.listAssignmentAudits())
 
   return {
+    updated_at: nowIso(),
     product: {
       host: 'edu.handtyped.app',
       teacher_surface: 'web',
@@ -141,10 +153,12 @@ async function buildSafeEduDashboard(store) {
       assignments: assignments.length,
       live_sessions: live_sessions.length,
       replays_available: replays.length,
+      audits_recorded: assignment_audits.length,
     },
     classrooms,
     assignments,
     live_sessions,
+    assignment_audits,
     architecture: {
       teacher_web_origin: 'https://edu.handtyped.app',
       replay_origin: 'https://replay.handtyped.app',
@@ -153,12 +167,36 @@ async function buildSafeEduDashboard(store) {
   }
 }
 
+async function findJoinCodeConflict(store, joinCode, excludeClassroomId = null) {
+  const normalizedJoinCode = String(joinCode || '').trim().toUpperCase()
+  if (!normalizedJoinCode) {
+    return null
+  }
+
+  const classrooms = await store.listClassrooms()
+  return (
+    classrooms.find(
+      (classroom) =>
+        classroom.id !== excludeClassroomId &&
+        String(classroom.join_code || '').trim().toUpperCase() === normalizedJoinCode,
+    ) || null
+  )
+}
+
 function defaultTeacher(env) {
   return {
     id: 'teacher_default',
     name: 'Joseph Tan',
     email: env.EDU_TEACHER_EMAIL || 'teacher@edu.handtyped.app',
     access_code: env.EDU_TEACHER_ACCESS_CODE || 'handtyped-edu',
+  }
+}
+
+function eduGoogleConfig(env) {
+  return {
+    enabled: Boolean(String(env.EDU_GOOGLE_CLIENT_ID || '').trim()),
+    client_id: String(env.EDU_GOOGLE_CLIENT_ID || '').trim(),
+    hosted_domain: String(env.EDU_GOOGLE_HOSTED_DOMAIN || '').trim(),
   }
 }
 
@@ -233,12 +271,29 @@ export default {
       return json(await buildSafeEduDashboard(store))
     }
 
+    if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/dashboard/updates') {
+      const store = getEduStore(env)
+      await ensureEduSeedData(store)
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      return json(await buildEduDashboardDelta(store, { since: url.searchParams.get('since') || '' }))
+    }
+
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/config') {
+      const google = eduGoogleConfig(env)
       return json({
         host: 'edu.handtyped.app',
         teacher_surface: 'web',
         student_surface: 'native',
         replay_origin: 'https://replay.handtyped.app',
+        auth: {
+          password_enabled: true,
+          google_enabled: google.enabled,
+          google_client_id: google.client_id,
+          google_hosted_domain: google.hosted_domain,
+        },
       })
     }
 
@@ -250,28 +305,47 @@ export default {
       const authStore = getEduAuthStore(env)
       const body = await parseJsonRequest(request)
       const fallbackTeacher = defaultTeacher(env)
-      const normalizedEmail = String(body?.email || '').trim().toLowerCase()
       let teacher = null
+      let providerName = String(body?.provider || '').trim() || 'password'
 
-      if (
-        normalizedEmail === fallbackTeacher.email.toLowerCase() &&
-        String(body?.access_code || '') === fallbackTeacher.access_code
-      ) {
-        teacher = fallbackTeacher
+      if (providerName === 'google') {
+        const google = eduGoogleConfig(env)
+        const profile = await verifyGoogleIdToken({
+          credential: body?.credential,
+          clientId: google.client_id,
+          hostedDomain: google.hosted_domain,
+          mockVerifier: env.__googleTokenVerifier || null,
+        }).catch(() => null)
+
+        await ensureEduSeedData(getEduStore(env))
+        teacher = profile
+          ? await authenticateTeacherWithGoogle(getEduStore(env), profile)
+          : null
       } else {
-        try {
-          teacher = await authenticateTeacher(getEduStore(env), {
-            email: body?.email,
-            accessCode: body?.access_code,
-          })
-        } catch {
-          teacher = null
+        const normalizedEmail = String(body?.email || '').trim().toLowerCase()
+        if (
+          normalizedEmail === fallbackTeacher.email.toLowerCase() &&
+          (String(body?.password || '') === fallbackTeacher.access_code ||
+            String(body?.access_code || '') === fallbackTeacher.access_code)
+        ) {
+          teacher = fallbackTeacher
+        } else {
+          try {
+            teacher = await authenticateTeacher(getEduStore(env), {
+              email: body?.email,
+              password: body?.password,
+              accessCode: body?.access_code,
+            })
+          } catch {
+            teacher = null
+          }
         }
+        providerName = body?.password ? 'password' : 'access-code'
       }
       if (!teacher) {
-        return json({ error: 'Invalid teacher email or access code', authenticated: false }, { status: 401 })
+        return json({ error: 'Invalid teacher login', authenticated: false }, { status: 401 })
       }
-      const sessionRecord = await createTeacherSession(authStore, teacher)
+      const sessionRecord = await createTeacherSession(authStore, teacher, providerName)
       return json(await getTeacherSession(authStore, `edu_teacher_session=${sessionRecord.id}`), {
         headers: {
           'Set-Cookie': teacherSessionCookie(sessionRecord.id),
@@ -307,6 +381,10 @@ export default {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const classroom = buildClassroom(await parseJsonRequest(request))
+      const conflict = await findJoinCodeConflict(store, classroom.join_code)
+      if (conflict) {
+        return json({ error: 'Join code already in use', join_code: classroom.join_code }, { status: 409 })
+      }
       classroom.updated_at = nowIso()
       await store.putClassroom(classroom)
       return json(classroom, { status: 201 })
@@ -337,6 +415,10 @@ export default {
         return json({ error: 'Not found' }, { status: 404 })
       }
       const classroom = buildClassroom({ ...existing, ...(await parseJsonRequest(request)), id, updated_at: nowIso() })
+      const conflict = await findJoinCodeConflict(store, classroom.join_code, classroom.id)
+      if (conflict) {
+        return json({ error: 'Join code already in use', join_code: classroom.join_code }, { status: 409 })
+      }
       await store.putClassroom(classroom)
       return json(classroom)
     }
@@ -381,10 +463,18 @@ export default {
       const assignment = buildAssignment(await parseJsonRequest(request))
       assignment.updated_at = nowIso()
       await store.putAssignment(assignment)
+      await store.putAssignmentAudit(
+        buildAssignmentAuditRecord({ action: 'created', assignment, actor: session }),
+      )
       return json(assignment, { status: 201 })
     }
 
-    if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/assignments/')) {
+    if (
+      eduHost &&
+      request.method === 'GET' &&
+      url.pathname.startsWith('/api/edu/assignments/') &&
+      !url.pathname.endsWith('/audit')
+    ) {
       const store = getEduStore(env)
       await ensureEduSeedData(store)
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
@@ -410,7 +500,32 @@ export default {
       }
       const assignment = buildAssignment({ ...existing, ...(await parseJsonRequest(request)), id, updated_at: nowIso() })
       await store.putAssignment(assignment)
+      await store.putAssignmentAudit(
+        buildAssignmentAuditRecord({
+          action: 'updated',
+          assignment,
+          previousAssignment: existing,
+          actor: session,
+        }),
+      )
       return json(assignment)
+    }
+
+    if (eduHost && request.method === 'GET' && /\/api\/edu\/assignments\/[^/]+\/audit$/.test(url.pathname)) {
+      const store = getEduStore(env)
+      await ensureEduSeedData(store)
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const parts = url.pathname.split('/')
+      const assignmentId = parts[parts.length - 2]
+      const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
+      if (!assignment) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const audits = (await store.listAssignmentAudits()).filter((item) => item.assignment_id === assignmentId)
+      return json(audits)
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/live-sessions') {

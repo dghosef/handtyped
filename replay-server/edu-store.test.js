@@ -184,4 +184,27 @@ describe('createD1EduStore', () => {
     await expect(store.getAssignment(assignment.id)).resolves.toBeNull()
     await expect(store.getClassroom(classroom.id)).resolves.toBeNull()
   })
+
+  it('stores the printing policy flag on assignments', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const assignment = buildAssignment({
+      id: 'assignment-printing',
+      title: 'Printing rules',
+      policy: {
+        copy_paste_allowed: false,
+        printing_allowed: true,
+        require_lockdown: false,
+        require_fullscreen: false,
+      },
+    })
+
+    await store.putAssignment(assignment)
+
+    await expect(store.getAssignment(assignment.id)).resolves.toMatchObject({
+      id: 'assignment-printing',
+      policy: {
+        printing_allowed: true,
+      },
+    })
+  })
 })

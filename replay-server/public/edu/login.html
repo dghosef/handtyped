@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/edu/styles.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <div class="app landing-app">
@@ -28,43 +29,146 @@
           <div class="section-label">Teacher access</div>
           <h2>Continue to the teacher workspace</h2>
           <p class="subhead">
-            Sign in with a teacher email and access code. This keeps the teacher workspace on the web
+            Sign in with a teacher email and password, or continue with Google. This keeps the teacher workspace on the web
             while leaving student-side attestation and enforcement in the native app.
           </p>
-          <p class="subhead">Default local development account: <strong>teacher@edu.handtyped.app</strong> with access code <strong>handtyped-edu</strong>.</p>
+          <p class="subhead">Default local development account: <strong>teacher@edu.handtyped.app</strong> with password <strong>handtyped-edu</strong>.</p>
         </div>
+        <p class="subhead login-status" id="login-status" hidden></p>
         <form class="edu-form login-form" id="teacher-login-form">
           <label>
             <span>Email</span>
             <input name="email" type="email" value="teacher@edu.handtyped.app" required />
           </label>
           <label>
-            <span>Access code</span>
-            <input name="access_code" type="password" value="handtyped-edu" required />
+            <span>Password</span>
+            <input name="password" type="password" value="handtyped-edu" required />
           </label>
           <button class="button" type="submit">Sign in</button>
         </form>
+        <div class="login-divider" id="google-login-divider"><span>or</span></div>
+        <div id="google-signin-shell">
+          <div id="google-signin-button"></div>
+        </div>
       </section>
     </main>
   </div>
 
   <script type="module">
+    let googleClientId = ''
+    let googleHostedDomain = ''
+    let googleEnabled = false
+
+    const statusEl = document.getElementById('login-status')
     const form = document.getElementById('teacher-login-form')
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault()
-      const payload = Object.fromEntries(new FormData(form).entries())
-      const response = await fetch('/api/edu/auth/login', {
+    const googleShell = document.getElementById('google-signin-shell')
+    const googleDivider = document.getElementById('google-login-divider')
+
+    function setStatus(message, tone = 'default') {
+      if (!message) {
+        statusEl.hidden = true
+        statusEl.textContent = ''
+        statusEl.dataset.tone = 'default'
+        return
+      }
+      statusEl.hidden = false
+      statusEl.textContent = message
+      statusEl.dataset.tone = tone
+    }
+
+    async function loadConfig() {
+      const res = await fetch('/api/edu/config')
+      if (!res.ok) {
+        return
+      }
+      const config = await res.json().catch(() => null)
+      googleEnabled = Boolean(config?.auth?.google_enabled)
+      googleClientId = config?.auth?.google_client_id || ''
+      googleHostedDomain = config?.auth?.google_hosted_domain || ''
+    }
+
+    async function loadSession() {
+      const res = await fetch('/api/edu/auth/session')
+      if (!res.ok) {
+        return
+      }
+      const session = await res.json().catch(() => null)
+      if (session?.authenticated) {
+        window.location.href = '/app'
+      }
+    }
+
+    function updateGoogleUi() {
+      const showGoogle = googleEnabled && googleClientId
+      googleShell.hidden = !showGoogle
+      googleDivider.hidden = !showGoogle
+      if (showGoogle && googleHostedDomain) {
+        setStatus(`Google sign-in is limited to ${googleHostedDomain} accounts.`, 'default')
+      }
+    }
+
+    async function loginWithPayload(payload, fallbackError) {
+      const loginResponse = await fetch('/api/edu/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (response.ok) {
+      if (loginResponse.ok) {
         window.location.href = '/app'
         return
       }
-      const data = await response.json().catch(() => ({}))
-      window.alert(data.error || 'Could not sign in.')
+      const data = await loginResponse.json().catch(() => ({}))
+      setStatus(data.error || fallbackError, 'danger')
+    }
+
+    function handleGoogleCredential(response) {
+      if (!response?.credential) {
+        setStatus('Google sign-in did not return a credential.', 'danger')
+        return
+      }
+      void loginWithPayload(
+        {
+          provider: 'google',
+          credential: response.credential,
+        },
+        'Could not sign in with Google.',
+      )
+    }
+
+    function initGoogleButton() {
+      if (!googleEnabled || !googleClientId || !window.google?.accounts?.id) {
+        updateGoogleUi()
+        return
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredential,
+        hd: googleHostedDomain || undefined,
+      })
+      window.google.accounts.id.renderButton(
+        document.getElementById('google-signin-button'),
+        {
+          theme: 'outline',
+          size: 'large',
+          text: 'signin_with',
+          shape: 'rectangular',
+          width: 320,
+        },
+      )
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      setStatus('')
+      const payload = Object.fromEntries(new FormData(form).entries())
+      await loginWithPayload({ ...payload, provider: 'password' }, 'Could not sign in.')
     })
+
+    await loadSession()
+    await loadConfig()
+    updateGoogleUi()
+    initGoogleButton()
   </script>
 </body>
 </html>

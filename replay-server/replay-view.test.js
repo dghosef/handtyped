@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildFocusSegments,
   buildInactiveSpans,
   buildTimelineGapMarkers,
   buildSyntheticHistory,
@@ -8,6 +9,7 @@ import {
   compressIdleGaps,
   documentWithAttribution,
   downloadFilenameForDocument,
+  safeJsonLines,
   formatAbsoluteReplayTime,
   getDurationFromHistory,
   getElapsedRawTime,
@@ -15,8 +17,10 @@ import {
   getRawDurationFromHistory,
   getReplayOriginWallMs,
   findHistoryIndex,
+  parseKeydowns,
   parseFocusEvents,
   parseHistory,
+  renderMarkdownToHtml,
 } from './public/replay-view.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -47,6 +51,7 @@ describe('replay history start state', () => {
   })
 
   it('uses the homepage header font for the replay title', () => {
+    expect(replayPageHtml).toContain('cdn.jsdelivr.net/npm/marked/marked.min.js')
     expect(replayPageHtml).toContain(
       "fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap",
     )
@@ -58,11 +63,30 @@ describe('replay history start state', () => {
     expect(replayPageHtml).toContain('.play-btn,')
     expect(replayPageHtml).toContain('.speed-select {')
     expect(replayPageHtml).toContain('.doc-page {')
+    expect(replayPageHtml).toContain('#doc-content h1')
     expect(replayPageHtml).toContain('.section-label {')
     expect(replayPageHtml).toContain('.keyboard-note p {')
+    expect(replayPageHtml).toContain('renderMarkdownInto')
+    expect(replayPageHtml).not.toContain('docContentEl.textContent = text')
     expect(replayPageHtml).not.toContain('Session stats')
     expect(replayPageHtml).not.toContain('stat-keystrokes')
     expect(replayPageHtml).not.toContain('stat-words')
+  })
+
+  it('initializes replay speed from the restored speed dropdown value', () => {
+    for (const html of [replayPageHtml, eduReplayPageHtml]) {
+      expect(html).toContain("const speedSelectEl = document.getElementById('speed-select')")
+      expect(html).toContain('function readSelectedSpeed()')
+      expect(html).toContain('speed = readSelectedSpeed()')
+      expect(html).toContain("speedSelectEl.addEventListener('change', () => {")
+      expect(html).not.toContain("document.getElementById('speed-select').addEventListener('change', event =>")
+    }
+  })
+
+  it('escapes raw html when marked is unavailable during markdown rendering', () => {
+    expect(renderMarkdownToHtml('Hello <script>alert(1)</script>')).toBe(
+      '<p>Hello &lt;script&gt;alert(1)&lt;/script&gt;</p>',
+    )
   })
 
   it('preserves the actual timestamp of the first parsed edit', () => {
@@ -350,6 +374,15 @@ describe('replay history start state', () => {
     )
   })
 
+  it('falls back to created_at when explicit replay origin metadata is missing', () => {
+    const createdAt = '2026-04-22T21:00:00.000Z'
+    expect(getReplayOriginWallMs({ created_at: createdAt })).toBe(Date.parse(createdAt))
+  })
+
+  it('formats unknown absolute replay time when the session lacks any origin timestamp', () => {
+    expect(formatAbsoluteReplayTime({}, 45_000)).toBe('Unknown time')
+  })
+
   it('parseHistory reconstructs string-based deletions correctly', () => {
     const history = parseHistory(
       {
@@ -543,3 +576,71 @@ describe('replay history start state', () => {
     expect(history).toEqual([{ t: 0, text: '' }])
   })
 })
+  it('safeJsonLines drops malformed json rows without dropping valid ones', () => {
+    expect(
+      safeJsonLines('{"type":"down","t":3}\nnot json\n\n{"type":"up","t":2}\n'),
+    ).toEqual([
+      { type: 'down', t: 3 },
+      { type: 'up', t: 2 },
+    ])
+  })
+
+  it('parseKeydowns keeps only down events and sorts them by time', () => {
+    expect(
+      parseKeydowns(
+        '{"type":"up","t":8}\n{"type":"down","t":30}\n{"type":"down","t":10}\n{"type":"move"}',
+      ),
+    ).toEqual([
+      { type: 'down', t: 10 },
+      { type: 'down', t: 30 },
+    ])
+  })
+
+  it('buildFocusSegments covers the whole replay with active and inactive ranges', () => {
+    const history = compressIdleGaps([
+      { t: 0, text: '' },
+      { t: 1000, text: 'a' },
+      { t: 120_000, text: 'ab' },
+      { t: 180_000, text: 'abc' },
+    ], 5000)
+    const total = getDurationFromHistory(history)
+    const compressedInactiveStart = compressedTimeForRawMs(history, 60_000)
+    const compressedActiveResume = compressedTimeForRawMs(history, 150_000)
+
+    expect(buildFocusSegments(
+      [
+        { t: 60_000, state: 'inactive' },
+        { t: 150_000, state: 'active' },
+      ],
+      history,
+      total,
+    )).toEqual([
+      { state: 'active', start: 0, end: compressedInactiveStart, rawStart: 0, rawEnd: 60_000 },
+      {
+        state: 'inactive',
+        start: compressedInactiveStart,
+        end: compressedActiveResume,
+        rawStart: 60_000,
+        rawEnd: 150_000,
+      },
+      {
+        state: 'active',
+        start: compressedActiveResume,
+        end: total,
+        rawStart: 150_000,
+        rawEnd: 180_000,
+      },
+    ])
+  })
+
+  it('buildFocusSegments defaults to one active segment when no focus events exist', () => {
+    const history = compressIdleGaps([
+      { t: 0, text: '' },
+      { t: 800, text: 'draft' },
+      { t: 1600, text: 'draft done' },
+    ], 5000)
+
+    expect(buildFocusSegments([], history, getDurationFromHistory(history))).toEqual([
+      { state: 'active', start: 0, end: 1600, rawStart: 0, rawEnd: 1600 },
+    ])
+  })

@@ -60,7 +60,53 @@
           </div>
           <button class="button" id="edit-assignment-button" type="button">Edit assignment</button>
         </div>
+        <section class="teacher-panel monitoring-overview" id="monitoring-overview">
+          <div class="monitoring-overview-grid">
+            <div class="overview-stat">
+              <div class="section-label">Students</div>
+              <div class="overview-value" id="overview-students">0</div>
+              <div class="selection-meta" id="overview-students-meta">No sessions</div>
+            </div>
+            <div class="overview-stat">
+              <div class="section-label">Needs attention</div>
+              <div class="overview-value overview-danger" id="overview-attention">0</div>
+              <div class="selection-meta" id="overview-attention-meta">No active alerts</div>
+            </div>
+            <div class="overview-stat">
+              <div class="section-label">Unfocused</div>
+              <div class="overview-value" id="overview-unfocused">0</div>
+              <div class="selection-meta" id="overview-unfocused-meta">Students who left the app</div>
+            </div>
+            <div class="overview-stat">
+              <div class="section-label">Offline / stale</div>
+              <div class="overview-value" id="overview-offline">0</div>
+              <div class="selection-meta" id="overview-offline-meta">Sessions not reporting recently</div>
+            </div>
+          </div>
+        </section>
+        <section class="teacher-panel monitoring-toolbar">
+          <div class="monitoring-filters" id="session-filter-bar">
+            <button class="button button-secondary small-button" type="button" data-filter="all">All students</button>
+            <button class="button button-secondary small-button" type="button" data-filter="attention">Needs attention</button>
+            <button class="button button-secondary small-button" type="button" data-filter="active">Active only</button>
+            <button class="button button-secondary small-button" type="button" data-filter="violations">Violations</button>
+            <button class="button button-secondary small-button" type="button" data-filter="offline">Offline / stale</button>
+          </div>
+          <label class="monitoring-search">
+            <span class="section-label">Student search</span>
+            <input id="session-search-input" type="search" placeholder="Filter by student name" />
+          </label>
+        </section>
         <section class="student-grid" id="session-grid"></section>
+        <section class="teacher-panel audit-panel" id="assignment-audit-panel">
+          <div class="stage-header">
+            <div>
+              <div class="section-label">Assignment timeline</div>
+              <h3>Recent teacher changes</h3>
+            </div>
+          </div>
+          <div id="assignment-audit-list" class="audit-list"></div>
+        </section>
       </section>
     </main>
   </div>
@@ -138,6 +184,10 @@
             <input name="window_end_date" type="date" />
           </label>
         </fieldset>
+        <div class="form-callout" id="assignment-schedule-summary">
+          <div class="section-label">Schedule summary</div>
+          <p class="muted" id="assignment-schedule-summary-text">Choose days and times to generate a summary.</p>
+        </div>
         <fieldset class="form-fieldset">
           <legend>Temporary access override</legend>
           <div class="selector-row">
@@ -158,6 +208,10 @@
           <label class="checkbox-label">
             <input type="checkbox" name="copy_paste_allowed" />
             <span>Allow copy and paste inside the student app</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="printing_allowed" />
+            <span>Allow printing from the student app</span>
           </label>
           <label class="checkbox-label">
             <input type="checkbox" name="require_lockdown" />
@@ -183,6 +237,11 @@
             <textarea name="browser_allowed_domains" rows="3" placeholder="example.com&#10;wikipedia.org"></textarea>
           </label>
         </fieldset>
+        <div class="form-callout" id="assignment-validation-panel">
+          <div class="section-label">Checks</div>
+          <ul id="assignment-validation-errors" class="validation-list"></ul>
+          <ul id="assignment-validation-warnings" class="validation-list validation-warnings"></ul>
+        </div>
         <div class="form-actions">
           <button class="button" id="assignment-form-submit" type="submit">Create assignment</button>
           <button class="button button-secondary" id="assignment-form-cancel" type="button" hidden>Cancel</button>

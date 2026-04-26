@@ -390,6 +390,35 @@ fn end_to_end_hid_rejected_input_does_not_change_document_or_history() {
 }
 
 #[test]
+fn end_to_end_hid_rejected_input_after_real_typing_keeps_document_and_history_stable() {
+    let mut harness = WorkflowHarness::new("", false);
+    harness.type_text("safe");
+    let history_before = harness.history.clone();
+
+    let response = harness.frame(vec![Event::Text("x".into())], false);
+
+    assert_eq!(response, EditorResponse::None);
+    assert_eq!(harness.editor.to_markdown(), "safe");
+    assert_eq!(harness.history, history_before);
+    assert_eq!(replay_text_from_history(&harness.history), "safe");
+}
+
+#[test]
+fn end_to_end_paste_is_blocked_without_mutating_document_or_history() {
+    let mut harness = WorkflowHarness::new("", false);
+
+    let paste_response = harness.frame(vec![Event::Paste("pasted text".into())], true);
+
+    assert_eq!(paste_response, EditorResponse::PasteBlocked);
+    assert_eq!(harness.editor.to_markdown(), "");
+    assert!(harness.history.is_empty());
+
+    harness.type_text("typed");
+    assert_eq!(harness.editor.to_markdown(), "typed");
+    assert_eq!(replay_text_from_history(&harness.history), "typed");
+}
+
+#[test]
 fn end_to_end_backspace_session_reconstructs_from_compact_history() {
     let temp_dir = TempDir::new().unwrap();
     let path = temp_dir.path().join("backspace.ht");
@@ -490,6 +519,122 @@ fn end_to_end_long_form_draft_survives_save_reopen_with_all_paragraphs_intact() 
 
     let reopened = WorkflowHarness::new(&loaded.payload.markdown, false);
     assert_eq!(reopened.editor.to_markdown(), expected);
+}
+
+#[test]
+fn end_to_end_markdown_rich_draft_roundtrips_through_save_reopen_and_replay() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("markdown-rich.ht");
+
+    let mut harness = WorkflowHarness::new("", false);
+    let mut expected = String::new();
+
+    let segments = [
+        "# Field notes from a real draft",
+        "\n\n",
+        "> The replay should preserve quoted context, not flatten it.",
+        "\n\n",
+        "- first checkpoint",
+        "\n",
+        "- second checkpoint",
+        "\n\n",
+        "Use `cargo test` before shipping the build.",
+        "\n\n",
+        "[Read the docs](https://handtyped.app) before the last review.",
+        "\n\n",
+        "The typo is subtlee",
+    ];
+
+    for segment in segments {
+        harness.type_text(segment);
+        expected.push_str(segment);
+    }
+
+    harness.frame(
+        vec![Event::Key {
+            key: Key::Backspace,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+            physical_key: None,
+        }],
+        true,
+    );
+    expected.pop();
+    harness.type_text(".");
+    expected.push('.');
+
+    assert_eq!(harness.editor.to_markdown(), expected);
+    assert!(expected.contains("> The replay should preserve quoted context"));
+    assert!(expected.contains("- first checkpoint"));
+    assert!(expected.contains("`cargo test`"));
+    assert!(expected.contains("[Read the docs](https://handtyped.app)"));
+
+    let undo_response = harness.press_key(Key::Z, Modifiers::MAC_CMD);
+    assert_eq!(undo_response, EditorResponse::Changed);
+    assert!(harness.editor.to_markdown().ends_with("subtle"));
+
+    let redo_response = harness.press_key(Key::Z, Modifiers::MAC_CMD | Modifiers::SHIFT);
+    assert_eq!(redo_response, EditorResponse::Changed);
+    assert_eq!(harness.editor.to_markdown(), expected);
+
+    let payload = harness.payload();
+    document::save_document(&path, payload.clone()).unwrap();
+    let loaded = document::load_document(&path).unwrap().unwrap();
+
+    assert_eq!(loaded.payload.markdown, expected);
+    assert_eq!(loaded.payload.doc_history, payload.doc_history);
+    assert!(loaded
+        .payload
+        .doc_history
+        .iter()
+        .all(|entry| entry.get("text").is_none()));
+    assert_eq!(
+        replay_text_from_history(&loaded.payload.doc_history),
+        loaded.payload.markdown
+    );
+
+    let mut reopened = WorkflowHarness::new(&loaded.payload.markdown, true);
+    reopened.history = loaded.payload.doc_history.clone();
+    reopened.last_text = loaded.payload.markdown.clone();
+    reopened.elapsed_ms = loaded
+        .payload
+        .doc_history
+        .last()
+        .and_then(|entry| entry.get("t"))
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0);
+    reopened.editor.set_undo_state(
+        loaded.payload.undo_changes.clone(),
+        loaded.payload.undo_index,
+    );
+
+    let open_line = reopened.frame(vec![Event::Text("o".into())], true);
+    assert_eq!(open_line, EditorResponse::Changed);
+    reopened.type_text("Final note: markdown structure survived the full workflow.");
+    reopened.frame(
+        vec![Event::Key {
+            key: Key::Escape,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+            physical_key: None,
+        }],
+        true,
+    );
+
+    let final_payload = reopened.payload();
+    document::save_document(&path, final_payload.clone()).unwrap();
+    let final_loaded = document::load_document(&path).unwrap().unwrap();
+
+    assert!(final_loaded
+        .payload
+        .markdown
+        .contains("Final note: markdown structure survived the full workflow."));
+    assert_eq!(
+        replay_text_from_history(&final_loaded.payload.doc_history),
+        final_loaded.payload.markdown
+    );
 }
 
 #[test]

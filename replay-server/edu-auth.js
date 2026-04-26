@@ -1,4 +1,5 @@
 import { buildTeacherAuthSession, buildTeacherSessionRecord, normalizeTeacherEmail } from './edu-schema.js'
+import { verifyTeacherPassword } from './edu-password.js'
 
 export const EDU_SESSION_COOKIE = 'edu_teacher_session'
 
@@ -26,20 +27,58 @@ export function clearTeacherSessionCookie() {
   return `${EDU_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
 }
 
-export async function authenticateTeacher(store, { email, accessCode }) {
+export async function authenticateTeacher(store, { email, accessCode, password }) {
   const teacher = await store.getTeacherByEmail(normalizeTeacherEmail(email))
-  if (!teacher || teacher.access_code !== String(accessCode || '')) {
+  if (!teacher) {
     return null
   }
+
+  if (typeof password === 'string' && password.length > 0) {
+    return verifyTeacherPassword(teacher, password) ? teacher : null
+  }
+
+  if (teacher.access_code !== String(accessCode || '')) {
+    return null
+  }
+
   return teacher
 }
 
-export async function createTeacherSession(store, teacher) {
+export async function authenticateTeacherWithGoogle(store, profile) {
+  const normalizedEmail = normalizeTeacherEmail(profile?.email)
+  const googleSubject = String(profile?.sub || '')
+  if (!normalizedEmail || !googleSubject) {
+    return null
+  }
+
+  const teacher = await store.getTeacherByEmail(normalizedEmail)
+  if (!teacher) {
+    return null
+  }
+
+  if (teacher.google_subject && teacher.google_subject !== googleSubject) {
+    return null
+  }
+
+  if (!teacher.google_subject) {
+    const updatedTeacher = {
+      ...teacher,
+      google_subject: googleSubject,
+      updated_at: new Date().toISOString(),
+    }
+    await store.putTeacher(updatedTeacher)
+    return updatedTeacher
+  }
+
+  return teacher
+}
+
+export async function createTeacherSession(store, teacher, provider = 'password') {
   const record = buildTeacherSessionRecord({
     teacher_id: teacher.id,
     teacher_name: teacher.name,
     teacher_email: teacher.email,
-    provider: 'access-code',
+    provider,
   })
   await store.putTeacherSession(record)
   return record

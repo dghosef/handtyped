@@ -58,8 +58,9 @@ async function teacherLogin() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      provider: 'password',
       email: 'teacher@edu.handtyped.app',
-      access_code: 'handtyped-edu',
+      password: 'handtyped-edu',
     }),
   })
   return {
@@ -207,6 +208,28 @@ beforeAll(async () => {
   const { createApp } = await import('./server-lib.js')
   const app = createApp(sessionsDir, {
     trustedSignerKeys: [publicKeyHex(trustedSignerKeyPair)],
+    googleClientId: 'test-google-client-id',
+    googleTokenVerifier: async (credential) => {
+      if (credential !== 'valid-google-credential') {
+        if (credential !== 'valid-google-credential-2') {
+          throw new Error('invalid google credential')
+        }
+        return {
+          sub: 'google-sub-2',
+          email: 'teacher@edu.handtyped.app',
+          email_verified: true,
+          aud: 'test-google-client-id',
+          name: 'Joseph Tan',
+        }
+      }
+      return {
+        sub: 'google-sub-1',
+        email: 'teacher@edu.handtyped.app',
+        email_verified: true,
+        aud: 'test-google-client-id',
+        name: 'Joseph Tan',
+      }
+    },
   })
   await new Promise((resolve) => {
     server = app.listen(port, resolve)
@@ -234,6 +257,81 @@ describe('attestation compatibility', () => {
 
     expect(res.status).toBe(200)
     expect(body.url).toContain(`/${sessionId}`)
+  })
+})
+
+describe('teacher auth', () => {
+  it('publishes Google auth config for the teacher login page', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/config`)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toMatchObject({
+      auth: {
+        password_enabled: true,
+        google_enabled: true,
+        google_client_id: 'test-google-client-id',
+      },
+    })
+  })
+
+  it('signs in a teacher with email and password', async () => {
+    const result = await teacherLogin()
+
+    expect(result.status).toBe(200)
+    expect(result.cookie).toContain('edu_teacher_session=')
+    expect(result.body).toMatchObject({
+      authenticated: true,
+      teacher_email: 'teacher@edu.handtyped.app',
+      provider: 'password',
+    })
+  })
+
+  it('signs in a teacher with Google', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'google',
+        credential: 'valid-google-credential',
+      }),
+    })
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('set-cookie') || '').toContain('edu_teacher_session=')
+    expect(body).toMatchObject({
+      authenticated: true,
+      teacher_email: 'teacher@edu.handtyped.app',
+      provider: 'google',
+    })
+  })
+
+  it('rejects a different Google subject for the same teacher email once linked', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'google',
+        credential: 'valid-google-credential-2',
+      }),
+    })
+
+    expect(res.status).toBe(401)
+    expect(await res.json()).toMatchObject({
+      authenticated: false,
+      error: 'Invalid teacher login',
+    })
+  })
+
+  it('serves the teacher login and app shells at production-style paths', async () => {
+    const loginRes = await fetch(`${baseUrl}/login`)
+    const appRes = await fetch(`${baseUrl}/app`)
+
+    expect(loginRes.status).toBe(200)
+    expect(appRes.status).toBe(200)
+    expect(await loginRes.text()).toContain('Sign in to Handtyped EDU')
+    expect(await appRes.text()).toContain('Handtyped EDU Teacher App')
   })
 })
 
@@ -298,6 +396,7 @@ describe('trusted signer file bootstrap', () => {
 
 describe('edu teacher and student flow', () => {
   it('supports classroom creation, student config join, and live replay publishing', async () => {
+    const joinCode = `APL${shortId(5)}`
     const login = await teacherLogin()
     expect(login.status).toBe(200)
     expect(login.body).toMatchObject({
@@ -311,14 +410,14 @@ describe('edu teacher and student flow', () => {
       {
         name: 'AP Literature',
         teacher_name: 'Ms. Keating',
-        join_code: 'APLIT1',
+        join_code: joinCode,
       },
       { Cookie: login.cookie },
     )
     expect(createClassroom.status).toBe(201)
     expect(createClassroom.body).toMatchObject({
       name: 'AP Literature',
-      join_code: 'APLIT1',
+      join_code: joinCode.toUpperCase(),
     })
 
     const createAssignment = await request(
@@ -341,12 +440,12 @@ describe('edu teacher and student flow', () => {
 
     const studentConfig = await request(
       'GET',
-      '/api/edu/student/config?join_code=APLIT1',
+      `/api/edu/student/config?join_code=${joinCode}`,
       undefined,
     )
     expect(studentConfig.status).toBe(200)
     expect(studentConfig.body).toMatchObject({
-      classroom: { join_code: 'APLIT1', name: 'AP Literature' },
+      classroom: { join_code: joinCode.toUpperCase(), name: 'AP Literature' },
       assignments: [
         {
           title: 'Hamlet timed write',
@@ -416,6 +515,152 @@ describe('edu teacher and student flow', () => {
       id: replayId,
       student_name: 'Ada',
       assignment_title: 'Hamlet timed write',
+    })
+  })
+
+  it('reflects assignment create, update, and delete changes in student config', async () => {
+    const joinCode = `REA${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const createClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Realtime Literature',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(createClassroom.status).toBe(201)
+
+    const createAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Draft one',
+        course: 'Realtime Literature',
+        classroom_id: createClassroom.body.id,
+        classroom_name: createClassroom.body.name,
+        prompt: 'Start with a quick draft.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(createAssignment.status).toBe(201)
+
+    const initialConfig = await request('GET', `/api/edu/student/config?join_code=${joinCode}`)
+    expect(initialConfig.status).toBe(200)
+    expect(initialConfig.body).toMatchObject({
+      classroom: { join_code: joinCode.toUpperCase(), name: 'Realtime Literature' },
+      assignments: [
+        {
+          id: createAssignment.body.id,
+          title: 'Draft one',
+          prompt: 'Start with a quick draft.',
+        },
+      ],
+    })
+
+    const updatedWindows = [
+      {
+        label: 'Updated window',
+        days: {
+          monday: true,
+          tuesday: false,
+          wednesday: true,
+          thursday: false,
+          friday: true,
+          saturday: false,
+          sunday: false,
+        },
+        end_date: '2026-05-30',
+        start_hour: 9,
+        start_minute: 15,
+        end_hour: 10,
+        end_minute: 45,
+      },
+    ]
+
+    const updateAssignment = await request(
+      'PUT',
+      `/api/edu/assignments/${createAssignment.body.id}`,
+      {
+        title: 'Draft two',
+        prompt: 'Revised prompt for the same class.',
+        windows: updatedWindows,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(updateAssignment.status).toBe(200)
+    expect(updateAssignment.body).toMatchObject({
+      id: createAssignment.body.id,
+      title: 'Draft two',
+      prompt: 'Revised prompt for the same class.',
+      windows: updatedWindows,
+    })
+
+    const updatedConfig = await request('GET', `/api/edu/student/config?join_code=${joinCode}`)
+    expect(updatedConfig.status).toBe(200)
+    expect(updatedConfig.body).toMatchObject({
+      classroom: { join_code: joinCode.toUpperCase(), name: 'Realtime Literature' },
+      assignments: [
+        {
+          id: createAssignment.body.id,
+          title: 'Draft two',
+          prompt: 'Revised prompt for the same class.',
+          windows: updatedWindows,
+        },
+      ],
+    })
+
+    const deleteClassroom = await request(
+      'DELETE',
+      `/api/edu/classrooms/${createClassroom.body.id}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(deleteClassroom.status).toBe(200)
+
+    const deletedConfig = await request('GET', `/api/edu/student/config?join_code=${joinCode}`)
+    expect(deletedConfig.status).toBe(200)
+    expect(deletedConfig.body).toMatchObject({
+      classroom: null,
+      assignments: [],
+    })
+  })
+
+  it('rejects duplicate classroom join codes case-insensitively', async () => {
+    const joinCode = `ENG${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const first = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'First Period',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(first.status).toBe(201)
+
+    const duplicate = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Second Period',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode.toLowerCase(),
+      },
+      { Cookie: login.cookie },
+    )
+    expect(duplicate.status).toBe(409)
+    expect(duplicate.body).toMatchObject({
+      error: 'Join code already in use',
+      join_code: joinCode.toUpperCase(),
     })
   })
 })
@@ -508,12 +753,19 @@ describe('POST /api/sessions', () => {
     expect(body.error).toContain('Untrusted Handtyped signer public key')
   })
 
-  it('rejects non-SPI keyboards even with a valid signature', async () => {
+  it('accepts FIFO keyboards with a valid signature', async () => {
+    const envelope = signedEnvelope({ keyboard_transport: 'FIFO' })
+    const { status } = await request('POST', '/api/sessions', envelope)
+
+    expect([200, 201]).toContain(status)
+  })
+
+  it('rejects non-built-in keyboards even with a valid signature', async () => {
     const envelope = signedEnvelope({ keyboard_transport: 'USB' })
     const { status, body } = await request('POST', '/api/sessions', envelope)
 
     expect(status).toBe(400)
-    expect(body.error).toContain('SPI keyboard transport')
+    expect(body.error).toContain('trusted built-in keyboard transport')
   })
 
   it('rejects runtime tampering indicators even with a valid signature', async () => {

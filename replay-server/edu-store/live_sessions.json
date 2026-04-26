@@ -49,7 +49,7 @@
   },
   {
     "id": "student:hamlet",
-    "assignment_id": "assignment_f778d55efe074f71",
+    "assignment_id": "assignment_482d7fe6eec94ee7",
     "assignment_title": "Hamlet timed write",
     "course": "AP Literature",
     "classroom": "AP Literature",
@@ -71,6 +71,6 @@
     "focused": true,
     "hid_active": true,
     "replay_session_id": "edu-replay-integration",
-    "updated_at": "2026-04-26T01:57:32.671Z"
+    "updated_at": "2026-04-26T12:24:42.785Z"
   }
 ]

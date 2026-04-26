@@ -1,3 +1,5 @@
+import { buildTeacherPasswordFields } from './edu-password.js'
+
 function randomId(prefix) {
   if (globalThis.crypto?.randomUUID) {
     return `${prefix}_${globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
@@ -32,11 +34,15 @@ export function buildClassroom(input = {}) {
 
 export function buildTeacher(input = {}) {
   const now = nowIso()
+  const passwordFields = buildTeacherPasswordFields(input)
   return {
     id: input.id || randomId('teacher'),
     name: String(input.name || 'Teacher'),
     email: normalizeTeacherEmail(input.email || 'teacher@edu.handtyped.app'),
     access_code: String(input.access_code || 'handtyped-edu'),
+    password_hash: passwordFields.password_hash,
+    password_salt: passwordFields.password_salt,
+    google_subject: input.google_subject ? String(input.google_subject) : null,
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,
   }
@@ -78,6 +84,7 @@ export function buildAssignment(input = {}) {
       : [buildAssignmentWindow()],
     policy: {
       copy_paste_allowed: Boolean(input.policy?.copy_paste_allowed),
+      printing_allowed: Boolean(input.policy?.printing_allowed),
       require_lockdown: input.policy?.require_lockdown ?? false,
       require_fullscreen: input.policy?.require_fullscreen ?? false,
     },
@@ -105,6 +112,8 @@ export function buildLiveSession(input = {}) {
     student_name: String(input.student_name || 'Student'),
     current_text: String(input.current_text || ''),
     document_history: Array.isArray(input.document_history) ? input.document_history : [],
+    focus_events: Array.isArray(input.focus_events) ? input.focus_events : [],
+    keystroke_log: String(input.keystroke_log || ''),
     current_url: input.current_url ?? null,
     current_url_title: input.current_url_title ?? null,
     url_history: Array.isArray(input.url_history) ? input.url_history : [],
@@ -116,6 +125,25 @@ export function buildLiveSession(input = {}) {
     hid_active: input.hid_active ?? true,
     replay_session_id: input.replay_session_id ?? null,
     updated_at: String(input.updated_at || nowIso()),
+  }
+}
+
+export function buildAssignmentAudit(input = {}) {
+  const now = nowIso()
+  return {
+    id: input.id || randomId('assignment_audit'),
+    assignment_id: String(input.assignment_id || ''),
+    classroom_id: input.classroom_id ?? null,
+    assignment_title: String(input.assignment_title || ''),
+    action: String(input.action || 'updated'),
+    actor_id: input.actor_id ?? null,
+    actor_name: input.actor_name ?? null,
+    actor_email: input.actor_email ?? null,
+    summary: String(input.summary || ''),
+    changes: Array.isArray(input.changes) ? input.changes : [],
+    snapshot: input.snapshot || null,
+    created_at: String(input.created_at || now),
+    updated_at: String(input.updated_at || now),
   }
 }
 

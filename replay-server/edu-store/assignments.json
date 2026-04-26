@@ -536,5 +536,510 @@
     "temporary_access_until": null,
     "created_at": "2026-04-26T01:57:32.661Z",
     "updated_at": "2026-04-26T01:57:32.661Z"
+  },
+  {
+    "id": "assignment_99f26c719c674492",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_8244d22d390f4348",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T02:22:02.427Z",
+    "updated_at": "2026-04-26T02:22:02.427Z"
+  },
+  {
+    "id": "assignment_29ea031e6d394d10",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_e310a45e85f14fba",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T02:40:28.192Z",
+    "updated_at": "2026-04-26T02:40:28.192Z"
+  },
+  {
+    "id": "assignment_9c171388df324056",
+    "title": "Draft one",
+    "course": "Realtime Literature",
+    "classroom_id": "classroom_dc94bd4708b24fc5",
+    "classroom_name": "Realtime Literature",
+    "prompt": "Start with a quick draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T02:40:28.209Z",
+    "updated_at": "2026-04-26T02:40:28.209Z"
+  },
+  {
+    "id": "assignment_7514902739774383",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_d3541903487e421c",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T02:40:46.834Z",
+    "updated_at": "2026-04-26T02:40:46.834Z"
+  },
+  {
+    "id": "assignment_e8d50d6b8d2e4f56",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_b1057dd3c8bd4f83",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T03:19:13.850Z",
+    "updated_at": "2026-04-26T03:19:13.850Z"
+  },
+  {
+    "id": "assignment_aede3392e4ec4a22",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_58dcc376c9fa42a7",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T03:22:51.636Z",
+    "updated_at": "2026-04-26T03:22:51.637Z"
+  },
+  {
+    "id": "assignment_6f64cf77ee37456d",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_94d63dc6cce74cb1",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T03:23:04.550Z",
+    "updated_at": "2026-04-26T03:23:04.550Z"
+  },
+  {
+    "id": "assignment_32490408b1e14eb4",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_a03131336fc64a8b",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T04:19:01.153Z",
+    "updated_at": "2026-04-26T04:19:01.153Z"
+  },
+  {
+    "id": "assignment_e7f4ac02665e413b",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_af78713b33314080",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T04:21:42.557Z",
+    "updated_at": "2026-04-26T04:21:42.557Z"
+  },
+  {
+    "id": "assignment_1c4ea8753f1a452b",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_38eb91590cb84f52",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T11:58:55.049Z",
+    "updated_at": "2026-04-26T11:58:55.049Z"
+  },
+  {
+    "id": "assignment_482d7fe6eec94ee7",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_ab4711ce012c4311",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-26T12:24:42.776Z",
+    "updated_at": "2026-04-26T12:24:42.776Z"
   }
 ]

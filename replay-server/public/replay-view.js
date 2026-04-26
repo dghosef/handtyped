@@ -376,6 +376,106 @@ export function buildSyntheticHistory(finalText, keyEvents) {
   return makeStrictlyIncreasingTimeline(dedupeHistory(snapshots))
 }
 
+export function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderPlainTextHtml(markdown) {
+  const text = String(markdown || '')
+  if (!text) return ''
+
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+}
+
+function getSafeMarkedRenderer() {
+  const markedApi = globalThis?.marked
+  if (!markedApi?.parse || typeof markedApi.Renderer !== 'function') {
+    return null
+  }
+
+  const renderer = new markedApi.Renderer()
+  renderer.html = (token) => {
+    if (typeof token === 'string') {
+      return escapeHtml(token)
+    }
+
+    return escapeHtml(token?.text || token?.raw || '')
+  }
+
+  return { markedApi, renderer }
+}
+
+export function renderMarkdownToHtml(markdown) {
+  const source = String(markdown || '')
+  if (!source) return ''
+
+  const markedState = getSafeMarkedRenderer()
+  if (!markedState) {
+    return renderPlainTextHtml(source)
+  }
+
+  try {
+    return markedState.markedApi.parse(source, {
+      async: false,
+      gfm: true,
+      breaks: false,
+      headerIds: false,
+      mangle: false,
+      renderer: markedState.renderer,
+    })
+  } catch {
+    return renderPlainTextHtml(source)
+  }
+}
+
+function findCursorHost(root) {
+  let node = root?.lastElementChild || null
+  const descendTags = new Set([
+    'BLOCKQUOTE',
+    'LI',
+    'OL',
+    'PRE',
+    'TABLE',
+    'TBODY',
+    'TD',
+    'TH',
+    'THEAD',
+    'TR',
+    'UL',
+  ])
+
+  while (node && descendTags.has(node.tagName) && node.lastElementChild) {
+    node = node.lastElementChild
+  }
+
+  return node || root
+}
+
+export function renderMarkdownInto(container, markdown, options = {}) {
+  if (!container) return
+
+  const { cursorEl = null, showCursor = false } = options
+  container.innerHTML = renderMarkdownToHtml(markdown)
+
+  if (!cursorEl) return
+
+  if (!showCursor) {
+    cursorEl.remove()
+    return
+  }
+
+  const host = findCursorHost(container)
+  host.appendChild(cursorEl)
+}
+
 export function documentWithAttribution(text, url) {
   const trimmed = String(text || '').replace(/[ \t]+$/, '')
   const attributionUrl = String(url || '').trim()

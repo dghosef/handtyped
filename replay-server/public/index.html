@@ -442,6 +442,7 @@ background: var(--blue);
       parseHistory,
       parseFocusEvents,
       parseKeydowns,
+      renderMarkdownInto,
     } from './replay-view.js'
 
     const replayEl = document.getElementById('mini-replay')
@@ -481,7 +482,7 @@ background: var(--blue);
       const scrollTop = documentEl.scrollTop
       const scrollLeft = documentEl.scrollLeft
       const rawText = index >= 0 ? history[index]?.text || '' : ''
-      documentEl.innerHTML = marked.parse(rawText)
+      renderMarkdownInto(documentEl, rawText)
       documentEl.scrollTop = scrollTop
       documentEl.scrollLeft = scrollLeft
       fillEl.style.width = `${(elapsedMs / total) * 100}%`

@@ -16,15 +16,24 @@ import {
   buildEduReplay,
   nowIso,
 } from './edu-schema.js'
-import { buildEduDashboard, buildStudentConfig, createNodeEduStore, ensureEduSeedData } from './edu-store.js'
+import {
+  buildAssignmentAuditRecord,
+  buildEduDashboard,
+  buildEduDashboardDelta,
+  buildStudentConfig,
+  createNodeEduStore,
+  ensureEduSeedData,
+} from './edu-store.js'
 import {
   authenticateTeacher,
+  authenticateTeacherWithGoogle,
   clearTeacherSessionCookie,
   createTeacherSession,
   destroyTeacherSession,
   getTeacherSession,
   teacherSessionCookie,
 } from './edu-auth.js'
+import { verifyGoogleIdToken } from './edu-google-auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PUBLIC_ORIGIN = process.env.REPLAY_SERVER_PUBLIC_ORIGIN || 'https://replay.handtyped.app'
@@ -94,6 +103,34 @@ function serveEduReplayPage(_req, res) {
   res.sendFile(join(__dirname, 'public', 'edu', 'replay.html'))
 }
 
+function eduGoogleConfig(config = {}) {
+  const clientId = String(config.googleClientId || process.env.EDU_GOOGLE_CLIENT_ID || '')
+  const hostedDomain = String(
+    config.googleHostedDomain || process.env.EDU_GOOGLE_HOSTED_DOMAIN || '',
+  ).trim()
+  return {
+    enabled: Boolean(clientId),
+    client_id: clientId,
+    hosted_domain: hostedDomain,
+  }
+}
+
+async function findJoinCodeConflict(store, joinCode, excludeClassroomId = null) {
+  const normalizedJoinCode = String(joinCode || '').trim().toUpperCase()
+  if (!normalizedJoinCode) {
+    return null
+  }
+
+  const classrooms = await store.listClassrooms()
+  return (
+    classrooms.find(
+      (classroom) =>
+        classroom.id !== excludeClassroomId &&
+        String(classroom.join_code || '').trim().toUpperCase() === normalizedJoinCode,
+    ) || null
+  )
+}
+
 export function createApp(sessionsDir, config = {}) {
   if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true })
   const eduStoreDir = config.eduStoreDir || join(sessionsDir, '..', 'edu-store')
@@ -118,7 +155,15 @@ export function createApp(sessionsDir, config = {}) {
     res.sendFile(join(__dirname, 'public', 'edu', 'app.html'))
   })
 
+  app.get('/app', (_req, res) => {
+    res.sendFile(join(__dirname, 'public', 'edu', 'app.html'))
+  })
+
   app.get('/edu/login', (_req, res) => {
+    res.sendFile(join(__dirname, 'public', 'edu', 'login.html'))
+  })
+
+  app.get('/login', (_req, res) => {
     res.sendFile(join(__dirname, 'public', 'edu', 'login.html'))
   })
 
@@ -135,12 +180,28 @@ export function createApp(sessionsDir, config = {}) {
     res.json(await buildEduDashboard(eduStore))
   })
 
+  app.get('/api/edu/dashboard/updates', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    res.json(await buildEduDashboardDelta(eduStore, { since: req.query.since }))
+  })
+
   app.get('/api/edu/config', (_req, res) => {
+    const google = eduGoogleConfig(config)
     res.json({
       host: 'edu.handtyped.app',
       teacher_surface: 'web',
       student_surface: 'native',
       replay_origin: PUBLIC_ORIGIN,
+      auth: {
+        password_enabled: true,
+        google_enabled: google.enabled,
+        google_client_id: google.client_id,
+        google_hosted_domain: google.hosted_domain,
+      },
     })
   })
 
@@ -150,14 +211,36 @@ export function createApp(sessionsDir, config = {}) {
 
   app.post('/api/edu/auth/login', async (req, res) => {
     await ensureEduSeedData(eduStore)
-    const teacher = await authenticateTeacher(eduStore, {
-      email: req.body?.email,
-      accessCode: req.body?.access_code,
-    })
-    if (!teacher) {
-      return res.status(401).json({ error: 'Invalid teacher email or access code', authenticated: false })
+    const provider = String(req.body?.provider || '').trim() || 'password'
+    let teacher = null
+    let providerName = provider
+
+    if (provider === 'google') {
+      const google = eduGoogleConfig(config)
+      const googleProfile = await verifyGoogleIdToken({
+        credential: req.body?.credential,
+        clientId: google.client_id,
+        hostedDomain: google.hosted_domain,
+        mockVerifier: config.googleTokenVerifier || null,
+      }).catch(() => null)
+
+      teacher = googleProfile
+        ? await authenticateTeacherWithGoogle(eduStore, googleProfile)
+        : null
+      providerName = 'google'
+    } else {
+      teacher = await authenticateTeacher(eduStore, {
+        email: req.body?.email,
+        password: req.body?.password,
+        accessCode: req.body?.access_code,
+      })
+      providerName = req.body?.password ? 'password' : 'access-code'
     }
-    const sessionRecord = await createTeacherSession(eduStore, teacher)
+
+    if (!teacher) {
+      return res.status(401).json({ error: 'Invalid teacher login', authenticated: false })
+    }
+    const sessionRecord = await createTeacherSession(eduStore, teacher, providerName)
     res.setHeader('Set-Cookie', teacherSessionCookie(sessionRecord.id))
     res.json(
       await getTeacherSession(
@@ -189,6 +272,10 @@ export function createApp(sessionsDir, config = {}) {
     }
     await ensureEduSeedData(eduStore)
     const classroom = buildClassroom(req.body || {})
+    const conflict = await findJoinCodeConflict(eduStore, classroom.join_code)
+    if (conflict) {
+      return res.status(409).json({ error: 'Join code already in use', join_code: classroom.join_code })
+    }
     classroom.updated_at = nowIso()
     await eduStore.putClassroom(classroom)
     res.status(201).json(classroom)
@@ -214,6 +301,10 @@ export function createApp(sessionsDir, config = {}) {
     const existing = await eduStore.getClassroom(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
     const classroom = buildClassroom({ ...existing, ...(req.body || {}), id: req.params.id, updated_at: nowIso() })
+    const conflict = await findJoinCodeConflict(eduStore, classroom.join_code, classroom.id)
+    if (conflict) {
+      return res.status(409).json({ error: 'Join code already in use', join_code: classroom.join_code })
+    }
     await eduStore.putClassroom(classroom)
     res.json(classroom)
   })
@@ -252,7 +343,24 @@ export function createApp(sessionsDir, config = {}) {
     const assignment = buildAssignment(req.body || {})
     assignment.updated_at = nowIso()
     await eduStore.putAssignment(assignment)
+    await eduStore.putAssignmentAudit(
+      buildAssignmentAuditRecord({ action: 'created', assignment, actor: session }),
+    )
     res.status(201).json(assignment)
+  })
+
+  app.get('/api/edu/assignments/:id/audit', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const assignment = await eduStore.getAssignment(req.params.id)
+    if (!assignment) return res.status(404).json({ error: 'Not found' })
+    const audits = (await eduStore.listAssignmentAudits()).filter(
+      (item) => item.assignment_id === req.params.id,
+    )
+    res.json(audits)
   })
 
   app.get('/api/edu/assignments/:id', async (req, res) => {
@@ -276,6 +384,14 @@ export function createApp(sessionsDir, config = {}) {
     if (!existing) return res.status(404).json({ error: 'Not found' })
     const assignment = buildAssignment({ ...existing, ...(req.body || {}), id: req.params.id, updated_at: nowIso() })
     await eduStore.putAssignment(assignment)
+    await eduStore.putAssignmentAudit(
+      buildAssignmentAuditRecord({
+        action: 'updated',
+        assignment,
+        previousAssignment: existing,
+        actor: session,
+      }),
+    )
     res.json(assignment)
   })
 

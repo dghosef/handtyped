@@ -10,6 +10,8 @@ server/humanproof.db
 .worktrees/
 target/
 .DS_Store
+*.swp
+*~
 .qwen/
 test-results/
 replay-server/node_modules/

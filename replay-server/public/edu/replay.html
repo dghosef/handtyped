@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Handtyped Replay</title>
-  <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
+  <title>Handtyped EDU Replay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -21,12 +21,10 @@
       --timeline-jump: #d39a21;
       --timeline-jump-dark: #8b6400;
       --line: #dddddd;
-      --panel: #ffffff;
-      --panel-strong: #f3f3f3;
     }
 
     body {
-      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+      font-family: 'Open Sans', Arial, sans-serif;
       color: var(--ink);
       background: var(--page);
       line-height: 1.45;
@@ -62,7 +60,7 @@
       line-height: 1.15;
       font-weight: 650;
       letter-spacing: -0.02em;
-      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+      font-family: 'Open Sans', Arial, sans-serif;
       margin: 0 0 14px;
     }
 
@@ -81,8 +79,7 @@
       align-items: center;
     }
 
-    .share-btn,
-    .share-link {
+    .share-btn {
       appearance: none;
       border: 1px solid var(--line);
       background: var(--paper);
@@ -98,29 +95,20 @@
       transition: background .15s ease, color .15s ease, border-color .15s ease;
     }
 
-    .share-btn.primary,
-    .share-link.primary {
+    .share-btn.primary {
       background: var(--accent);
       color: #fff;
       border-color: var(--accent);
     }
 
-    .share-btn:hover,
-    .share-link:hover {
+    .share-btn:hover {
       background: #f7f7f7;
       border-color: #cfcfcf;
     }
 
-    .share-btn.primary:hover,
-    .share-link.primary:hover {
+    .share-btn.primary:hover {
       background: var(--accent-dark);
       border-color: var(--accent-dark);
-    }
-
-    .share-btn:disabled {
-      opacity: 0.55;
-      cursor: default;
-      transform: none;
     }
 
     p {
@@ -166,8 +154,7 @@
       color: var(--muted);
     }
 
-    .play-btn,
-    .speed-select {
+    .play-btn, .speed-select {
       appearance: none;
       border: 1px solid var(--line);
       background: var(--paper);
@@ -189,14 +176,6 @@
       position: relative;
     }
 
-    .progress-readout {
-      margin-top: 8px;
-      font-size: 12px;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
     .progress-track {
       height: 10px;
       background: #e5e5e5;
@@ -211,43 +190,12 @@
       background: var(--timeline-inactive-bg);
     }
 
-    .progress-track.inactive::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        135deg,
-        rgba(185, 77, 70, 0.16) 0,
-        rgba(185, 77, 70, 0.16) 7px,
-        rgba(255, 255, 255, 0.06) 7px,
-        rgba(255, 255, 255, 0.06) 14px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
-
     .progress-track.inactive .progress-fill {
       background: var(--timeline-inactive);
     }
 
     .progress-track.inactive .progress-thumb {
       background: var(--timeline-inactive-dark);
-    }
-
-    .progress-inactive-spans {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .progress-inactive-span {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      background: linear-gradient(180deg, rgba(185, 77, 70, 0.52), rgba(146, 54, 49, 0.72));
-      border-radius: 0;
-      box-shadow: inset 0 0 0 1px rgba(255, 221, 208, 0.12);
     }
 
     .timeline-key {
@@ -273,16 +221,10 @@
       height: 8px;
       border-radius: 999px;
       border: 1px solid rgba(0, 0, 0, 0.08);
-      flex: 0 0 auto;
     }
 
     .timeline-key-swatch.inactive {
       background: linear-gradient(180deg, rgba(185, 77, 70, 0.55), rgba(146, 54, 49, 0.72));
-    }
-
-    .timeline-key-swatch.jump {
-      background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
-      border-color: var(--timeline-jump-dark);
     }
 
     .progress-fill {
@@ -321,30 +263,20 @@
       background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
       border: 1px solid var(--timeline-jump-dark);
       border-radius: 999px;
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.72),
-        0 0 8px rgba(211, 154, 33, 0.2);
     }
 
-    .progress-tooltip {
+    .progress-inactive-spans {
       position: absolute;
-      bottom: 100%;
-      left: 0;
-      background: #333;
-      color: #fff;
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 4px;
+      inset: 0;
       pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
-      white-space: nowrap;
-      margin-bottom: 6px;
-      transform: translateX(-50%);
+      z-index: 1;
     }
 
-    .progress-tooltip.visible {
-      opacity: 1;
+    .progress-inactive-span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, rgba(185, 77, 70, 0.52), rgba(146, 54, 49, 0.72));
     }
 
     .time-display {
@@ -376,10 +308,9 @@
       font-size: 17px;
       line-height: 1.72;
       color: #222222;
-      font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+      font-family: 'Open Sans', Arial, sans-serif;
       white-space: pre-wrap;
       word-break: break-word;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
 
     .cursor-blink {
@@ -397,35 +328,21 @@
       50% { opacity: 0; }
     }
 
-    .muted {
-      color: var(--muted);
-    }
-
-    .mono {
-      font-family: "Menlo", "SFMono-Regular", monospace;
-      font-size: 12px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-
-    .section-label {
-      margin: 0 0 10px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-family: inherit;
-    }
-
-    .keyboard-note {
-      margin-top: 28px;
-    }
-
-    .keyboard-note p {
-      margin: 0;
+    .metadata-row {
+      display: flex;
+      gap: 16px;
+      margin: 12px 0;
       font-size: 14px;
       color: var(--muted);
+    }
+
+    .metadata-item {
+      display: flex;
+      gap: 6px;
+    }
+
+    .metadata-label {
+      font-weight: 600;
     }
 
     body.embed {
@@ -453,25 +370,20 @@
     body.embed .share-row,
     body.embed .keyboard-note,
     body.embed .replay-status,
-    body.embed .section-label {
+    body.embed .replay-meta {
       display: none;
-    }
-
-    body.embed .page {
-      margin: 0;
     }
 
     body.embed .replay-shell {
       margin: 0;
-      display: flex;
-      flex-direction: column;
       flex: 1;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     body.embed .replay-controls {
       padding: 0 0 8px;
-      flex-wrap: nowrap;
     }
 
     body.embed .replay-stage {
@@ -483,40 +395,16 @@
     body.embed .replay-stage-scroll {
       max-height: none;
       height: 100%;
-      overflow: hidden;
-      border-radius: 0;
-      overscroll-behavior: contain;
     }
 
     body.embed .doc-page {
       min-height: 100%;
-      box-shadow: none;
-      border: 0;
-      padding: 0;
-      font-size: 16px;
-      line-height: 1.6;
       height: 100%;
     }
 
-    body.embed .replay-status {
-      display: none;
-    }
-
     @media (max-width: 840px) {
-      .page {
-        padding-inline: 14px;
-      }
-
-      h1 {
-        font-size: 32px;
-      }
-
-      .intro,
-      p,
-      .keyboard-note p {
-        font-size: 16px;
-      }
-
+      .page { padding-inline: 14px; }
+      h1 { font-size: 32px; }
       .doc-page {
         min-height: 440px;
         padding: 24px 20px;
@@ -532,30 +420,50 @@
         <a href="https://handtyped.app">
           <img class="brand-mark" src="/handtyped-icon.png" alt="Handtyped" />
         </a>
-        <h1 id="headline">Writing Session Analysis</h1>
+        <h1 id="headline">Writing Session Replay</h1>
       </div>
 
       <div class="intro" id="session-date">Loading session…</div>
 
-      <div class="share-row">
-        <button class="share-btn" id="btn-copy-link">Copy Replay Link</button>
-        <button class="share-btn" id="btn-download-document">Download Document</button>
-        <button class="share-btn" id="btn-copy-document">Copy Document Text</button>
+      <div class="metadata-row">
+        <div class="metadata-item">
+          <span class="metadata-label">Student:</span>
+          <span id="student-name">-</span>
+        </div>
+        <div class="metadata-item">
+          <span class="metadata-label">Assignment:</span>
+          <span id="assignment-title">-</span>
+        </div>
+        <div class="metadata-item">
+          <span class="metadata-label">Course:</span>
+          <span id="course">-</span>
+        </div>
       </div>
 
-      <div class="replay-caption">Replay of this page being written.</div>
+      <div class="share-row">
+        <button class="share-btn" id="btn-copy-link">Copy Replay Link</button>
+      </div>
+
+      <div class="replay-meta">
+        <div class="timeline-key" aria-label="Timeline legend">
+          <span class="timeline-key-item">
+            <span class="timeline-key-swatch inactive" aria-hidden="true"></span>Inactive
+          </span>
+        </div>
+      </div>
+      <div class="replay-caption">Replaying keystrokes from this assignment session.</div>
       <div class="replay-time" id="replay-time">PST</div>
 
       <div class="replay-shell">
         <div class="replay-controls">
-          <button class="play-btn" id="btn-play">&#9654;</button>
+          <button class="play-btn" id="btn-play">▶</button>
           <div class="progress-wrap">
             <div class="progress-track" id="progress-track">
+              <div class="progress-inactive-spans" id="progress-inactive-spans"></div>
+              <div class="progress-gap-markers" id="progress-gap-markers"></div>
               <div class="progress-fill" id="progress-fill"></div>
               <div class="progress-thumb" id="progress-thumb"></div>
             </div>
-            <div class="progress-readout" id="progress-readout">Absolute time: --</div>
-            <div class="progress-tooltip" id="progress-tooltip"></div>
           </div>
           <div class="time-display" id="time-display">0:00 / 0:00</div>
           <select class="speed-select" id="speed-select">
@@ -567,22 +475,17 @@
             <option value="25">25×</option>
             <option value="50">50×</option>
             <option value="500">500×</option>
-            <option value="5000">5000×</option>
           </select>
         </div>
         <div class="replay-status" id="status-msg">Loading session…</div>
         <div class="replay-stage">
           <div class="replay-stage-scroll" id="replay-stage-scroll">
-            <div class="doc-page"><span id="doc-content"></span><span class="cursor-blink" id="cursor"></span></div>
+            <div class="doc-page">
+              <span id="doc-content"></span>
+              <span class="cursor-blink" id="cursor"></span>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="keyboard-note">
-        <div class="section-label">Input verification</div>
-        <p>
-          This session was recorded from the built-in SPI keyboard, signed by Handtyped on the Mac, and verified by the replay server before storage. External USB keyboards, Bluetooth keyboards, and software-injected keystrokes are excluded.
-        </p>
       </div>
     </div>
   </div>
@@ -590,26 +493,21 @@
   <script type="module">
     import {
       compressIdleGaps,
-      compressedTimeForRawMs,
-      documentWithAttribution,
-      downloadFilenameForDocument,
       findHistoryIndex,
       getDurationFromHistory,
       getDurationFromKeydowns,
-      getElapsedRawTime,
+      parseHistory,
+      parseKeydowns,
+      parseFocusEvents,
       buildInactiveSpans,
       buildTimelineGapMarkers,
       formatAbsoluteReplayTime,
       getFocusStateAtElapsedMs,
-      parseFocusEvents,
-      parseHistory,
-      parseKeydowns,
+      compressedTimeForRawMs,
     } from '/replay-view.js'
 
     const sessionId = location.pathname.split('/').pop()
     const isEmbed = new URLSearchParams(location.search).has('embed')
-    const shareUrl = location.href
-    const headlineEl = document.getElementById('headline')
 
     if (isEmbed) {
       document.body.classList.add('embed')
@@ -619,6 +517,8 @@
     let history = []
     let focusEvents = []
     let replayFocusEvents = []
+    let inactiveSpans = []
+    let gapMarkers = []
     let keydowns = []
     let playing = false
     let speed = 1
@@ -631,44 +531,15 @@
     const statusMsgEl = document.getElementById('status-msg')
     const playBtnEl = document.getElementById('btn-play')
     const replayTimeEl = document.getElementById('replay-time')
-    const progressReadoutEl = document.getElementById('progress-readout')
     const progressTrackEl = document.getElementById('progress-track')
-
-    function currentDocumentName() {
-      return session?.document_name || ''
-    }
-
-    function currentDocumentText() {
-      return session?.doc_text || history[history.length - 1]?.text || ''
-    }
-
-    function buildReplayHistoryWithAttribution(baseHistory) {
-      const items = Array.isArray(baseHistory) ? baseHistory.slice() : []
-      const finalText = session?.doc_text || items[items.length - 1]?.text || ''
-      const finalDocument = documentWithAttribution(finalText, shareUrl)
-      const lastT = items.length ? Number(items[items.length - 1]?.t) || 0 : 0
-
-      if (!items.length) {
-        return [{ t: 0, text: finalDocument }]
-      }
-
-      if (items[items.length - 1]?.text === finalDocument) {
-        return items
-      }
-
-      items.push({
-        t: lastT + 800,
-        text: finalDocument,
-      })
-      return items
-    }
+    const progressInactiveSpansEl = document.getElementById('progress-inactive-spans')
+    const progressGapMarkersEl = document.getElementById('progress-gap-markers')
 
     function getTotalDuration() {
       const historyDuration = getDurationFromHistory(history)
       if (historyDuration > 0) {
         return Math.max(historyDuration, 1000)
       }
-
       return Math.max(getDurationFromKeydowns(keydowns), 1000)
     }
 
@@ -677,45 +548,40 @@
       return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
     }
 
-    function getRawElapsedForCompressedElapsed(elapsedMs) {
-      const idx = findHistoryIndex(history, elapsedMs)
-      return idx >= 0 ? getElapsedRawTime(history, idx) : 0
+    function renderGapMarkers() {
+      if (!progressGapMarkersEl) return
+      progressGapMarkersEl.innerHTML = ''
+
+      const total = getTotalDuration()
+      if (total <= 0 || !gapMarkers.length) return
+
+      for (const marker of gapMarkers) {
+        const left = Math.max(0, Math.min(100, (marker.end / total) * 100))
+        const el = document.createElement('span')
+        el.className = 'progress-gap-marker'
+        el.style.left = `${left}%`
+        progressGapMarkersEl.appendChild(el)
+      }
     }
 
-    function formatWriterTimezone(sessionData) {
-      const timezone = String(sessionData?.recorded_timezone || '').trim()
-      if (timezone) {
-        if (/^[A-Za-z]{2,5}$/.test(timezone)) {
-          return timezone.toUpperCase()
-        }
+    function renderInactiveSpans() {
+      if (!progressInactiveSpansEl) return
+      progressInactiveSpansEl.innerHTML = ''
 
-        const createdAt = new Date(sessionData?.created_at || '')
-        if (!Number.isNaN(createdAt.getTime()) && Intl?.DateTimeFormat) {
-          try {
-            const zoneParts = new Intl.DateTimeFormat('en-US', {
-              timeZone: timezone,
-              timeZoneName: 'short',
-            }).formatToParts(createdAt)
-            const shortZone = zoneParts.find((part) => part.type === 'timeZoneName')?.value
-            if (shortZone) {
-              return shortZone.toUpperCase()
-            }
-          } catch {}
-        }
+      const total = getTotalDuration()
+      if (total <= 0 || !inactiveSpans.length) return
 
-        return timezone.toUpperCase()
+      for (const span of inactiveSpans) {
+        const left = Math.max(0, Math.min(100, (span.start / total) * 100))
+        const width = Math.max(0, ((span.end - span.start) / total) * 100)
+        if (width <= 0) continue
+
+        const el = document.createElement('span')
+        el.className = 'progress-inactive-span'
+        el.style.left = `${left}%`
+        el.style.width = `${width}%`
+        progressInactiveSpansEl.appendChild(el)
       }
-
-      const offsetMinutes = Number(sessionData?.recorded_timezone_offset_minutes)
-      if (Number.isFinite(offsetMinutes)) {
-        const sign = offsetMinutes >= 0 ? '+' : '-'
-        const absolute = Math.abs(offsetMinutes)
-        const hours = String(Math.floor(absolute / 60)).padStart(2, '0')
-        const minutes = String(absolute % 60).padStart(2, '0')
-        return `UTC${sign}${hours}:${minutes}`
-      }
-
-      return 'Local time'
     }
 
     function renderAt(elapsedMs) {
@@ -726,7 +592,8 @@
       docContentEl.textContent = text
       cursorEl.style.display = currentElapsedMs >= total ? 'none' : ''
 
-      replayTimeEl.textContent = formatWriterTimezone(session)
+      const focusState = getFocusStateAtElapsedMs(replayFocusEvents, currentElapsedMs)
+      progressTrackEl.classList.toggle('inactive', focusState === 'inactive')
 
       if (currentElapsedMs >= total) {
         playing = false
@@ -751,10 +618,6 @@
       document.getElementById('progress-fill').style.width = pct + '%'
       document.getElementById('progress-thumb').style.left = pct + '%'
       document.getElementById('time-display').textContent = `${formatTime(elapsedMs)} / ${formatTime(total)}`
-      replayTimeEl.textContent = formatWriterTimezone(session)
-      if (progressReadoutEl) {
-        progressReadoutEl.textContent = `Absolute time: ${formatAbsoluteReplayTime(session, getRawElapsedForCompressedElapsed(elapsedMs))}`
-      }
     }
 
     function startPlay() {
@@ -794,97 +657,56 @@
       statusMsgEl.textContent = status
     }
 
-    function formatOffsetSuffix(totalOffsetMinutes) {
-      const sign = totalOffsetMinutes >= 0 ? '+' : '-'
-      const absolute = Math.abs(totalOffsetMinutes)
-      const hours = String(Math.floor(absolute / 60)).padStart(2, '0')
-      const minutes = String(absolute % 60).padStart(2, '0')
-      return `UTC${sign}${hours}:${minutes}`
-    }
-
-    function formatRecordedDateTime(isoString, timezoneLabel, offsetMinutes) {
-      const parsed = new Date(isoString)
-      if (Number.isNaN(parsed.getTime())) return 'Unknown export time'
-
-      const shifted = new Date(parsed.getTime() + (offsetMinutes * 60 * 1000))
-      const month = shifted.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
-      const day = shifted.getUTCDate()
-      const year = shifted.getUTCFullYear()
-      let hours = shifted.getUTCHours()
-      const minutes = String(shifted.getUTCMinutes()).padStart(2, '0')
-      const meridiem = hours >= 12 ? 'PM' : 'AM'
-      hours = hours % 12 || 12
-
-      const zoneText = timezoneLabel
-        ? `${timezoneLabel} (${formatOffsetSuffix(offsetMinutes)})`
-        : formatOffsetSuffix(offsetMinutes)
-
-      return `Exported ${month} ${day}, ${year} at ${hours}:${minutes} ${meridiem} ${zoneText}`
-    }
-
-    async function copyText(text) {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(text)
-          return true
-        } catch {}
-      }
-
-      try {
-        const input = document.createElement('textarea')
-        input.value = text
-        input.setAttribute('readonly', '')
-        input.style.position = 'absolute'
-        input.style.left = '-9999px'
-        document.body.appendChild(input)
-        input.select()
-        const copied = document.execCommand('copy')
-        input.remove()
-        if (copied) return true
-      } catch {}
-
-      window.prompt('Copy this link:', text)
-      return false
-    }
-
-    function downloadDocument() {
-      const text = documentWithAttribution(currentDocumentText(), shareUrl)
-      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = downloadFilenameForDocument(
-        currentDocumentName(),
-        currentDocumentText(),
-      )
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 0)
-    }
-
     async function loadSession() {
       try {
-        const res = await fetch(`/api/sessions/${sessionId}`)
+        const res = await fetch(`/api/edu/replays/${sessionId}`)
         if (!res.ok) throw new Error('Session not found')
         session = await res.json()
 
-        keydowns = parseKeydowns(session.keystroke_log)
-        history = compressIdleGaps(
-          buildReplayHistoryWithAttribution(parseHistory(session, keydowns))
-        )
+        document.getElementById('student-name').textContent = session.student_name || '-'
+        document.getElementById('assignment-title').textContent = session.assignment_title || '-'
+        document.getElementById('course').textContent = session.course || '-'
+        document.getElementById('headline').textContent = 
+          session.assignment_title ? `${session.assignment_title} - ${session.student_name}` : 'Writing Session Replay'
+
+        const dateStr = session.last_activity_at || session.updated_at || ''
+        if (dateStr) {
+          const date = new Date(dateStr)
+          if (!Number.isNaN(date.getTime())) {
+            const formatted = date.toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit'
+            })
+            document.getElementById('session-date').textContent = formatted
+          }
+        }
+
+        keydowns = parseKeydowns(session.keystroke_log || '')
         focusEvents = parseFocusEvents(session)
-        replayFocusEvents = focusEvents.map((event) => ({
+
+        const rawHistory = parseHistory(
+          {
+            doc_history: session.document_history || [],
+            doc_text: session.current_text || '',
+          },
+          keydowns,
+        )
+        history = compressIdleGaps(rawHistory)
+
+        replayFocusEvents = focusEvents.map(event => ({
           ...event,
           t: compressedTimeForRawMs(history, event.t),
         }))
-        document.getElementById('session-date').textContent = formatRecordedDateTime(
-          session.created_at,
-          session.recorded_timezone,
-          Number(session.recorded_timezone_offset_minutes || 0),
-        )
-        headlineEl.textContent = currentDocumentName() || 'Writing Session Analysis'
-        replayTimeEl.textContent = formatWriterTimezone(session)
+
+        const totalDuration = getDurationFromHistory(history)
+        inactiveSpans = buildInactiveSpans(focusEvents, history, totalDuration)
+        gapMarkers = buildTimelineGapMarkers(history, 15000)
+
+        renderInactiveSpans()
+        renderGapMarkers()
 
         renderBlankState()
         startPlay()
@@ -909,11 +731,10 @@
       }
     })
 
-    function seekTo(targetElapsed, notice) {
+    function seekTo(targetElapsed) {
       const total = getTotalDuration()
       const wasPlaying = playing
 
-      // Stop the old animation loop without changing button text/state yet.
       cancelAnimationFrame(animationHandle)
       animationHandle = null
       playing = false
@@ -929,11 +750,8 @@
         playBtnEl.textContent = '▶'
       }
 
-      statusMsgEl.textContent = notice
+      statusMsgEl.textContent = 'Replay position updated.'
     }
-
-    let isDraggingTimeline = false
-    let resumeAfterDrag = false
 
     function elapsedFromClientX(clientX) {
       const rect = progressTrackEl.getBoundingClientRect()
@@ -941,69 +759,23 @@
       return Math.max(0, Math.min(1, pct)) * getTotalDuration()
     }
 
-    function beginTimelineDrag(event) {
+    progressTrackEl.addEventListener('pointerdown', event => {
       if (event.button !== 0 && event.pointerType !== 'touch') return
-      isDraggingTimeline = true
-      resumeAfterDrag = playing
+      const wasPlaying = playing
       pausePlay('Timeline scrubbed')
-      if (progressTrackEl.setPointerCapture) {
-        progressTrackEl.setPointerCapture(event.pointerId)
-      }
-      seekTo(elapsedFromClientX(event.clientX), 'Replay position updated from the timeline.')
-    }
-
-    function updateTimelineDrag(event) {
-      if (!isDraggingTimeline) return
-      seekTo(elapsedFromClientX(event.clientX), 'Replay position updated from the timeline.')
-    }
-
-    function endTimelineDrag(event) {
-      if (!isDraggingTimeline) return
-      isDraggingTimeline = false
-      if (progressTrackEl.releasePointerCapture) {
-        try {
-          progressTrackEl.releasePointerCapture(event.pointerId)
-        } catch {}
-      }
-      if (currentElapsedMs < getTotalDuration() && resumeAfterDrag) {
+      seekTo(elapsedFromClientX(event.clientX))
+      if (wasPlaying) {
         startPlay()
       }
-    }
-
-    progressTrackEl.addEventListener('pointerdown', beginTimelineDrag)
-    progressTrackEl.addEventListener('pointermove', updateTimelineDrag)
-    progressTrackEl.addEventListener('pointerup', endTimelineDrag)
-    progressTrackEl.addEventListener('pointercancel', endTimelineDrag)
-
-    progressTrackEl.addEventListener('pointerenter', () => {
-      document.getElementById('progress-tooltip').classList.add('visible')
-    })
-    progressTrackEl.addEventListener('pointerleave', () => {
-      document.getElementById('progress-tooltip').classList.remove('visible')
-    })
-    progressTrackEl.addEventListener('pointermove', (event) => {
-      const tooltip = document.getElementById('progress-tooltip')
-      const elapsedMs = elapsedFromClientX(event.clientX)
-      const total = getTotalDuration()
-      const pct = total > 0 ? (elapsedMs / total) * 100 : 0
-      tooltip.textContent = formatAbsoluteReplayTime(session, getRawElapsedForCompressedElapsed(elapsedMs))
-      tooltip.style.left = pct + '%'
     })
 
     document.getElementById('btn-copy-link').addEventListener('click', async () => {
-      const copied = await copyText(shareUrl)
-      statusMsgEl.textContent = copied ? 'Replay link copied!' : 'Replay link ready to copy.'
-    })
-
-    document.getElementById('btn-copy-document').addEventListener('click', async () => {
-      const text = documentWithAttribution(currentDocumentText(), shareUrl)
-      const copied = await copyText(text)
-      statusMsgEl.textContent = copied ? 'Document text copied!' : 'Document text ready to copy.'
-    })
-
-    document.getElementById('btn-download-document').addEventListener('click', () => {
-      downloadDocument()
-      statusMsgEl.textContent = 'Document downloaded.'
+      try {
+        await navigator.clipboard.writeText(location.href)
+        statusMsgEl.textContent = 'Replay link copied!'
+      } catch {
+        statusMsgEl.textContent = 'Copy link manually: ' + location.href
+      }
     })
 
     loadSession()

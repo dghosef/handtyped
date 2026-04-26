@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID};
 use tauri::Manager;
 
@@ -8,15 +8,18 @@ pub mod document;
 pub mod editor;
 pub mod hid;
 pub mod integrity;
+pub mod lockdown;
 pub mod observability;
 pub mod preview;
+pub mod screencapture;
 pub mod session;
 pub mod signing;
 pub mod upload;
 pub mod vim;
 pub mod wysiwyg;
 
-use session::{AppState, SessionState};
+use hid::CaptureState;
+use session::AppState;
 
 const HELP_GETTING_STARTED_ID: &str = "help.getting_started";
 const HELP_SHORTCUTS_ID: &str = "help.shortcuts";
@@ -143,21 +146,15 @@ pub fn run() {
     // ── 3. Build shared state ────────────────────────────────────────────────
     let start_mach = unsafe { hid::mach_absolute_time() };
 
-    let state = Arc::new(AppState {
-        session: Mutex::new(SessionState::new(start_mach)),
-        editor_state: Mutex::new(
-            editor::load_editor_state_from_disk()
-                .ok()
-                .flatten()
-                .unwrap_or_default(),
-        ),
-        hid_active: std::sync::atomic::AtomicBool::new(false),
-        builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
-        integrity: report,
-        keyboard_info: Mutex::new(None),
-        last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
-        observability: Mutex::new(observability::RuntimeObservability::load_from_disk()),
-    });
+    let state = Arc::new(AppState::new(
+        Arc::new(CaptureState::new(start_mach)),
+        editor::load_editor_state_from_disk()
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        report,
+        observability::RuntimeObservability::load_from_disk(),
+    ));
 
     let state_for_hid = Arc::clone(&state);
 
@@ -180,9 +177,18 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
-        .setup(move |_app| {
+        .setup(move |app| {
             unsafe { hid::request_input_monitoring_access() };
             hid::start_hid_capture(state_for_hid);
+
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(e) = window.set_content_protected(true) {
+                    eprintln!("[handtyped] WARNING: could not set content protection: {}", e);
+                }
+            }
+
+            screencapture::start_screen_capture_detection(app.handle().clone());
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -195,6 +201,8 @@ pub fn run() {
             commands::load_editor_state,
             commands::save_editor_state,
             commands::open_document,
+            commands::set_lockdown_mode,
+            commands::get_lockdown_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

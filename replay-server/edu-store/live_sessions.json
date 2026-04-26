@@ -1,0 +1,76 @@
+[
+  {
+    "id": "live_ava",
+    "assignment_id": "gatsby-close-reading",
+    "assignment_title": "Gatsby Close Reading",
+    "course": "English 11",
+    "classroom": "English 11 - Period 1",
+    "student_name": "Ava L.",
+    "current_text": "Nick becomes credible because he sees wealth from both inside and outside the circle.",
+    "document_history": [],
+    "current_url": "https://www.gutenberg.org/files/64317/64317-h/64317-h.htm",
+    "current_url_title": null,
+    "url_history": [],
+    "violation_count": 0,
+    "violations": [],
+    "last_activity_at": "2026-04-25T13:36:55.261Z",
+    "schedule_open": true,
+    "focused": true,
+    "hid_active": true,
+    "replay_session_id": "edu_replay_ava",
+    "updated_at": "2026-04-25T13:36:55.261Z"
+  },
+  {
+    "id": "live_mason",
+    "assignment_id": "macbeth-timed-essay",
+    "assignment_title": "Macbeth Timed Essay",
+    "course": "English 11",
+    "classroom": "English 11 - Period 3",
+    "student_name": "Mason R.",
+    "current_text": "Macbeth treats prophecy as permission, and that choice turns fear into policy.",
+    "document_history": [],
+    "current_url": null,
+    "current_url_title": null,
+    "url_history": [],
+    "violation_count": 1,
+    "violations": [
+      {
+        "t": 1777124215261000000,
+        "kind": "focus_lost",
+        "detail": "Student app lost focus once."
+      }
+    ],
+    "last_activity_at": "2026-04-25T13:36:55.261Z",
+    "schedule_open": true,
+    "focused": true,
+    "hid_active": true,
+    "replay_session_id": null,
+    "updated_at": "2026-04-25T13:36:55.261Z"
+  },
+  {
+    "id": "student:hamlet",
+    "assignment_id": "assignment_f778d55efe074f71",
+    "assignment_title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom": "AP Literature",
+    "student_name": "Ada",
+    "current_text": "Hamlet delays because certainty never arrives.",
+    "document_history": [
+      {
+        "op": "insert",
+        "text": "Hamlet delays because certainty never arrives."
+      }
+    ],
+    "current_url": null,
+    "current_url_title": null,
+    "url_history": [],
+    "violation_count": 0,
+    "violations": [],
+    "last_activity_at": "2026-04-25T00:00:00Z",
+    "schedule_open": true,
+    "focused": true,
+    "hid_active": true,
+    "replay_session_id": "edu-replay-integration",
+    "updated_at": "2026-04-26T01:57:32.671Z"
+  }
+]

@@ -10,6 +10,21 @@ import { fileURLToPath } from 'url'
 import { parseReplayAttestation, buildReplayUrl } from './session-store.js'
 import { parseTrustedSignerAllowlist } from './trusted-signers.js'
 import { createReplayGuardrails, resolveReplayUploadRateLimit } from './guardrails.js'
+import {
+  buildAssignment,
+  buildClassroom,
+  buildEduReplay,
+  nowIso,
+} from './edu-schema.js'
+import { buildEduDashboard, buildStudentConfig, createNodeEduStore, ensureEduSeedData } from './edu-store.js'
+import {
+  authenticateTeacher,
+  clearTeacherSessionCookie,
+  createTeacherSession,
+  destroyTeacherSession,
+  getTeacherSession,
+  teacherSessionCookie,
+} from './edu-auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PUBLIC_ORIGIN = process.env.REPLAY_SERVER_PUBLIC_ORIGIN || 'https://replay.handtyped.app'
@@ -75,8 +90,14 @@ function serveReplayPage(_req, res) {
   res.sendFile(join(__dirname, 'public', 'replay.html'))
 }
 
+function serveEduReplayPage(_req, res) {
+  res.sendFile(join(__dirname, 'public', 'edu', 'replay.html'))
+}
+
 export function createApp(sessionsDir, config = {}) {
   if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true })
+  const eduStoreDir = config.eduStoreDir || join(sessionsDir, '..', 'edu-store')
+  const eduStore = createNodeEduStore(eduStoreDir)
   const getTrustedSignerAllowlist = loadTrustedSignerAllowlist(config)
   const uploadRateLimit = resolveReplayUploadRateLimit(config)
   const guardrails = createReplayGuardrails({
@@ -88,6 +109,231 @@ export function createApp(sessionsDir, config = {}) {
   const app = express()
   app.use(express.json({ limit: '6mb' }))
   app.use(express.static(join(__dirname, 'public')))
+
+  app.get('/edu', (_req, res) => {
+    res.sendFile(join(__dirname, 'public', 'edu', 'index.html'))
+  })
+
+  app.get('/edu/app', (_req, res) => {
+    res.sendFile(join(__dirname, 'public', 'edu', 'app.html'))
+  })
+
+  app.get('/edu/login', (_req, res) => {
+    res.sendFile(join(__dirname, 'public', 'edu', 'login.html'))
+  })
+
+  app.get('/edu/replay/:id', (req, res) => {
+    serveEduReplayPage(req, res)
+  })
+
+  app.get('/api/edu/dashboard', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    res.json(await buildEduDashboard(eduStore))
+  })
+
+  app.get('/api/edu/config', (_req, res) => {
+    res.json({
+      host: 'edu.handtyped.app',
+      teacher_surface: 'web',
+      student_surface: 'native',
+      replay_origin: PUBLIC_ORIGIN,
+    })
+  })
+
+  app.get('/api/edu/auth/session', (req, res) => {
+    getTeacherSession(eduStore, req.headers.cookie).then((session) => res.json(session))
+  })
+
+  app.post('/api/edu/auth/login', async (req, res) => {
+    await ensureEduSeedData(eduStore)
+    const teacher = await authenticateTeacher(eduStore, {
+      email: req.body?.email,
+      accessCode: req.body?.access_code,
+    })
+    if (!teacher) {
+      return res.status(401).json({ error: 'Invalid teacher email or access code', authenticated: false })
+    }
+    const sessionRecord = await createTeacherSession(eduStore, teacher)
+    res.setHeader('Set-Cookie', teacherSessionCookie(sessionRecord.id))
+    res.json(
+      await getTeacherSession(
+        eduStore,
+        `${req.headers.cookie || ''}; edu_teacher_session=${sessionRecord.id}`,
+      ),
+    )
+  })
+
+  app.post('/api/edu/auth/logout', async (req, res) => {
+    await destroyTeacherSession(eduStore, req.headers.cookie)
+    res.setHeader('Set-Cookie', clearTeacherSessionCookie())
+    res.json({ authenticated: false, teacher_id: null, teacher_name: null, teacher_email: null })
+  })
+
+  app.get('/api/edu/classrooms', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    res.json(await eduStore.listClassrooms())
+  })
+
+  app.post('/api/edu/classrooms', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const classroom = buildClassroom(req.body || {})
+    classroom.updated_at = nowIso()
+    await eduStore.putClassroom(classroom)
+    res.status(201).json(classroom)
+  })
+
+  app.get('/api/edu/classrooms/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const classroom = await eduStore.getClassroom(req.params.id)
+    if (!classroom) return res.status(404).json({ error: 'Not found' })
+    res.json(classroom)
+  })
+
+  app.put('/api/edu/classrooms/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getClassroom(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const classroom = buildClassroom({ ...existing, ...(req.body || {}), id: req.params.id, updated_at: nowIso() })
+    await eduStore.putClassroom(classroom)
+    res.json(classroom)
+  })
+
+  app.delete('/api/edu/classrooms/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getClassroom(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const assignments = await eduStore.listAssignments()
+    for (const assignment of assignments.filter((item) => item.classroom_id === req.params.id)) {
+      await eduStore.deleteAssignment(assignment.id)
+    }
+    await eduStore.deleteClassroom(req.params.id)
+    res.json({ deleted: true, classroom_id: req.params.id })
+  })
+
+  app.get('/api/edu/assignments', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    res.json(await eduStore.listAssignments())
+  })
+
+  app.post('/api/edu/assignments', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const assignment = buildAssignment(req.body || {})
+    assignment.updated_at = nowIso()
+    await eduStore.putAssignment(assignment)
+    res.status(201).json(assignment)
+  })
+
+  app.get('/api/edu/assignments/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const assignment = await eduStore.getAssignment(req.params.id)
+    if (!assignment) return res.status(404).json({ error: 'Not found' })
+    res.json(assignment)
+  })
+
+  app.put('/api/edu/assignments/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getAssignment(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const assignment = buildAssignment({ ...existing, ...(req.body || {}), id: req.params.id, updated_at: nowIso() })
+    await eduStore.putAssignment(assignment)
+    res.json(assignment)
+  })
+
+  app.get('/api/edu/live-sessions', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    res.json(await eduStore.listLiveSessions())
+  })
+
+  app.post('/api/edu/live-sessions', async (req, res) => {
+    await ensureEduSeedData(eduStore)
+    const session = {
+      ...(req.body || {}),
+      id:
+        req.body?.id ||
+        `${req.body?.student_name || 'student'}:${req.body?.assignment_id || 'assignment'}`,
+      updated_at: nowIso(),
+    }
+    await eduStore.putLiveSession(session)
+    res.status(201).json(session)
+  })
+
+  app.get('/api/edu/live-sessions/:id', async (req, res) => {
+    const teacherSession = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!teacherSession.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const liveSession = await eduStore.getLiveSession(req.params.id)
+    if (!liveSession) return res.status(404).json({ error: 'Not found' })
+    res.json(liveSession)
+  })
+
+  app.get('/api/edu/replays/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const replay = await eduStore.getReplay(req.params.id)
+    if (!replay) return res.status(404).json({ error: 'Not found' })
+    res.json(replay)
+  })
+
+  app.post('/api/edu/replays', async (req, res) => {
+    await ensureEduSeedData(eduStore)
+    const replay = buildEduReplay({ ...(req.body || {}), updated_at: nowIso() })
+    await eduStore.putReplay(replay)
+    res.status(201).json(replay)
+  })
+
+  app.get('/api/edu/student/config', async (req, res) => {
+    await ensureEduSeedData(eduStore)
+    res.json(await buildStudentConfig(eduStore, { joinCode: req.query.join_code || '' }))
+  })
 
   app.get('/api/health', (_req, res) => {
     const trustedSignerAllowlist = getTrustedSignerAllowlist()

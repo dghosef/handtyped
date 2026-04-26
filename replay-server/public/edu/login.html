@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Handtyped EDU Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/edu/styles.css" />
+</head>
+<body>
+  <div class="app landing-app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Teacher access</div>
+        <h1>Sign in to Handtyped EDU</h1>
+        <p class="subhead">Teacher workflows live on the web. Student enforcement stays in the native app.</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="button button-secondary" href="/">EDU home</a>
+      </div>
+    </header>
+
+    <main class="landing-main">
+      <section class="panel cta-panel">
+        <div>
+          <div class="section-label">Teacher access</div>
+          <h2>Continue to the teacher workspace</h2>
+          <p class="subhead">
+            Sign in with a teacher email and access code. This keeps the teacher workspace on the web
+            while leaving student-side attestation and enforcement in the native app.
+          </p>
+          <p class="subhead">Default local development account: <strong>teacher@edu.handtyped.app</strong> with access code <strong>handtyped-edu</strong>.</p>
+        </div>
+        <form class="edu-form login-form" id="teacher-login-form">
+          <label>
+            <span>Email</span>
+            <input name="email" type="email" value="teacher@edu.handtyped.app" required />
+          </label>
+          <label>
+            <span>Access code</span>
+            <input name="access_code" type="password" value="handtyped-edu" required />
+          </label>
+          <button class="button" type="submit">Sign in</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    const form = document.getElementById('teacher-login-form')
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const payload = Object.fromEntries(new FormData(form).entries())
+      const response = await fetch('/api/edu/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (response.ok) {
+        window.location.href = '/app'
+        return
+      }
+      const data = await response.json().catch(() => ({}))
+      window.alert(data.error || 'Could not sign in.')
+    })
+  </script>
+</body>
+</html>

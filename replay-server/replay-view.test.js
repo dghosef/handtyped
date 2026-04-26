@@ -25,8 +25,27 @@ const replayPageHtml = fs.readFileSync(
   path.join(process.cwd(), 'public', 'replay.html'),
   'utf8',
 )
+const eduReplayPageHtml = fs.readFileSync(
+  path.join(process.cwd(), 'public', 'edu', 'replay.html'),
+  'utf8',
+)
+const eduAppJs = fs.readFileSync(
+  path.join(process.cwd(), 'public', 'edu', 'app.js'),
+  'utf8',
+)
 
 describe('replay history start state', () => {
+  it('keeps the edu replay page on the shared history parser', () => {
+    expect(eduReplayPageHtml).toContain('parseHistory,')
+    expect(eduReplayPageHtml).toContain('const rawHistory = parseHistory(')
+    expect(eduReplayPageHtml).not.toContain("text: h.ins || ''")
+  })
+
+  it('links teacher replay actions to the edu replay route', () => {
+    expect(eduAppJs).toContain('href="/edu/replay/${escapeHtml(')
+    expect(eduAppJs).not.toContain('href="/replay/${escapeHtml(')
+  })
+
   it('uses the homepage header font for the replay title', () => {
     expect(replayPageHtml).toContain(
       "fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap",

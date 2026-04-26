@@ -4,6 +4,7 @@ import { gzipSync, gunzipSync } from 'zlib'
 import worker from './worker.js'
 
 function makeEnv() {
+  const kv = new Map()
   return {
     REPLAY_TRUSTED_SIGNER_KEYS: '',
     REPLAY_UPLOAD_RATE_LIMIT_COUNT: '',
@@ -15,12 +16,40 @@ function makeEnv() {
       },
     },
     SESSIONS: {
-      async get() {
-        return null
+      async get(key) {
+        return kv.has(key) ? kv.get(key) : null
       },
-      async put() {},
+      async put(key, value) {
+        kv.set(key, value)
+      },
+      async delete(key) {
+        kv.delete(key)
+      },
+      async list({ prefix } = {}) {
+        return {
+          keys: [...kv.keys()]
+            .filter((key) => !prefix || key.startsWith(prefix))
+            .map((name) => ({ name })),
+        }
+      },
     },
   }
+}
+
+async function loginTeacher(env) {
+  const res = await worker.fetch(
+    new Request('https://edu.handtyped.app/api/edu/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'teacher@edu.handtyped.app',
+        access_code: 'handtyped-edu',
+      }),
+    }),
+    env,
+  )
+  const cookie = res.headers.get('set-cookie')
+  return { res, cookie }
 }
 
 const ED25519_SPKI_PREFIX_HEX = '302a300506032b6570032100'
@@ -148,6 +177,259 @@ describe('worker host routing', () => {
 
     expect(res.status).toBe(200)
     expect(await res.text()).toBe('asset:/')
+  })
+
+  it('serves the edu landing page on edu.handtyped.app', async () => {
+    const res = await worker.fetch(new Request('https://edu.handtyped.app/', { method: 'GET' }), makeEnv())
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('asset:/edu/index.html')
+  })
+
+  it('serves the teacher app shell on edu.handtyped.app/app', async () => {
+    const res = await worker.fetch(new Request('https://edu.handtyped.app/app', { method: 'GET' }), makeEnv())
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('asset:/edu/app.html')
+  })
+
+  it('serves the edu replay page on edu.handtyped.app/edu/replay/:id', async () => {
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/edu/replay/replay:ada:hamlet', { method: 'GET' }),
+      makeEnv(),
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('asset:/edu/replay.html')
+  })
+
+  it('serves the edu dashboard api on edu.handtyped.app', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/dashboard', { method: 'GET', headers: { Cookie: cookie } }),
+      env,
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      product: { host: 'edu.handtyped.app', teacher_surface: 'web', student_surface: 'native' },
+      summary: { classrooms: 2, assignments: 2, live_sessions: 2 },
+    })
+  })
+
+  it('serves the edu login page', async () => {
+    const res = await worker.fetch(new Request('https://edu.handtyped.app/login', { method: 'GET' }), makeEnv())
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('asset:/edu/login.html')
+  })
+
+  it('returns unauthenticated teacher session by default', async () => {
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/auth/session', { method: 'GET' }),
+      makeEnv(),
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ authenticated: false })
+  })
+
+  it('signs in a teacher with email and access code', async () => {
+    const env = makeEnv()
+    const { res, cookie } = await loginTeacher(env)
+
+    expect(res.status).toBe(200)
+    expect(cookie).toContain('edu_teacher_session=')
+    expect(await res.json()).toMatchObject({
+      authenticated: true,
+      teacher_email: 'teacher@edu.handtyped.app',
+    })
+  })
+
+  it('creates classrooms for authenticated teacher sessions', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ name: 'AP Lit', teacher_name: 'Ms. Keating', join_code: 'APLIT1' }),
+      }),
+      env,
+    )
+
+    expect(res.status).toBe(201)
+    expect(await res.json()).toMatchObject({ name: 'AP Lit', teacher_name: 'Ms. Keating', join_code: 'APLIT1' })
+  })
+
+  it('returns student config for a classroom join code', async () => {
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=P1EN11', { method: 'GET' }),
+      makeEnv(),
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      classroom: { join_code: 'P1EN11' },
+      assignments: [{ classroom_id: 'period-1' }],
+    })
+  })
+
+  it('stores and returns edu replay records for authenticated teachers', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const create = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/replays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'edu_replay_test',
+          live_session_id: 'student:assignment',
+          assignment_id: 'assignment',
+          assignment_title: 'Timed essay',
+          course: 'English',
+          student_name: 'Test Student',
+          current_text: 'Draft text',
+          document_history: [{ op: 'insert', text: 'Draft text' }],
+          url_history: [],
+          violations: [],
+        }),
+      }),
+      env,
+    )
+
+    expect(create.status).toBe(201)
+
+    const read = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/replays/edu_replay_test', {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+
+    expect(read.status).toBe(200)
+    expect(await read.json()).toMatchObject({
+      id: 'edu_replay_test',
+      student_name: 'Test Student',
+      assignment_title: 'Timed essay',
+    })
+  })
+
+  it('supports teacher classroom creation and student join config round-trip', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Period 5',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'P5ENG',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Poetry response',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Respond to the assigned poem.',
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+
+    const config = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=P5ENG', {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(config.status).toBe(200)
+    expect(await config.json()).toMatchObject({
+      classroom: { join_code: 'P5ENG', name: 'Period 5' },
+      assignments: [{ title: 'Poetry response', classroom_id: createdClassroom.id }],
+    })
+  })
+
+  it('deletes a class and its assignments for authenticated teachers', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Delete Period',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'DEL111',
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+
+    await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Delete this assignment',
+          course: 'English',
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          prompt: 'Temporary assignment.',
+        }),
+      }),
+      env,
+    )
+
+    const deleted = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/classrooms/${classroom.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(deleted.status).toBe(200)
+
+    const config = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=DEL111', {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(config.status).toBe(200)
+    expect(await config.json()).toMatchObject({
+      classroom: null,
+      assignments: [],
+    })
   })
 })
 

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "edu_replay_ava",
+    "live_session_id": "live_ava",
+    "assignment_id": "gatsby-close-reading",
+    "assignment_title": "Gatsby Close Reading",
+    "course": "English 11",
+    "classroom": "English 11 - Period 1",
+    "student_name": "Ava L.",
+    "current_text": "Nick becomes credible because he sees wealth from both inside and outside the circle.",
+    "document_history": [
+      {
+        "op": "insert",
+        "text": "Nick becomes credible because he sees wealth."
+      }
+    ],
+    "current_url": "https://www.gutenberg.org/files/64317/64317-h/64317-h.htm",
+    "current_url_title": null,
+    "url_history": [
+      {
+        "t": 1777124215262000000,
+        "url": "https://www.gutenberg.org/files/64317/64317-h/64317-h.htm",
+        "allowed": true,
+        "source": "seed"
+      }
+    ],
+    "violation_count": 0,
+    "violations": [],
+    "last_activity_at": "2026-04-25T13:36:55.262Z",
+    "focused": true,
+    "hid_active": true,
+    "updated_at": "2026-04-25T13:36:55.262Z"
+  },
+  {
+    "id": "edu-replay-integration",
+    "live_session_id": "student:hamlet",
+    "assignment_id": "assignment_f778d55efe074f71",
+    "assignment_title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom": "AP Literature",
+    "student_name": "Ada",
+    "current_text": "Hamlet delays because certainty never arrives.",
+    "document_history": [
+      {
+        "op": "insert",
+        "text": "Hamlet delays because certainty never arrives."
+      }
+    ],
+    "keystroke_log": "",
+    "focus_events": [],
+    "current_url": null,
+    "current_url_title": null,
+    "url_history": [],
+    "violation_count": 0,
+    "violations": [],
+    "last_activity_at": "2026-04-26T01:57:32.667Z",
+    "focused": true,
+    "hid_active": true,
+    "start_wall_ns": 0,
+    "updated_at": "2026-04-26T01:57:32.667Z"
+  }
+]

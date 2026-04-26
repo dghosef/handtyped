@@ -151,10 +151,15 @@
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      gap: 10px;
+      gap: 0;
     }
 
-.mini-replay {
+    .demo-frame {
+      border: 1px solid var(--line);
+      background: #fbfbfb;
+    }
+
+    .mini-replay {
       height: 360px;
       display: flex;
       flex-direction: column;
@@ -163,6 +168,19 @@
       padding: 16px;
       border-radius: 0;
       border: 1px solid #e7e7e7;
+      border-top: 0;
+    }
+
+    .mini-replay-controls {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 0 0 76px;
+    }
+
+    .mini-replay .mini-replay-controls {
+      padding-bottom: 18px;
     }
 
     .mini-track {
@@ -183,6 +201,15 @@
 background: var(--blue);
     }
 
+    .mini-inactive-span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(34, 34, 34, 0.1);
+      pointer-events: none;
+      border-radius: 999px;
+    }
+
     .mini-speed {
       appearance: none;
       border: 1px solid var(--line);
@@ -196,6 +223,9 @@ background: var(--blue);
       height: 44px;
       cursor: pointer;
       font-weight: 700;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
     }
 
     .mini-speed {
@@ -212,6 +242,13 @@ background: var(--blue);
       cursor: pointer;
       touch-action: none;
       position: relative;
+    }
+
+    #mini-inactive-spans {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
     }
 
     .mini-fill {
@@ -255,8 +292,14 @@ background: var(--blue);
     .mini-document a {
       color: var(--blue);
     }
+
+    .mini-caption {
+      padding: 18px 20px 20px;
+      border-top: 1px solid var(--line);
+      background: #ffffff;
       font-size: 0.96rem;
       line-height: 1.58;
+      color: var(--ink);
     }
 
     .section {
@@ -272,7 +315,7 @@ background: var(--blue);
     }
 
     .section p {
-      margin: 0 0 16px;
+      margin: 0 0 10px;
     }
 
     .section p:last-child {
@@ -349,29 +392,33 @@ background: var(--blue);
           <p>With Handtyped, you can show the world that your work was human-written. For bloggers, Redditors, students, journalists, and everyone in between.</p>
           <div class="hero-actions">
             <a class="button" id="download-button" href="/downloads/Handtyped-macos.dmg" download="Handtyped-macos.dmg">Download for macOS</a>
+            <a class="button button-secondary" id="education-button" href="https://edu.handtyped.app">For Education</a>
             <a class="button button-secondary" id="github-button" href="https://github.com/dghosef/handtyped">GitHub</a>
           </div>
         </div>
 
         <div class="mini-stack">
-          <div class="mini-replay" id="mini-replay" data-session-id="1seeSaZBfpjwiF8P" data-session-url="./landing-replay.json" aria-label="Replay preview of the landing page text">
-            <div class="mini-replay-controls">
-              <button class="mini-play" id="mini-play" type="button" aria-label="Pause replay">&#10074;&#10074;</button>
-              <div class="mini-track" id="mini-track" aria-label="Replay timeline">
-                <div class="mini-fill" id="mini-fill"></div>
+          <div class="demo-frame">
+            <div class="mini-replay" id="mini-replay" data-session-id="1seeSaZBfpjwiF8P" data-session-url="./landing-replay.json" aria-label="Replay preview of the landing page text">
+              <div class="mini-replay-controls">
+                <button class="mini-play" id="mini-play" type="button" aria-label="Pause replay">&#10074;&#10074;</button>
+                <div class="mini-track" id="mini-track" aria-label="Replay timeline">
+                  <div id="mini-inactive-spans"></div>
+                  <div class="mini-fill" id="mini-fill"></div>
+                </div>
+                <div class="mini-time" id="mini-time">0:00 / 0:00</div>
+                <select class="mini-speed" id="mini-speed" aria-label="Replay speed">
+                  <option value="0.5">0.5x</option>
+                  <option value="1">1x</option>
+                  <option value="2">2x</option>
+                  <option value="5">5x</option>
+                  <option value="10" selected>10x</option>
+                </select>
               </div>
-              <div class="mini-time" id="mini-time">0:00 / 0:00</div>
-              <select class="mini-speed" id="mini-speed" aria-label="Replay speed">
-                <option value="0.5">0.5x</option>
-                <option value="1">1x</option>
-                <option value="2">2x</option>
-                <option value="5">5x</option>
-                <option value="10" selected>10x</option>
-              </select>
+              <div class="mini-document" id="mini-document">Loading replay...</div>
             </div>
-            <div class="mini-document" id="mini-document">Loading replay...</div>
+            <div class="mini-caption">Watch exactly how this page was written</div>
           </div>
-          <div class="mini-caption">Watch exactly how this page was written</div>
         </div>
       </section>
 
@@ -388,10 +435,12 @@ background: var(--blue);
 
   <script type="module">
     import {
+      buildInactiveSpans,
       compressIdleGaps,
       findHistoryIndex,
       getDurationFromHistory,
       parseHistory,
+      parseFocusEvents,
       parseKeydowns,
     } from './replay-view.js'
 
@@ -402,6 +451,7 @@ background: var(--blue);
     const timeEl = document.getElementById('mini-time')
     const speedEl = document.getElementById('mini-speed')
     const documentEl = document.getElementById('mini-document')
+    const inactiveSpansEl = document.getElementById('mini-inactive-spans')
 
     let history = []
     let playing = true
@@ -517,6 +567,18 @@ background: var(--blue);
       const session = await response.json()
       const keydowns = parseKeydowns(session.keystroke_log)
       history = compressIdleGaps(parseHistory(session, keydowns))
+      const inactiveSpans = buildInactiveSpans(
+        parseFocusEvents(session),
+        history,
+        totalDuration(),
+      )
+      inactiveSpansEl.innerHTML = inactiveSpans
+        .map(({ start, end }) => {
+          const widthPct = totalDuration() > 0 ? ((end - start) / totalDuration()) * 100 : 0
+          const leftPct = totalDuration() > 0 ? (start / totalDuration()) * 100 : 0
+          return `<div class="mini-inactive-span" style="left:${leftPct}%;width:${widthPct}%;"></div>`
+        })
+        .join('')
       render(0)
       start()
     }

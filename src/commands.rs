@@ -1,6 +1,7 @@
 use crate::bundle;
 use crate::document::{self, DocumentPayload};
 use crate::editor::{self, EditorDocumentState, EditorMode};
+use crate::lockdown;
 use crate::observability;
 use crate::session::{AppState, ExtraEvent};
 use crate::signing;
@@ -10,6 +11,21 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
+
+#[tauri::command]
+pub fn set_lockdown_mode(enabled: bool) -> Result<(), String> {
+    if enabled {
+        lockdown::enter_lockdown_mode();
+    } else {
+        lockdown::exit_lockdown_mode();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_lockdown_mode() -> bool {
+    lockdown::is_in_lockdown_mode()
+}
 
 fn now_ns() -> u64 {
     SystemTime::now()
@@ -63,7 +79,7 @@ fn build_saved_editor_state(
 /// (computed in JS via crypto.subtle so the raw content never leaves the frontend).
 #[tauri::command]
 pub fn log_paste_event(char_count: usize, content_hash: String, state: State<Arc<AppState>>) {
-    let mut s = state.session.lock().unwrap();
+    let mut s = state.capture.session.lock().unwrap();
     s.append_extra(ExtraEvent {
         t: now_ns(),
         kind: "paste".into(),
@@ -75,7 +91,7 @@ pub fn log_paste_event(char_count: usize, content_hash: String, state: State<Arc
 
 #[tauri::command]
 pub fn log_focus_loss_event(duration_ms: u64, state: State<Arc<AppState>>) {
-    let mut s = state.session.lock().unwrap();
+    let mut s = state.capture.session.lock().unwrap();
     s.append_extra(ExtraEvent {
         t: now_ns(),
         kind: "focus_loss".into(),
@@ -87,17 +103,17 @@ pub fn log_focus_loss_event(duration_ms: u64, state: State<Arc<AppState>>) {
 
 #[tauri::command]
 pub fn get_keystroke_count(state: State<Arc<AppState>>) -> usize {
-    state.session.lock().unwrap().keystroke_count()
+    state.capture.session.lock().unwrap().keystroke_count()
 }
 
 #[tauri::command]
 pub fn get_hid_status(state: State<Arc<AppState>>) -> bool {
-    state.hid_active.load(Ordering::Acquire)
+    state.capture.hid_active.load(Ordering::Acquire)
 }
 
 #[tauri::command]
 pub fn consume_builtin_keydown(state: State<Arc<AppState>>) -> bool {
-    consume_pending_builtin_keydown(&state.builtin_keydown_timestamp)
+    consume_pending_builtin_keydown(&state.capture.builtin_keydown_timestamp)
 }
 
 #[tauri::command]
@@ -181,7 +197,7 @@ pub async fn upload_replay_session(
     let recorded_timezone = now_local.format("%Z").to_string();
     let recorded_timezone_offset_minutes = now_local.offset().local_minus_utc() / 60;
     let (session_id, log_jsonl, keystroke_count, start_wall_ns, log_chain_hash) = {
-        let s = state.session.lock().unwrap();
+        let s = state.capture.session.lock().unwrap();
         (
             s.session_id.clone(),
             s.to_jsonl(),
@@ -192,7 +208,7 @@ pub async fn upload_replay_session(
     };
 
     let integrity = state.integrity.clone();
-    let keyboard = state.keyboard_info.lock().unwrap().clone();
+    let keyboard = state.capture.keyboard_info.lock().unwrap().clone();
 
     let payload = serde_json::json!({
         "session_id": session_id,
@@ -331,9 +347,9 @@ pub async fn export_bundle(
     state: State<'_, Arc<AppState>>,
 ) -> Result<String, String> {
     let integrity = state.integrity.clone();
-    let keyboard = state.keyboard_info.lock().unwrap().clone();
+    let keyboard = state.capture.keyboard_info.lock().unwrap().clone();
     let input = {
-        let s = state.session.lock().unwrap();
+        let s = state.capture.session.lock().unwrap();
         bundle::BundleInput {
             session_id: s.session_id.clone(),
             session_nonce: s.session_nonce.clone(),

@@ -5,7 +5,7 @@ use handtyped_lib::hid;
 use handtyped_lib::integrity;
 use handtyped_lib::observability;
 use handtyped_lib::preview::{parse_markdown_for_preview, PreviewBlock};
-use handtyped_lib::session::{AppState, ExtraEvent, SessionState};
+use handtyped_lib::session::{AppState, ExtraEvent};
 use handtyped_lib::signing;
 use handtyped_lib::wysiwyg::{MarkdownEditor, ModeColors};
 use muda::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const EDITOR_WIDGET_ID: &str = "handtyped_md_editor";
@@ -25,21 +25,15 @@ fn main() -> eframe::Result<()> {
     integrity::deny_debugger_attach();
     let report = integrity::run_checks();
     let start_mach = unsafe { hid::mach_absolute_time() };
-    let state = Arc::new(AppState {
-        session: Mutex::new(SessionState::new(start_mach)),
-        editor_state: Mutex::new(
-            editor::load_editor_state_from_disk()
-                .ok()
-                .flatten()
-                .unwrap_or_default(),
-        ),
-        hid_active: std::sync::atomic::AtomicBool::new(false),
-        builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
-        integrity: report,
-        keyboard_info: Mutex::new(None),
-        last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
-        observability: Mutex::new(observability::RuntimeObservability::load_from_disk()),
-    });
+    let state = Arc::new(AppState::new(
+        Arc::new(hid::CaptureState::new(start_mach)),
+        editor::load_editor_state_from_disk()
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        report,
+        observability::RuntimeObservability::load_from_disk(),
+    ));
 
     unsafe { hid::request_input_monitoring_access() };
     hid::start_hid_capture(Arc::clone(&state));
@@ -713,35 +707,30 @@ mod tests {
 
     #[test]
     fn focus_transition_initializes_without_logging() {
-        let state = AppState {
-            session: Mutex::new(SessionState::new(0)),
-            editor_state: Mutex::new(EditorDocumentState::default()),
-            hid_active: std::sync::atomic::AtomicBool::new(false),
-            builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
-            integrity: Default::default(),
-            keyboard_info: Mutex::new(None),
-            last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
-            observability: Mutex::new(observability::RuntimeObservability::default()),
-        };
+        let state = AppState::new(
+            Arc::new(hid::CaptureState::new(0)),
+            EditorDocumentState::default(),
+            Default::default(),
+            observability::RuntimeObservability::default(),
+        );
         let mut last_focus = None;
 
         assert!(!record_focus_transition(&state, &mut last_focus, true, 10));
-        assert_eq!(state.session.lock().unwrap().focus_events(), Vec::new());
+        assert_eq!(
+            state.capture.session.lock().unwrap().focus_events(),
+            Vec::new()
+        );
     }
 
     #[test]
     fn focus_transition_logs_only_when_active_state_changes() {
-        let state = AppState {
-            session: Mutex::new(SessionState::new(0)),
-            editor_state: Mutex::new(EditorDocumentState::default()),
-            hid_active: std::sync::atomic::AtomicBool::new(false),
-            builtin_keydown_timestamp: std::sync::atomic::AtomicU64::new(0),
-            integrity: Default::default(),
-            keyboard_info: Mutex::new(None),
-            last_keydown_ns: std::sync::atomic::AtomicU64::new(0),
-            observability: Mutex::new(observability::RuntimeObservability::default()),
-        };
-        let start = state.session.lock().unwrap().start_wall_ns;
+        let state = AppState::new(
+            Arc::new(hid::CaptureState::new(0)),
+            EditorDocumentState::default(),
+            Default::default(),
+            observability::RuntimeObservability::default(),
+        );
+        let start = state.capture.session.lock().unwrap().start_wall_ns;
         let mut last_focus = Some(true);
 
         assert!(!record_focus_transition(
@@ -769,7 +758,7 @@ mod tests {
             start + 5_000_000
         ));
 
-        let focus_events = state.session.lock().unwrap().focus_events();
+        let focus_events = state.capture.session.lock().unwrap().focus_events();
         assert_eq!(focus_events.len(), 2);
         assert_eq!(focus_events[0].state, "inactive");
         assert_eq!(focus_events[0].t, 2);
@@ -1696,17 +1685,22 @@ fn record_focus_transition(
         return false;
     }
 
-    state.session.lock().unwrap().append_extra(ExtraEvent {
-        t: timestamp_ns,
-        kind: if current_active {
-            "focus_active".into()
-        } else {
-            "focus_inactive".into()
-        },
-        char_count: None,
-        duration_ms: None,
-        content_hash: None,
-    });
+    state
+        .capture
+        .session
+        .lock()
+        .unwrap()
+        .append_extra(ExtraEvent {
+            t: timestamp_ns,
+            kind: if current_active {
+                "focus_active".into()
+            } else {
+                "focus_inactive".into()
+            },
+            char_count: None,
+            duration_ms: None,
+            content_hash: None,
+        });
     true
 }
 
@@ -2941,7 +2935,7 @@ impl NativeEditorApp {
     }
 
     fn hid_active(&self) -> bool {
-        self.state.hid_active.load(Ordering::Acquire)
+        self.state.capture.hid_active.load(Ordering::Acquire)
     }
 
     fn health_snapshot(&self) -> observability::HealthSnapshot {
@@ -2975,7 +2969,11 @@ impl NativeEditorApp {
             return false;
         }
         // Check if there's a recent SPI keydown (within last 200ms)
-        let last_keydown = self.state.builtin_keydown_timestamp.load(Ordering::Acquire);
+        let last_keydown = self
+            .state
+            .capture
+            .builtin_keydown_timestamp
+            .load(Ordering::Acquire);
         if last_keydown == 0 {
             return false;
         }

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Handtyped EDU Teacher App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css?family=Open%20Sans%3A400%2C600%2C700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/edu/styles.css" />
+</head>
+<body>
+  <div class="teacher-app-shell">
+    <header class="teacher-topbar">
+      <a class="teacher-brand" href="/edu">Handtyped EDU</a>
+      <div class="teacher-topbar-actions">
+        <a class="button button-secondary" href="/">Main site</a>
+        <button class="button button-secondary" id="logout-button" type="button" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <main class="teacher-main">
+      <section class="teacher-panel auth-panel" id="auth-panel"></section>
+
+      <!-- Classes and Assignments View -->
+      <section id="classes-view">
+        <section class="teacher-panel teacher-stage" id="classroom-stage">
+          <div class="stage-header">
+            <div>
+              <div class="section-label">Classes</div>
+              <h2>Select a class</h2>
+            </div>
+            <div class="stage-actions">
+              <button class="button button-secondary" id="delete-classroom-button" type="button">Delete class</button>
+              <button class="button" id="new-classroom-button" type="button">New class</button>
+            </div>
+          </div>
+          <section class="selection-grid" id="classroom-grid"></section>
+        </section>
+
+        <section class="teacher-panel teacher-stage" id="assignment-stage" hidden>
+          <div class="stage-header">
+            <div>
+              <div class="section-label">Assignments</div>
+              <h2 id="assignment-stage-title">Select an assignment</h2>
+            </div>
+            <button class="button" id="new-assignment-button" type="button">New assignment</button>
+          </div>
+          <section class="selection-grid" id="assignment-grid"></section>
+        </section>
+      </section>
+
+      <!-- Assignment Student View -->
+      <section id="assignment-view" hidden>
+        <div class="stage-header">
+          <div>
+            <button class="button button-secondary" id="back-to-assignments-button" type="button">← Back to assignments</button>
+            <h2 id="assignment-view-title">Assignment Name</h2>
+            <p class="muted" id="assignment-view-meta"></p>
+          </div>
+          <button class="button" id="edit-assignment-button" type="button">Edit assignment</button>
+        </div>
+        <section class="student-grid" id="session-grid"></section>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="classroom-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="section-label">Create class</div>
+          <h2>New classroom</h2>
+        </div>
+        <button class="button button-secondary modal-close" type="button" data-close-modal="classroom-modal">Close</button>
+      </div>
+      <form class="inline-form" id="classroom-form">
+        <label>
+          <span>Class name</span>
+          <input name="name" type="text" placeholder="English 11 - Period 1" required />
+        </label>
+        <label>
+          <span>Join code</span>
+          <input name="join_code" type="text" placeholder="Optional custom code" />
+        </label>
+        <button class="button" type="submit">Create class</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="assignment-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="section-label" id="assignment-modal-label">Create assignment</div>
+          <h2 id="assignment-modal-title">New assignment</h2>
+        </div>
+        <button class="button button-secondary modal-close" type="button" data-close-modal="assignment-modal">Close</button>
+      </div>
+      <form class="inline-form" id="assignment-form">
+        <input type="hidden" name="assignment_id" id="assignment-id-input" />
+        <label>
+          <span>Title</span>
+          <input name="title" type="text" placeholder="Timed essay" required />
+        </label>
+        <label>
+          <span>Course</span>
+          <select name="course" id="assignment-course-select" required></select>
+        </label>
+        <label>
+          <span>Prompt</span>
+          <textarea name="prompt" rows="4" placeholder="Write an in-class response..." required></textarea>
+        </label>
+        <fieldset class="form-fieldset">
+          <legend>Availability</legend>
+          <div class="section-label">Days of week</div>
+          <div class="weekday-grid">
+            <label class="checkbox-label"><input type="checkbox" name="day_monday" checked /><span>Mon</span></label>
+            <label class="checkbox-label"><input type="checkbox" name="day_tuesday" checked /><span>Tue</span></label>
+            <label class="checkbox-label"><input type="checkbox" name="day_wednesday" checked /><span>Wed</span></label>
+            <label class="checkbox-label"><input type="checkbox" name="day_thursday" checked /><span>Thu</span></label>
+            <label class="checkbox-label"><input type="checkbox" name="day_friday" checked /><span>Fri</span></label>
+            <label class="checkbox-label"><input type="checkbox" name="day_saturday" /><span>Sat</span></label>
+            <label class="checkbox-label"><input type="checkbox" name="day_sunday" /><span>Sun</span></label>
+          </div>
+          <div class="selector-row">
+            <label>
+              <span>Start time</span>
+              <input name="window_start_time" type="time" value="10:00" required />
+            </label>
+            <label>
+              <span>End time</span>
+              <input name="window_end_time" type="time" value="11:00" required />
+            </label>
+          </div>
+          <label>
+            <span>Available until date</span>
+            <input name="window_end_date" type="date" />
+          </label>
+        </fieldset>
+        <fieldset class="form-fieldset">
+          <legend>Temporary access override</legend>
+          <div class="selector-row">
+            <label>
+              <span>Custom access until</span>
+              <input name="temporary_access_until" type="datetime-local" />
+            </label>
+            <div class="temporary-access-actions">
+              <span>Quick actions</span>
+              <button class="button button-secondary small-button" id="temp-access-3pm-button" type="button">
+                Give access until 3:00 PM today
+              </button>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset class="form-fieldset">
+          <legend>Rules</legend>
+          <label class="checkbox-label">
+            <input type="checkbox" name="copy_paste_allowed" />
+            <span>Allow copy and paste inside the student app</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="require_lockdown" />
+            <span>Lock the student Mac to Handtyped only while editing</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="require_fullscreen" />
+            <span>Open the student app in fullscreen</span>
+          </label>
+        </fieldset>
+        <fieldset class="form-fieldset">
+          <legend>Embedded Study Browser</legend>
+          <label class="checkbox-label">
+            <input type="checkbox" name="browser_enabled" />
+            <span>Enable the built-in study browser</span>
+          </label>
+          <label>
+            <span>Home URL</span>
+            <input name="browser_home_url" type="url" placeholder="https://example.com" />
+          </label>
+          <label>
+            <span>Allowed domains (one per line)</span>
+            <textarea name="browser_allowed_domains" rows="3" placeholder="example.com&#10;wikipedia.org"></textarea>
+          </label>
+        </fieldset>
+        <div class="form-actions">
+          <button class="button" id="assignment-form-submit" type="submit">Create assignment</button>
+          <button class="button button-secondary" id="assignment-form-cancel" type="button" hidden>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="/edu/app.js"></script>
+</body>
+</html>

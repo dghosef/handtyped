@@ -77,11 +77,13 @@ describe('landing page', () => {
     expect(landingPageHtml).not.toContain('<iframe')
   })
 
-  it('keeps one download button and one GitHub button', () => {
+  it('keeps download, education, and GitHub entry points', () => {
     expect(landingPageHtml.match(/Download for macOS/g)).toHaveLength(1)
     expect(landingPageHtml).toContain('id="download-button"')
     expect(landingPageHtml).toContain('href="/downloads/Handtyped-macos.dmg"')
     expect(landingPageHtml).toContain('download="Handtyped-macos.dmg"')
+    expect(landingPageHtml).toContain('id="education-button"')
+    expect(landingPageHtml).toContain('href="https://edu.handtyped.app"')
     expect(landingPageHtml).toContain('id="github-button"')
     expect(landingPageHtml).toContain('href="https://github.com/dghosef/handtyped"')
     expect(landingPageHtml).toContain('<h2>How it works</h2>')

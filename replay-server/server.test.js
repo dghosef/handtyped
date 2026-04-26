@@ -53,6 +53,22 @@ async function request(method, path, body, headers = {}) {
   return { status: res.status, body: json }
 }
 
+async function teacherLogin() {
+  const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'teacher@edu.handtyped.app',
+      access_code: 'handtyped-edu',
+    }),
+  })
+  return {
+    status: res.status,
+    body: await res.json().catch(() => null),
+    cookie: res.headers.get('set-cookie') || '',
+  }
+}
+
 function basePayload(overrides = {}) {
   return {
     session_id: shortId(),
@@ -277,6 +293,130 @@ describe('trusted signer file bootstrap', () => {
 
     expect(res.status).toBe(200)
     expect(body.url).toMatch(new RegExp(`/${body.id}$`))
+  })
+})
+
+describe('edu teacher and student flow', () => {
+  it('supports classroom creation, student config join, and live replay publishing', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+    expect(login.body).toMatchObject({
+      authenticated: true,
+      teacher_email: 'teacher@edu.handtyped.app',
+    })
+
+    const createClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'AP Literature',
+        teacher_name: 'Ms. Keating',
+        join_code: 'APLIT1',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(createClassroom.status).toBe(201)
+    expect(createClassroom.body).toMatchObject({
+      name: 'AP Literature',
+      join_code: 'APLIT1',
+    })
+
+    const createAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Hamlet timed write',
+        course: 'AP Literature',
+        classroom_id: createClassroom.body.id,
+        classroom_name: createClassroom.body.name,
+        prompt: 'Write about indecision in Hamlet.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(createAssignment.status).toBe(201)
+    expect(createAssignment.body).toMatchObject({
+      title: 'Hamlet timed write',
+      classroom_id: createClassroom.body.id,
+    })
+
+    const studentConfig = await request(
+      'GET',
+      '/api/edu/student/config?join_code=APLIT1',
+      undefined,
+    )
+    expect(studentConfig.status).toBe(200)
+    expect(studentConfig.body).toMatchObject({
+      classroom: { join_code: 'APLIT1', name: 'AP Literature' },
+      assignments: [
+        {
+          title: 'Hamlet timed write',
+          classroom_id: createClassroom.body.id,
+        },
+      ],
+    })
+
+    const replayId = 'edu-replay-integration'
+    const liveSessionId = 'student:hamlet'
+
+    const replayPublish = await request('POST', '/api/edu/replays', {
+      id: replayId,
+      live_session_id: liveSessionId,
+      assignment_id: createAssignment.body.id,
+      assignment_title: createAssignment.body.title,
+      course: createAssignment.body.course,
+      classroom: createClassroom.body.name,
+      student_name: 'Ada',
+      current_text: 'Hamlet delays because certainty never arrives.',
+      document_history: [{ op: 'insert', text: 'Hamlet delays because certainty never arrives.' }],
+      url_history: [],
+      violations: [],
+    })
+    expect(replayPublish.status).toBe(201)
+
+    const livePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: createAssignment.body.id,
+      assignment_title: createAssignment.body.title,
+      course: createAssignment.body.course,
+      classroom: createClassroom.body.name,
+      student_name: 'Ada',
+      current_text: 'Hamlet delays because certainty never arrives.',
+      document_history: [{ op: 'insert', text: 'Hamlet delays because certainty never arrives.' }],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-25T00:00:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+      replay_session_id: replayId,
+    })
+    expect(livePublish.status).toBe(201)
+    expect(livePublish.body).toMatchObject({ replay_session_id: replayId })
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, { Cookie: login.cookie })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          student_name: 'Ada',
+          replay_session_id: replayId,
+        }),
+      ]),
+    )
+
+    const replayRead = await request('GET', `/api/edu/replays/${replayId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(replayRead.status).toBe(200)
+    expect(replayRead.body).toMatchObject({
+      id: replayId,
+      student_name: 'Ada',
+      assignment_title: 'Hamlet timed write',
+    })
   })
 })
 
@@ -541,5 +681,12 @@ describe('GET /:id and /replay/:id', () => {
   it('returns 200 HTML even for unknown ids (SPA-style routing)', async () => {
     const res = await fetch(`${baseUrl}/${randomUUID()}`)
     expect(res.status).toBe(200)
+  })
+
+  it('serves the edu replay page at /edu/replay/:id', async () => {
+    const res = await fetch(`${baseUrl}/edu/replay/replay:ada:hamlet`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('text/html')
+    expect(await res.text()).toContain('Handtyped EDU Replay')
   })
 })

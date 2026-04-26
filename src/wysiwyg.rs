@@ -36,6 +36,7 @@ pub enum InlineSpan {
 /// Parse a string into a flat list of inline spans.
 /// Handles: **bold**, *italic*, ***bold-italic***, `code`, ~~strikethrough~~, [text](url).
 /// Does not handle nested spans (intentional: keeps rendering simple).
+#[inline]
 pub fn parse_inline(text: &str) -> Vec<InlineSpan> {
     let mut spans = Vec::new();
     let chars: Vec<char> = text.chars().collect();
@@ -135,10 +136,20 @@ pub fn parse_inline(text: &str) -> Vec<InlineSpan> {
     spans
 }
 
+#[inline]
 fn find_closing(chars: &[char], start: usize, marker: &str) -> Option<usize> {
     let mc: Vec<char> = marker.chars().collect();
     let mlen = mc.len();
     if mlen == 0 {
+        return None;
+    }
+    if mlen == 1 {
+        let target = mc[0];
+        for i in start..chars.len() {
+            if chars[i] == target {
+                return Some(i);
+            }
+        }
         return None;
     }
     for i in start..chars.len().saturating_sub(mlen - 1) {
@@ -250,10 +261,9 @@ pub fn build_inline_layout_job(
     job
 }
 
-fn build_editor_layout_job(ui: &egui::Ui, text: &str, wrap_width: f32) -> LayoutJob {
+fn build_editor_layout_job(ui: &egui::Ui, blocks: &[Block], wrap_width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = wrap_width;
-    let blocks = parse_blocks(text);
 
     let base_font = FontId::monospace(14.0);
     let base_color = ui.visuals().text_color();
@@ -398,7 +408,7 @@ fn build_editor_layout_job(ui: &egui::Ui, text: &str, wrap_width: f32) -> Layout
         }
     }
 
-    if job.text.is_empty() && text.is_empty() {
+    if blocks.is_empty() {
         job.text = String::new();
     }
 
@@ -408,6 +418,7 @@ fn build_editor_layout_job(ui: &egui::Ui, text: &str, wrap_width: f32) -> Layout
 // ── Block types ──────────────────────────────────────────────────────────────
 
 /// Parse a markdown string into a sequence of blocks.
+#[inline]
 pub fn parse_blocks(markdown: &str) -> Vec<Block> {
     let mut blocks: Vec<Block> = Vec::new();
     let lines: Vec<&str> = markdown.split('\n').collect();
@@ -679,6 +690,7 @@ pub struct MarkdownEditor {
     content: String,
     pub vim: crate::vim::VimState,
     pub vim_enabled: bool,
+    pub external_paste_allowed: bool,
     pub mode_colors: ModeColors,
     /// Persistent undo log across sessions.
     /// `undo_index` is the number of applied changes from the initial state.
@@ -690,15 +702,31 @@ pub struct MarkdownEditor {
     last_edit_at_ms: u64,
     trusted_clipboard_text: Option<String>,
     trusted_clipboard_mac: Option<[u8; 32]>,
+    /// Cache for parsed blocks - invalidated when content changes
+    cached_blocks: Option<(String, Vec<Block>)>,
+    /// Cache for inline spans - invalidated when content changes
+    cached_inline: Option<(String, Vec<InlineSpan>)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkdownFormatAction {
+    Bold,
+    Italic,
+    Underline,
+    Link,
+    BulletList,
+    NumberedList,
 }
 
 impl MarkdownEditor {
     pub fn new(markdown: &str) -> Self {
         let initial = markdown.to_string();
+        let cached_blocks = Some((initial.clone(), parse_blocks(&initial)));
         Self {
             content: initial.clone(),
             vim: crate::vim::VimState::new(),
             vim_enabled: false,
+            external_paste_allowed: false,
             mode_colors: ModeColors::default(),
             undo_changes: Vec::new(),
             undo_index: 0,
@@ -707,6 +735,8 @@ impl MarkdownEditor {
             last_edit_at_ms: 0,
             trusted_clipboard_text: None,
             trusted_clipboard_mac: None,
+            cached_blocks,
+            cached_inline: None,
         }
     }
 
@@ -724,6 +754,36 @@ impl MarkdownEditor {
 
     pub fn get_undo_state(&self) -> (Vec<TextChange>, usize) {
         (self.undo_changes.clone(), self.undo_index)
+    }
+
+    pub fn get_blocks(&mut self) -> std::borrow::Cow<'_, Vec<Block>> {
+        if let Some((ref cached_content, _)) = self.cached_blocks {
+            if cached_content == &self.content {
+                if let Some((_, ref blocks)) = self.cached_blocks {
+                    return std::borrow::Cow::Borrowed(blocks);
+                }
+            }
+        }
+        let blocks = parse_blocks(&self.content);
+        let blocks_ref = blocks.clone();
+        self.cached_blocks = Some((self.content.clone(), blocks));
+        std::borrow::Cow::Owned(blocks_ref)
+    }
+
+    pub fn get_inline_spans(&mut self, text: &str) -> Vec<InlineSpan> {
+        if let Some((ref cached_text, ref spans)) = self.cached_inline {
+            if cached_text == text {
+                return spans.clone();
+            }
+        }
+        let spans = parse_inline(text);
+        self.cached_inline = Some((text.to_string(), spans.clone()));
+        spans
+    }
+
+    fn invalidate_cache(&mut self) {
+        self.cached_blocks = None;
+        self.cached_inline = None;
     }
 
     fn now_ms() -> u64 {
@@ -775,12 +835,107 @@ impl MarkdownEditor {
         }
     }
 
+    fn current_char_range(ctx: &egui::Context) -> Option<(usize, usize)> {
+        let editor_id = egui::Id::new("handtyped_md_editor");
+        let state = egui::TextEdit::load_state(ctx, editor_id)?;
+        let range = state.cursor.char_range()?;
+        let start = range.primary.index.min(range.secondary.index);
+        let end = range.primary.index.max(range.secondary.index);
+        Some((start, end))
+    }
+
+    fn replace_char_range(text: &str, start: usize, end: usize, replacement: &str) -> String {
+        let mut chars: Vec<char> = text.chars().collect();
+        let start = start.min(chars.len());
+        let end = end.min(chars.len());
+        chars.splice(start..end, replacement.chars());
+        chars.into_iter().collect()
+    }
+
+    fn apply_programmatic_edit(&mut self, before: String, after: String) {
+        if before == after {
+            return;
+        }
+        self.content = after;
+        self.invalidate_cache();
+        self.record_forward_edit_snapshot(0, 0);
+        self.last_recorded_content = self.content.clone();
+    }
+
+    pub fn apply_formatting(&mut self, ctx: &egui::Context, action: MarkdownFormatAction) {
+        let before = self.content.clone();
+        let (start, end) = Self::current_char_range(ctx)
+            .unwrap_or((self.content.chars().count(), self.content.chars().count()));
+        let selected: String = self
+            .content
+            .chars()
+            .skip(start)
+            .take(end.saturating_sub(start))
+            .collect();
+        let replacement = match action {
+            MarkdownFormatAction::Bold => {
+                if selected.is_empty() {
+                    "**bold**".to_string()
+                } else {
+                    format!("**{}**", selected)
+                }
+            }
+            MarkdownFormatAction::Italic => {
+                if selected.is_empty() {
+                    "*italic*".to_string()
+                } else {
+                    format!("*{}*", selected)
+                }
+            }
+            MarkdownFormatAction::Underline => {
+                if selected.is_empty() {
+                    "<u>underline</u>".to_string()
+                } else {
+                    format!("<u>{}</u>", selected)
+                }
+            }
+            MarkdownFormatAction::Link => {
+                if selected.is_empty() {
+                    "[link text](https://example.com)".to_string()
+                } else {
+                    format!("[{}](https://example.com)", selected)
+                }
+            }
+            MarkdownFormatAction::BulletList => {
+                if selected.is_empty() {
+                    "- item".to_string()
+                } else {
+                    selected
+                        .lines()
+                        .map(|line| format!("- {}", line))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+            }
+            MarkdownFormatAction::NumberedList => {
+                if selected.is_empty() {
+                    "1. item".to_string()
+                } else {
+                    selected
+                        .lines()
+                        .enumerate()
+                        .map(|(i, line)| format!("{}. {}", i + 1, line))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+            }
+        };
+        let after = Self::replace_char_range(&before, start, end, &replacement);
+        self.apply_programmatic_edit(before, after);
+    }
+
     fn apply_undo(&mut self, te_state: &mut TextEditState) {
         if self.undo_index == 0 {
             return;
         }
         let change = self.undo_changes[self.undo_index - 1].clone();
         self.content = change.apply_inverse_to(&self.content);
+        self.invalidate_cache();
         self.undo_index -= 1;
         self.last_recorded_content = self.content.clone();
         Self::set_caret(te_state, change.cursor_before);
@@ -793,6 +948,7 @@ impl MarkdownEditor {
         }
         let change = self.undo_changes[self.undo_index].clone();
         self.content = change.apply_to(&self.content);
+        self.invalidate_cache();
         self.undo_index += 1;
         self.last_recorded_content = self.content.clone();
         Self::set_caret(te_state, change.cursor_after);
@@ -950,7 +1106,9 @@ impl MarkdownEditor {
                 for event in i.events.drain(..) {
                     if let egui::Event::Paste(_) = &event {
                         if hid_ok {
-                            if let Some(text) = self.trusted_clipboard_text() {
+                            if self.external_paste_allowed {
+                                unhandled.push(event.clone());
+                            } else if let Some(text) = self.trusted_clipboard_text() {
                                 unhandled.push(egui::Event::Paste(text));
                             } else {
                                 paste_blocked = true;
@@ -968,7 +1126,9 @@ impl MarkdownEditor {
                         // doesn't fight with our persisted revision log.
                         for ev in produced.drain(..) {
                             if let egui::Event::Paste(_) = ev {
-                                if let Some(text) = self.trusted_clipboard_text() {
+                                if self.external_paste_allowed {
+                                    unhandled.push(ev);
+                                } else if let Some(text) = self.trusted_clipboard_text() {
                                     unhandled.push(egui::Event::Paste(text));
                                 } else {
                                     paste_blocked = true;
@@ -1001,7 +1161,9 @@ impl MarkdownEditor {
                 for event in i.events.drain(..) {
                     if let egui::Event::Paste(_) = &event {
                         if hid_ok {
-                            if let Some(text) = self.trusted_clipboard_text() {
+                            if self.external_paste_allowed {
+                                unhandled.push(event.clone());
+                            } else if let Some(text) = self.trusted_clipboard_text() {
                                 unhandled.push(egui::Event::Paste(text));
                             } else {
                                 paste_blocked = true;
@@ -1092,8 +1254,9 @@ impl MarkdownEditor {
         egui::ScrollArea::vertical()
             .id_salt("md_editor_scroll")
             .show(ui, |ui| {
-                let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
-                    let layout_job = build_editor_layout_job(ui, string, wrap_width);
+                let blocks = self.get_blocks().into_owned();
+                let mut layouter = |ui: &egui::Ui, _string: &str, wrap_width: f32| {
+                    let layout_job = build_editor_layout_job(ui, &blocks, wrap_width);
                     ui.fonts(|fonts| fonts.layout_job(layout_job))
                 };
                 let output = egui::TextEdit::multiline(&mut self.content)
@@ -1137,6 +1300,14 @@ impl MarkdownEditor {
         });
         if let Some(copied_text) = copied_text {
             self.trust_clipboard_text(copied_text);
+            ui.ctx().output_mut(|output| {
+                output
+                    .commands
+                    .retain(|command| !matches!(command, egui::output::OutputCommand::CopyText(_)));
+                output
+                    .commands
+                    .push(egui::output::OutputCommand::CopyText(String::new()));
+            });
         }
 
         let changed = self.content != before;
@@ -1160,6 +1331,7 @@ impl MarkdownEditor {
             } else {
                 self.record_forward_edit_snapshot(cursor_before, cursor_after);
             }
+            self.invalidate_cache();
         }
 
         let save = self.vim.save_requested;
@@ -2208,7 +2380,8 @@ mod tests {
     fn editor_layouter_preserves_exact_text() {
         egui::__run_test_ui(|ui| {
             let source = "# Title\n- item\n> quote\n```rs\nlet x = 1;\n```";
-            let job = build_editor_layout_job(ui, source, 400.0);
+            let blocks = parse_blocks(source);
+            let job = build_editor_layout_job(ui, &blocks, 400.0);
             assert_eq!(job.text, source);
             assert!(job.sections.len() >= 4);
         });

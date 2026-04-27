@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createD1EduStore } from './edu-store.js'
+import { buildStudentConfig, createD1EduStore } from './edu-store.js'
 import { buildAssignment, buildClassroom, buildTeacher } from './edu-schema.js'
 
 class FakeD1PreparedStatement {
@@ -204,6 +204,212 @@ describe('createD1EduStore', () => {
       id: 'assignment-printing',
       policy: {
         printing_allowed: true,
+      },
+    })
+  })
+
+  it('personalizes temporary access per student in student config', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-personal', name: 'English 11', join_code: 'ENG11' })
+    const assignment = buildAssignment({
+      id: 'assignment-personal',
+      title: 'Timed write',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      temporary_access_until: '2026-04-27T18:00:00.000Z',
+      student_temporary_access_until: {
+        'ada lovelace': '2026-04-27T19:30:00.000Z',
+      },
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(assignment)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    const graceConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Grace Hopper',
+    })
+
+    expect(adaConfig.assignments[0]).toMatchObject({
+      id: 'assignment-personal',
+      temporary_access_until: '2026-04-27T19:30:00.000Z',
+      student_temporary_access_until: {},
+    })
+    expect(graceConfig.assignments[0]).toMatchObject({
+      id: 'assignment-personal',
+      temporary_access_until: '2026-04-27T18:00:00.000Z',
+      student_temporary_access_until: {},
+    })
+  })
+
+  it('preserves linked assignment ids in student config', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-linked', name: 'English 11', join_code: 'LINK11' })
+    const priorAssignment = buildAssignment({
+      id: 'assignment-prior',
+      title: 'Draft one',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      updated_at: '2026-04-27T18:00:00.000Z',
+    })
+    const currentAssignment = buildAssignment({
+      id: 'assignment-current',
+      title: 'Draft two',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      linked_assignment_ids: ['assignment-prior'],
+      updated_at: '2026-04-27T19:00:00.000Z',
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(priorAssignment)
+    await store.putAssignment(currentAssignment)
+
+    const config = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    const linked = config.assignments.find((assignment) => assignment.id === 'assignment-current')
+
+    expect(linked).toMatchObject({
+      id: 'assignment-current',
+      linked_assignment_ids: ['assignment-prior'],
+    })
+  })
+
+  it('filters targeted assignments by student name and learns the classroom roster', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-targeted', name: 'English 11', join_code: 'ENG11', students: [] })
+    const wholeClass = buildAssignment({
+      id: 'assignment-all',
+      title: 'Whole class draft',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+    })
+    const targeted = buildAssignment({
+      id: 'assignment-ada',
+      title: 'Ada only draft',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      assigned_students: ['Ada Lovelace'],
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(wholeClass)
+    await store.putAssignment(targeted)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    const graceConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Grace Hopper',
+    })
+
+    expect(adaConfig.assignments.map((item) => item.id).sort()).toEqual(['assignment-ada', 'assignment-all'])
+    expect(graceConfig.assignments.map((item) => item.id).sort()).toEqual(['assignment-all'])
+
+    await expect(store.getClassroom(classroom.id)).resolves.toMatchObject({
+      students: ['Ada Lovelace', 'Grace Hopper'],
+    })
+  })
+
+  it('merges student-specific setting overrides into the student config assignment', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-overrides', name: 'English 11', join_code: 'OVR11' })
+    const assignment = buildAssignment({
+      id: 'assignment-overrides',
+      title: 'Differentiated write',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      policy: {
+        allow_dictation: false,
+        copy_paste_allowed: false,
+        require_lockdown: true,
+      },
+      editor_policy: {
+        font_family: 'arial',
+        font_size: 22,
+        line_height: 'relaxed',
+      },
+      browser_policy: {
+        browser_enabled: true,
+        home_url: 'https://www.gutenberg.org',
+        allowed_domains: ['gutenberg.org'],
+      },
+      student_overrides: {
+        'ada lovelace': {
+          student_name: 'Ada Lovelace',
+          policy: {
+            allow_dictation: true,
+            copy_paste_allowed: true,
+          },
+          editor_policy: {
+            font_size: 28,
+          },
+          browser_policy: {
+            browser_enabled: false,
+            home_url: 'https://example.com',
+            allowed_domains: ['example.com'],
+          },
+        },
+      },
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(assignment)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    const graceConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Grace Hopper',
+    })
+
+    expect(adaConfig.assignments[0]).toMatchObject({
+      id: 'assignment-overrides',
+      student_overrides: {},
+      policy: {
+        allow_dictation: true,
+        copy_paste_allowed: true,
+        require_lockdown: true,
+      },
+      editor_policy: {
+        font_family: 'arial',
+        font_size: 28,
+        line_height: 'relaxed',
+      },
+      browser_policy: {
+        browser_enabled: false,
+        home_url: 'https://example.com',
+        allowed_domains: ['example.com'],
+      },
+    })
+
+    expect(graceConfig.assignments[0]).toMatchObject({
+      id: 'assignment-overrides',
+      student_overrides: {},
+      policy: {
+        allow_dictation: false,
+        copy_paste_allowed: false,
+        require_lockdown: true,
+      },
+      editor_policy: {
+        font_family: 'arial',
+        font_size: 22,
+        line_height: 'relaxed',
+      },
+      browser_policy: {
+        browser_enabled: true,
+        home_url: 'https://www.gutenberg.org',
+        allowed_domains: ['gutenberg.org'],
       },
     })
   })

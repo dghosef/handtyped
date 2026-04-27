@@ -10,7 +10,7 @@ import {
   createKvEduStore,
   ensureEduSeedData,
 } from './edu-store.js'
-import { buildAssignment, buildClassroom, buildEduReplay, nowIso } from './edu-schema.js'
+import { buildAssignment, buildClassroom, buildEduReplay, buildLiveSession, nowIso } from './edu-schema.js'
 import {
   authenticateTeacher,
   authenticateTeacherWithGoogle,
@@ -136,7 +136,9 @@ async function safeList(load, fallback = []) {
 async function buildSafeEduDashboard(store) {
   const classrooms = await safeList(() => store.listClassrooms())
   const assignments = await safeList(() => store.listAssignments())
-  const live_sessions = await safeList(() => store.listLiveSessions())
+  const live_sessions = (await safeList(() => store.listLiveSessions())).map((item) =>
+    buildLiveSession(item),
+  )
   const replays = await safeList(() => store.listReplays())
   const assignment_audits = await safeList(() => store.listAssignmentAudits())
 
@@ -511,6 +513,34 @@ export default {
       return json(assignment)
     }
 
+    if (
+      eduHost &&
+      request.method === 'DELETE' &&
+      url.pathname.startsWith('/api/edu/assignments/') &&
+      !url.pathname.endsWith('/audit')
+    ) {
+      const store = getEduStore(env)
+      await ensureEduSeedData(store)
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const id = url.pathname.split('/').pop()
+      const existing = id ? await store.getAssignment(id) : null
+      if (!existing) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      await store.deleteAssignment(id)
+      await store.putAssignmentAudit(
+        buildAssignmentAuditRecord({
+          action: 'deleted',
+          previousAssignment: existing,
+          actor: session,
+        }),
+      )
+      return json({ deleted: true, assignment_id: id })
+    }
+
     if (eduHost && request.method === 'GET' && /\/api\/edu\/assignments\/[^/]+\/audit$/.test(url.pathname)) {
       const store = getEduStore(env)
       await ensureEduSeedData(store)
@@ -534,21 +564,71 @@ export default {
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      return json(await store.listLiveSessions())
+      return json((await store.listLiveSessions()).map((item) => buildLiveSession(item)))
     }
 
     if (eduHost && request.method === 'POST' && url.pathname === '/api/edu/live-sessions') {
       const store = getEduStore(env)
       const incoming = await parseJsonRequest(request)
-      const session = {
+      const nextId =
+        incoming.id ||
+        `${incoming.student_name || 'student'}:${incoming.assignment_id || 'assignment'}`
+      const existing = await store.getLiveSession(nextId)
+      const session = buildLiveSession({
+        ...existing,
         ...incoming,
-        id:
-          incoming.id ||
-          `${incoming.student_name || 'student'}:${incoming.assignment_id || 'assignment'}`,
+        id: nextId,
+        grading:
+          incoming.grading && typeof incoming.grading === 'object'
+            ? incoming.grading
+            : existing?.grading,
         updated_at: nowIso(),
-      }
+      })
       await store.putLiveSession(session)
       return json(session, { status: 201 })
+    }
+
+    if (
+      eduHost &&
+      request.method === 'PUT' &&
+      /\/api\/edu\/live-sessions\/[^/]+\/grading$/.test(url.pathname)
+    ) {
+      const store = getEduStore(env)
+      const teacherSession = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!teacherSession.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const parts = url.pathname.split('/')
+      const sessionId = parts[parts.length - 2]
+      const existing = sessionId ? await store.getLiveSession(sessionId) : null
+      if (!existing) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const body = await parseJsonRequest(request)
+      const grading = {
+        rubric_scores:
+          body?.rubric_scores && typeof body.rubric_scores === 'object'
+            ? { ...body.rubric_scores }
+            : {},
+        teacher_comment: String(body?.teacher_comment || ''),
+        suggested_revisions: String(body?.suggested_revisions || ''),
+        returned_for_revision: Boolean(body?.returned_for_revision),
+        grade_label: String(body?.grade_label || ''),
+        grade_score:
+          body?.grade_score === '' || body?.grade_score == null ? null : Number(body?.grade_score),
+        inline_annotations: Array.isArray(body?.inline_annotations) ? body.inline_annotations : [],
+        updated_at: nowIso(),
+        actor_id: teacherSession.teacher_id || null,
+        actor_name: teacherSession.teacher_name || null,
+        actor_email: teacherSession.teacher_email || null,
+      }
+      const updated = buildLiveSession({
+        ...existing,
+        grading,
+        updated_at: nowIso(),
+      })
+      await store.putLiveSession(updated)
+      return json(updated)
     }
 
     if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/live-sessions/')) {
@@ -559,7 +639,7 @@ export default {
       }
       const id = url.pathname.split('/').pop()
       const liveSession = id ? await store.getLiveSession(id) : null
-      return liveSession ? json(liveSession) : json({ error: 'Not found' }, { status: 404 })
+      return liveSession ? json(buildLiveSession(liveSession)) : json({ error: 'Not found' }, { status: 404 })
     }
 
     if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/replays/')) {
@@ -608,6 +688,7 @@ export default {
       return json(
         await buildStudentConfig(store, {
           joinCode: url.searchParams.get('join_code') || '',
+          studentName: url.searchParams.get('student_name') || '',
         }),
       )
     }

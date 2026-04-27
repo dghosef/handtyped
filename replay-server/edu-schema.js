@@ -19,6 +19,112 @@ export function nowIso() {
   return new Date().toISOString()
 }
 
+function normalizeStudentOverrideKey(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function normalizeStudentPolicyOverride(input = {}) {
+  const output = {}
+  for (const key of [
+    'allow_dictation',
+    'copy_paste_allowed',
+    'printing_allowed',
+    'export_allowed',
+    'images_allowed',
+    'citations_required',
+    'require_lockdown',
+    'require_fullscreen',
+  ]) {
+    if (typeof input?.[key] === 'boolean') {
+      output[key] = input[key]
+    }
+  }
+  return output
+}
+
+function normalizeStudentEditorOverride(input = {}) {
+  const output = {}
+  if (['arial', 'serif', 'sans', 'mono'].includes(input?.font_family)) {
+    output.font_family = input.font_family
+  }
+  if ([16, 18, 20, 22, 24, 28, 32].includes(Number(input?.font_size))) {
+    output.font_size = Number(input.font_size)
+  }
+  if (['compact', 'single', 'relaxed', 'one-half', 'double'].includes(input?.line_height)) {
+    output.line_height = input.line_height
+  }
+  return output
+}
+
+function normalizeStudentBrowserOverride(input = {}) {
+  const output = {}
+  if (typeof input?.browser_enabled === 'boolean') {
+    output.browser_enabled = input.browser_enabled
+  }
+  if (Object.hasOwn(input || {}, 'home_url')) {
+    output.home_url = String(input?.home_url || '')
+  }
+  if (Object.hasOwn(input || {}, 'allowed_domains')) {
+    output.allowed_domains = Array.isArray(input?.allowed_domains)
+      ? input.allowed_domains.map((value) => String(value || '').trim()).filter(Boolean)
+      : []
+  }
+  if (typeof input?.log_all_navigation === 'boolean') {
+    output.log_all_navigation = input.log_all_navigation
+  }
+  return output
+}
+
+function normalizeStudentOverrides(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+
+  const normalized = {}
+  for (const [rawKey, rawValue] of Object.entries(input)) {
+    if (!rawValue || typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+      continue
+    }
+    const studentName = String(rawValue.student_name || rawKey || '').trim()
+    const key = normalizeStudentOverrideKey(studentName || rawKey)
+    if (!key) {
+      continue
+    }
+
+    const policy = normalizeStudentPolicyOverride(rawValue.policy)
+    const editorPolicy = normalizeStudentEditorOverride(rawValue.editor_policy)
+    const browserPolicy = normalizeStudentBrowserOverride(rawValue.browser_policy)
+    const override = {
+      student_name: studentName || rawKey,
+    }
+
+    if (Object.keys(policy).length) {
+      override.policy = policy
+    }
+    if (Object.keys(editorPolicy).length) {
+      override.editor_policy = editorPolicy
+    }
+    if (Object.keys(browserPolicy).length) {
+      override.browser_policy = browserPolicy
+    }
+
+    if (Object.hasOwn(rawValue, 'temporary_access_until')) {
+      override.temporary_access_until = rawValue.temporary_access_until ?? null
+    }
+
+    if (
+      override.policy ||
+      override.editor_policy ||
+      override.browser_policy ||
+      Object.hasOwn(override, 'temporary_access_until')
+    ) {
+      normalized[key] = override
+    }
+  }
+
+  return normalized
+}
+
 export function buildClassroom(input = {}) {
   const now = nowIso()
   return {
@@ -68,8 +174,23 @@ export function buildAssignmentWindow(input = {}) {
   }
 }
 
+export function buildRubricCriterion(input = {}) {
+  return {
+    id: input.id || randomId('rubric'),
+    title: String(input.title || 'Criterion'),
+    description: String(input.description || ''),
+    points: Math.max(1, Number(input.points || 4)),
+  }
+}
+
 export function buildAssignment(input = {}) {
   const now = nowIso()
+  const linkedAssignmentIds = Array.isArray(input.linked_assignment_ids)
+    ? [...new Set(input.linked_assignment_ids.map((value) => String(value || '').trim()).filter(Boolean))]
+    : []
+  const assignedStudents = Array.isArray(input.assigned_students)
+    ? [...new Set(input.assigned_students.map((value) => String(value || '').trim()).filter(Boolean))]
+    : []
   return {
     id: input.id || randomId('assignment'),
     title: String(input.title || 'Untitled assignment'),
@@ -83,10 +204,25 @@ export function buildAssignment(input = {}) {
       ? input.windows.map(buildAssignmentWindow)
       : [buildAssignmentWindow()],
     policy: {
+      allow_dictation: Boolean(input.policy?.allow_dictation),
       copy_paste_allowed: Boolean(input.policy?.copy_paste_allowed),
       printing_allowed: Boolean(input.policy?.printing_allowed),
+      export_allowed: Boolean(input.policy?.export_allowed),
+      images_allowed: Boolean(input.policy?.images_allowed),
+      citations_required: Boolean(input.policy?.citations_required),
       require_lockdown: input.policy?.require_lockdown ?? false,
       require_fullscreen: input.policy?.require_fullscreen ?? false,
+    },
+    editor_policy: {
+      font_family: ['arial', 'serif', 'sans', 'mono'].includes(input.editor_policy?.font_family)
+        ? input.editor_policy.font_family
+        : 'arial',
+      font_size: [16, 18, 20, 22, 24, 28, 32].includes(Number(input.editor_policy?.font_size))
+        ? Number(input.editor_policy.font_size)
+        : 22,
+      line_height: ['compact', 'single', 'relaxed', 'one-half', 'double'].includes(input.editor_policy?.line_height)
+        ? input.editor_policy.line_height
+        : 'relaxed',
     },
     browser_policy: {
       browser_enabled: input.browser_policy?.browser_enabled ?? true,
@@ -96,9 +232,45 @@ export function buildAssignment(input = {}) {
         : ['gutenberg.org'],
       log_all_navigation: input.browser_policy?.log_all_navigation ?? true,
     },
+    assigned_students: assignedStudents,
+    linked_assignment_ids: linkedAssignmentIds,
+    rubric: Array.isArray(input.rubric)
+      ? input.rubric.map(buildRubricCriterion).filter((criterion) => criterion.title.trim())
+      : [],
     temporary_access_until: input.temporary_access_until ?? null,
+    student_temporary_access_until:
+      input.student_temporary_access_until && typeof input.student_temporary_access_until === 'object'
+        ? { ...input.student_temporary_access_until }
+        : {},
+    student_overrides: normalizeStudentOverrides(input.student_overrides),
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,
+  }
+}
+
+function normalizeGradeScore(value) {
+  if (value === '' || value == null) {
+    return null
+  }
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function normalizeInlineAnnotation(input = {}) {
+  const createdAt = String(input.created_at || nowIso())
+  const start = Math.max(0, Number(input.start ?? 0) || 0)
+  const end = Math.max(start, Number(input.end ?? start) || start)
+  const type = input.type === 'suggestion' ? 'suggestion' : 'comment'
+  return {
+    id: input.id || randomId('annotation'),
+    type,
+    start,
+    end,
+    quote: String(input.quote || ''),
+    note: String(input.note || ''),
+    replacement: type === 'suggestion' ? String(input.replacement || '') : '',
+    created_at: createdAt,
+    updated_at: String(input.updated_at || createdAt),
   }
 }
 
@@ -124,6 +296,41 @@ export function buildLiveSession(input = {}) {
     focused: input.focused ?? true,
     hid_active: input.hid_active ?? true,
     replay_session_id: input.replay_session_id ?? null,
+    grading:
+      input.grading && typeof input.grading === 'object'
+        ? {
+            rubric_scores:
+              input.grading.rubric_scores && typeof input.grading.rubric_scores === 'object'
+                ? { ...input.grading.rubric_scores }
+                : {},
+            teacher_comment: String(input.grading.teacher_comment || ''),
+            suggested_revisions: String(input.grading.suggested_revisions || ''),
+            returned_for_revision: Boolean(input.grading.returned_for_revision),
+            grade_label: String(input.grading.grade_label || ''),
+            grade_score: normalizeGradeScore(input.grading.grade_score),
+            inline_annotations: Array.isArray(input.grading.inline_annotations)
+              ? input.grading.inline_annotations
+                  .map(normalizeInlineAnnotation)
+                  .sort((a, b) => a.start - b.start || a.end - b.end)
+              : [],
+            updated_at: input.grading.updated_at || null,
+            actor_id: input.grading.actor_id ?? null,
+            actor_name: input.grading.actor_name ?? null,
+            actor_email: input.grading.actor_email ?? null,
+          }
+        : {
+            rubric_scores: {},
+            teacher_comment: '',
+            suggested_revisions: '',
+            returned_for_revision: false,
+            grade_label: '',
+            grade_score: null,
+            inline_annotations: [],
+            updated_at: null,
+            actor_id: null,
+            actor_name: null,
+            actor_email: null,
+          },
     updated_at: String(input.updated_at || nowIso()),
   }
 }

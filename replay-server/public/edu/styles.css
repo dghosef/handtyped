@@ -27,6 +27,16 @@ body {
   line-height: 1.55;
 }
 
+.display-font,
+.teacher-brand,
+.teacher-main h1,
+.teacher-main h2,
+.teacher-main h3,
+.selection-title,
+.overview-value {
+  font-family: 'Lexend', 'Open Sans', Arial, Helvetica, sans-serif;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -57,6 +67,8 @@ p {
   color: #fff;
   cursor: pointer;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .button:hover {
@@ -105,9 +117,26 @@ p {
 
 .stage-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.quick-extend-control {
+  display: grid;
+  grid-template-columns: minmax(140px, 170px) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.quick-extend-control label {
+  display: grid;
+  gap: 6px;
+}
+
+.quick-extend-control .button {
+  white-space: nowrap;
 }
 
 .eyebrow,
@@ -211,7 +240,8 @@ p {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
-  grid-template-columns: auto auto;
+  grid-template-columns: repeat(2, max-content);
+  justify-content: end;
   gap: 8px;
 }
 
@@ -275,6 +305,12 @@ textarea {
   gap: 18px;
 }
 
+.stage-title-stack {
+  display: grid;
+  gap: 6px;
+  align-items: start;
+}
+
 .stage-header {
   display: flex;
   align-items: flex-end;
@@ -297,13 +333,15 @@ textarea {
 .selection-card {
   width: 100%;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   text-align: left;
   padding: 18px;
   border: 1px solid var(--line);
   background: var(--paper);
   color: var(--ink);
   cursor: pointer;
+  min-height: 160px;
+  align-content: start;
 }
 
 .selection-card:hover {
@@ -314,6 +352,40 @@ textarea {
 .selection-card.is-selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.selection-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.selection-count {
+  min-width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.selection-card-action-label,
+.assignment-card-kicker {
+  color: var(--accent-dark);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.selection-card-action-label {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .selection-title {
@@ -347,8 +419,7 @@ textarea {
 }
 
 .monitoring-overview,
-.monitoring-toolbar,
-.audit-panel {
+.monitoring-toolbar {
   display: grid;
   gap: 16px;
 }
@@ -500,7 +571,7 @@ textarea {
 }
 
 .modal-card {
-  width: min(100%, 560px);
+  width: min(100%, 760px);
   border: 1px solid var(--line);
   background: var(--paper);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
@@ -589,6 +660,387 @@ textarea {
   font-weight: 600;
 }
 
+.linked-assignment-copy {
+  margin-top: -4px;
+}
+
+.linked-assignment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.linked-assignment-empty {
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  background: var(--paper);
+  color: var(--muted);
+}
+
+.linked-assignment-option {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.linked-assignment-option strong {
+  display: block;
+  font-size: 0.98rem;
+  margin-bottom: 2px;
+}
+
+.linked-assignment-option .selection-meta {
+  margin-top: 4px;
+}
+
+.student-override-list {
+  display: grid;
+  gap: 12px;
+}
+
+.student-override-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.student-override-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.student-override-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.student-override-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.student-override-full {
+  grid-column: 1 / -1;
+}
+
+.rubric-builder-list,
+.grading-score-list,
+.grading-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.rubric-builder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 96px auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.rubric-description-field {
+  grid-column: 1 / -2;
+}
+
+.grading-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+}
+
+.grading-score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px;
+  gap: 10px;
+  align-items: center;
+}
+
+.grading-score-row strong,
+.grading-score-row em {
+  display: block;
+}
+
+.grading-score-row em {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.grading-panel textarea {
+  min-height: 70px;
+}
+
+.grading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.grading-return-row {
+  align-items: center;
+}
+
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.review-layout .student-grid {
+  grid-template-columns: 1fr;
+}
+
+.review-workspace {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  position: sticky;
+  top: 20px;
+}
+
+.review-workspace-empty {
+  border: 1px dashed var(--line);
+  background: var(--page);
+  padding: 18px;
+  color: var(--muted);
+}
+
+.review-workspace-header,
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.review-sync-pill,
+.review-selection-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.review-sync-pill.is-saving {
+  border-color: #efd39d;
+  background: #fff8e8;
+  color: #9a6700;
+}
+
+.review-sync-pill.is-error {
+  border-color: #efc3c1;
+  background: #fff1f0;
+  color: #991b1b;
+}
+
+.review-sync-pill.is-saved {
+  border-color: #b7e4d8;
+  background: #effaf6;
+  color: #0f766e;
+}
+
+.review-grade-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.review-card {
+  border: 1px solid var(--line);
+  background: var(--page);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.review-rubric-list {
+  display: grid;
+  gap: 10px;
+}
+
+.review-rubric-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.review-rubric-copy strong,
+.review-rubric-copy em {
+  display: block;
+}
+
+.review-rubric-copy em {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.review-draft-surface {
+  min-height: 420px;
+  max-height: 720px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: #fffdf9;
+  padding: 18px;
+  white-space: pre-wrap;
+  line-height: 1.75;
+  font-size: 1rem;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.review-draft-surface:focus {
+  outline: 2px solid rgba(13, 148, 136, 0.2);
+  outline-offset: 2px;
+}
+
+.review-selection-panel,
+.review-composer {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.review-selection-quote {
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.review-selection-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-selection-actions .button.is-selected {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-dark);
+}
+
+.review-annotation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.review-annotation-empty {
+  border: 1px dashed var(--line);
+  background: var(--paper);
+  padding: 14px;
+  color: var(--muted);
+}
+
+.review-annotation-card {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.review-annotation-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.review-annotation-head,
+.review-annotation-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.review-annotation-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
+  background: var(--page);
+}
+
+.review-annotation-tag-comment {
+  border-color: #c8d8ff;
+  background: #f4f7ff;
+  color: #2442a7;
+}
+
+.review-annotation-tag-suggestion {
+  border-color: #d8c7ff;
+  background: #f8f4ff;
+  color: #6c2fb0;
+}
+
+.review-annotation-quote,
+.review-annotation-replacement,
+.review-annotation-note {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--page);
+  line-height: 1.5;
+}
+
+.review-annotation-note {
+  background: #fffdf8;
+}
+
+.review-highlight {
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.review-highlight-comment {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.review-highlight-suggestion {
+  background: rgba(168, 85, 247, 0.14);
+  box-shadow: inset 0 -2px 0 rgba(168, 85, 247, 0.4);
+}
+
+.review-highlight-stale {
+  opacity: 0.68;
+  text-decoration: line-through;
+}
+
+.review-highlight.is-selected {
+  outline: 2px solid rgba(13, 148, 136, 0.35);
+  outline-offset: 1px;
+}
+
+.student-card-review-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 #assignment-form > label,
 #assignment-form .selector-row > label {
   gap: 7px;
@@ -625,6 +1077,36 @@ textarea {
 .student-section {
   display: grid;
   gap: 6px;
+}
+
+.edit-activity-block {
+  display: grid;
+  gap: 8px;
+}
+
+.edit-activity-meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.edit-activity-graph {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 6px;
+  height: 48px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  background: var(--page);
+}
+
+.edit-activity-bar {
+  display: block;
+  width: 100%;
+  min-height: 8%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
+  opacity: 0.95;
 }
 
 .student-text {
@@ -729,6 +1211,18 @@ textarea {
   font-size: 0.9rem;
 }
 
+.teacher-topbar-actions > .button,
+.stage-actions > .button,
+.stage-actions > .quick-extend-control,
+.form-actions > .button,
+.student-card-footer > .button {
+  margin: 0;
+}
+
+.modal-header .button {
+  align-self: start;
+}
+
 @media (max-width: 800px) {
   .landing-app,
   .teacher-app-shell {
@@ -756,5 +1250,37 @@ textarea {
 
   .monitoring-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .review-workspace {
+    position: static;
+  }
+
+  .review-grade-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .review-rubric-row {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-extend-control {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .rubric-builder-row,
+  .grading-score-row,
+  .student-override-header,
+  .student-override-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rubric-description-field {
+    grid-column: auto;
   }
 }

@@ -46,6 +46,94 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase()
 }
 
+function normalizeStudentOverrideKey(studentName) {
+  return String(studentName || '').trim().toLowerCase()
+}
+
+function assignmentTargetsStudent(assignment, studentName) {
+  const assignedStudents = Array.isArray(assignment?.assigned_students)
+    ? assignment.assigned_students.map((value) => String(value || '').trim()).filter(Boolean)
+    : []
+  if (!assignedStudents.length) {
+    return true
+  }
+  const normalizedStudent = normalizeStudentOverrideKey(studentName)
+  if (!normalizedStudent) {
+    return true
+  }
+  return assignedStudents.some((value) => normalizeStudentOverrideKey(value) === normalizedStudent)
+}
+
+async function rememberStudentInClassroom(store, classroom, studentName) {
+  const normalizedStudent = String(studentName || '').trim()
+  if (!normalizedStudent || !classroom) {
+    return classroom
+  }
+
+  const existingStudents = Array.isArray(classroom.students) ? classroom.students : []
+  const alreadyPresent = existingStudents.some(
+    (value) => normalizeStudentOverrideKey(value) === normalizeStudentOverrideKey(normalizedStudent),
+  )
+  if (alreadyPresent) {
+    return classroom
+  }
+
+  const updated = buildClassroom({
+    ...classroom,
+    students: [...existingStudents, normalizedStudent],
+    updated_at: nowIso(),
+  })
+  await store.putClassroom(updated)
+  return updated
+}
+
+function effectiveStudentTemporaryAccessUntil(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return assignment?.temporary_access_until ?? null
+  }
+  return assignment?.student_temporary_access_until?.[key] ?? assignment?.temporary_access_until ?? null
+}
+
+function effectiveStudentSettingsOverride(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return null
+  }
+  const overrides = assignment?.student_overrides
+  if (!overrides || typeof overrides !== 'object') {
+    return null
+  }
+  const override = overrides[key]
+  return override && typeof override === 'object' ? override : null
+}
+
+function assignmentForStudentConfig(assignment, studentName) {
+  const normalized = buildAssignment(assignment)
+  const override = effectiveStudentSettingsOverride(normalized, studentName)
+  const effectiveTemporaryAccessUntil = Object.hasOwn(override || {}, 'temporary_access_until')
+    ? override.temporary_access_until
+    : effectiveStudentTemporaryAccessUntil(normalized, studentName)
+  return {
+    ...normalized,
+    temporary_access_until: effectiveTemporaryAccessUntil,
+    policy: {
+      ...normalized.policy,
+      ...(override?.policy || {}),
+    },
+    editor_policy: {
+      ...normalized.editor_policy,
+      ...(override?.editor_policy || {}),
+    },
+    browser_policy: {
+      ...normalized.browser_policy,
+      ...(override?.browser_policy || {}),
+    },
+    student_temporary_access_until: {},
+    student_overrides: {},
+  }
+}
+
 function sortByUpdatedDesc(items) {
   return [...items].sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
 }
@@ -540,7 +628,7 @@ export async function ensureEduSeedData(store) {
 export async function buildEduDashboard(store) {
   const classrooms = await store.listClassrooms()
   const assignments = await store.listAssignments()
-  const live_sessions = await store.listLiveSessions()
+  const live_sessions = (await store.listLiveSessions()).map((item) => buildLiveSession(item))
   const replays = await store.listReplays()
   const assignment_audits = await store.listAssignmentAudits()
 
@@ -575,7 +663,7 @@ export async function buildEduDashboardDelta(store, { since } = {}) {
   const normalizedSince = String(since || '')
   const classrooms = await store.listClassrooms()
   const assignments = await store.listAssignments()
-  const live_sessions = await store.listLiveSessions()
+  const live_sessions = (await store.listLiveSessions()).map((item) => buildLiveSession(item))
   const replays = await store.listReplays()
   const assignment_audits = await store.listAssignmentAudits()
 
@@ -627,8 +715,18 @@ export function buildAssignmentAuditRecord({
     pushChange('Instructions', previousSnapshot.instructions, nextSnapshot.instructions)
     pushChange('Writing windows', previousSnapshot.windows, nextSnapshot.windows)
     pushChange('Temporary access until', previousSnapshot.temporary_access_until, nextSnapshot.temporary_access_until)
+    pushChange(
+      'Student extensions',
+      previousSnapshot.student_temporary_access_until,
+      nextSnapshot.student_temporary_access_until,
+    )
+    pushChange('Student setting overrides', previousSnapshot.student_overrides, nextSnapshot.student_overrides)
+    pushChange('Assigned students', previousSnapshot.assigned_students, nextSnapshot.assigned_students)
     pushChange('Rules', previousSnapshot.policy, nextSnapshot.policy)
+    pushChange('Writing defaults', previousSnapshot.editor_policy, nextSnapshot.editor_policy)
     pushChange('Browser policy', previousSnapshot.browser_policy, nextSnapshot.browser_policy)
+    pushChange('Linked assignments', previousSnapshot.linked_assignment_ids, nextSnapshot.linked_assignment_ids)
+    pushChange('Rubric', previousSnapshot.rubric, nextSnapshot.rubric)
   }
 
   const summary =
@@ -654,12 +752,16 @@ export function buildAssignmentAuditRecord({
   })
 }
 
-export async function buildStudentConfig(store, { joinCode }) {
+export async function buildStudentConfig(store, { joinCode, studentName } = {}) {
   const classrooms = await store.listClassrooms()
-  const classroom = classrooms.find((item) => item.join_code.toUpperCase() === String(joinCode || '').toUpperCase())
+  let classroom = classrooms.find((item) => item.join_code.toUpperCase() === String(joinCode || '').toUpperCase())
   if (!classroom) {
     return { classroom: null, assignments: [] }
   }
-  const assignments = (await store.listAssignments()).filter((item) => item.classroom_id === classroom.id)
+  classroom = await rememberStudentInClassroom(store, classroom, studentName)
+  const assignments = (await store.listAssignments())
+    .filter((item) => item.classroom_id === classroom.id)
+    .filter((item) => assignmentTargetsStudent(item, studentName))
+    .map((item) => assignmentForStudentConfig(item, studentName))
   return { classroom, assignments }
 }

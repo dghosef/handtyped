@@ -499,7 +499,7 @@ describe('worker host routing', () => {
     })
   })
 
-  it('reflects assignment updates and classroom deletion in student config', async () => {
+  it('reflects assignment create, update, and delete changes in student config', async () => {
     const env = makeEnv()
     const { cookie } = await loginTeacher(env)
 
@@ -621,14 +621,18 @@ describe('worker host routing', () => {
       ],
     })
 
-    const deletedClassroom = await worker.fetch(
-      new Request(`https://edu.handtyped.app/api/edu/classrooms/${createdClassroom.id}`, {
+    const deletedAssignment = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${createdAssignment.id}`, {
         method: 'DELETE',
         headers: { Cookie: cookie },
       }),
       env,
     )
-    expect(deletedClassroom.status).toBe(200)
+    expect(deletedAssignment.status).toBe(200)
+    expect(await deletedAssignment.json()).toMatchObject({
+      deleted: true,
+      assignment_id: createdAssignment.id,
+    })
 
     const deletedConfig = await worker.fetch(
       new Request('https://edu.handtyped.app/api/edu/student/config?join_code=REAL22', {
@@ -638,9 +642,362 @@ describe('worker host routing', () => {
     )
     expect(deletedConfig.status).toBe(200)
     expect(await deletedConfig.json()).toMatchObject({
-      classroom: null,
+      classroom: { join_code: 'REAL22', name: 'Realtime Period' },
       assignments: [],
     })
+  })
+
+  it('preserves teacher inline review data across later live-session sync updates', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Review Writing',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'REV22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Live feedback essay',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Draft and revise with teacher comments.',
+          rubric: [
+            { id: 'claim', title: 'Claim', description: 'Clear argument', points: 4 },
+            { id: 'evidence', title: 'Evidence', description: 'Specific support', points: 4 },
+          ],
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    const liveSessionId = 'review:student'
+    const initialLive = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: liveSessionId,
+          assignment_id: createdAssignment.id,
+          assignment_title: createdAssignment.title,
+          course: createdAssignment.course,
+          classroom: createdClassroom.name,
+          student_name: 'Ada',
+          current_text: 'Hamlet delays because certainty never arrives.',
+          document_history: [{ op: 'insert', text: 'Hamlet delays because certainty never arrives.' }],
+          current_url: null,
+          current_url_title: null,
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: '2026-04-27T12:00:00Z',
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+        }),
+      }),
+      env,
+    )
+    expect(initialLive.status).toBe(201)
+
+    const grading = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-sessions/${liveSessionId}/grading`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          rubric_scores: { claim: 3, evidence: 4 },
+          teacher_comment: 'Push the thesis one step further.',
+          suggested_revisions: 'Tighten the causal language in the opening sentence.',
+          returned_for_revision: true,
+          grade_label: 'A-',
+          grade_score: 91,
+          inline_annotations: [
+            {
+              type: 'comment',
+              start: 0,
+              end: 14,
+              quote: 'Hamlet delays',
+              note: 'Clarify what kind of delay this is.',
+            },
+            {
+              type: 'suggestion',
+              start: 15,
+              end: 22,
+              quote: 'because',
+              replacement: 'since',
+              note: 'Try a tighter connector here.',
+            },
+          ],
+        }),
+      }),
+      env,
+    )
+    expect(grading.status).toBe(200)
+    expect(await grading.json()).toMatchObject({
+      grading: {
+        grade_label: 'A-',
+        grade_score: 91,
+        returned_for_revision: true,
+        inline_annotations: [
+          expect.objectContaining({ type: 'comment', quote: 'Hamlet delays' }),
+          expect.objectContaining({ type: 'suggestion', replacement: 'since' }),
+        ],
+      },
+    })
+
+    const studentSyncUpdate = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: liveSessionId,
+          assignment_id: createdAssignment.id,
+          assignment_title: createdAssignment.title,
+          course: createdAssignment.course,
+          classroom: createdClassroom.name,
+          student_name: 'Ada',
+          current_text: 'Hamlet delays because certainty never fully arrives for him.',
+          document_history: [{ op: 'insert', text: 'Hamlet delays because certainty never fully arrives for him.' }],
+          current_url: null,
+          current_url_title: null,
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: '2026-04-27T12:01:00Z',
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+        }),
+      }),
+      env,
+    )
+    expect(studentSyncUpdate.status).toBe(201)
+    expect(await studentSyncUpdate.json()).toMatchObject({
+      grading: {
+        grade_label: 'A-',
+        teacher_comment: 'Push the thesis one step further.',
+      },
+    })
+
+    const persisted = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-sessions/${liveSessionId}`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(persisted.status).toBe(200)
+    expect(await persisted.json()).toMatchObject({
+      id: liveSessionId,
+      current_text: 'Hamlet delays because certainty never fully arrives for him.',
+      grading: {
+        grade_label: 'A-',
+        grade_score: 91,
+        returned_for_revision: true,
+        teacher_comment: 'Push the thesis one step further.',
+        inline_annotations: [
+          expect.objectContaining({ type: 'comment', quote: 'Hamlet delays' }),
+          expect.objectContaining({ type: 'suggestion', replacement: 'since' }),
+        ],
+      },
+    })
+  })
+
+  it('deletes assignments for authenticated teachers', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `DEL${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Delete Period',
+          teacher_name: 'Ms. Alvarez',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    expect(classroomRes.status).toBe(201)
+    const classroom = await classroomRes.json()
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Delete this assignment',
+          course: 'English',
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          prompt: 'Temporary assignment.',
+        }),
+      }),
+      env,
+    )
+    expect(assignmentRes.status).toBe(201)
+    const assignment = await assignmentRes.json()
+
+    const deleted = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(deleted.status).toBe(200)
+    expect(await deleted.json()).toMatchObject({
+      deleted: true,
+      assignment_id: assignment.id,
+    })
+
+    const assignments = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(assignments.status).toBe(200)
+    expect(await assignments.json()).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: assignment.id })]),
+    )
+
+    const dashboard = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/dashboard', {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(dashboard.status).toBe(200)
+    const dashboardBody = await dashboard.json()
+    expect(dashboardBody.assignment_audits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          assignment_id: assignment.id,
+          action: 'deleted',
+          assignment_title: 'Delete this assignment',
+        }),
+      ]),
+    )
+    expect(dashboardBody.assignments).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: assignment.id })]),
+    )
+  })
+
+  it('includes linked assignment ids in student config', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `LNK${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Linked Period',
+          teacher_name: 'Ms. Alvarez',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    expect(classroomRes.status).toBe(201)
+    const classroom = await classroomRes.json()
+
+    const priorAssignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Draft one',
+          course: 'English',
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          prompt: 'Write your first draft.',
+        }),
+      }),
+      env,
+    )
+    expect(priorAssignmentRes.status).toBe(201)
+    const priorAssignment = await priorAssignmentRes.json()
+
+    const linkedAssignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Draft two',
+          course: 'English',
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          prompt: 'Revise with access to your first draft.',
+          linked_assignment_ids: [priorAssignment.id],
+        }),
+      }),
+      env,
+    )
+    expect(linkedAssignmentRes.status).toBe(201)
+    const linkedAssignment = await linkedAssignmentRes.json()
+
+    const studentConfig = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}`, {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(studentConfig.status).toBe(200)
+    expect((await studentConfig.json()).assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: linkedAssignment.id,
+          linked_assignment_ids: [priorAssignment.id],
+        }),
+      ]),
+    )
   })
 
   it('deletes a class and its assignments for authenticated teachers', async () => {
@@ -701,6 +1058,69 @@ describe('worker host routing', () => {
     expect(await config.json()).toMatchObject({
       classroom: null,
       assignments: [],
+    })
+  })
+
+  it('allows creating assignments without an essay prompt', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Independent Reading',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'NOPROM',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Reading notes',
+          course: 'Independent Reading',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: '',
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    expect(await assignment.json()).toMatchObject({
+      title: 'Reading notes',
+      prompt: '',
+    })
+
+    const config = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/student/config?join_code=NOPROM', {
+        method: 'GET',
+      }),
+      env,
+    )
+    expect(config.status).toBe(200)
+    expect(await config.json()).toMatchObject({
+      classroom: { join_code: 'NOPROM', name: 'Independent Reading' },
+      assignments: [
+        {
+          title: 'Reading notes',
+          prompt: '',
+        },
+      ],
     })
   })
 })
@@ -841,5 +1261,279 @@ describe('worker monitoring and throttling', () => {
     expect(first.status).toBe(200)
     expect(second.status).toBe(429)
     expect(Number(second.headers.get('Retry-After'))).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('worker per-student assignment extensions', () => {
+  it('returns a personalized temporary access deadline for the matching student only', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `EXT${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'Extensions',
+          teacher_name: 'Joseph Tan',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+    expect(classroomRes.status).toBe(201)
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Timed Write',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          temporary_access_until: '2026-04-27T18:00:00.000Z',
+          student_temporary_access_until: {
+            'ada lovelace': '2026-04-27T19:30:00.000Z',
+          },
+        }),
+      }),
+      env,
+    )
+    const assignment = await assignmentRes.json()
+    expect(assignmentRes.status).toBe(201)
+
+    const adaRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    const graceRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Grace Hopper')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+
+    expect(adaRes.status).toBe(200)
+    expect(await adaRes.json()).toMatchObject({
+      assignments: [
+        {
+          id: assignment.id,
+          temporary_access_until: '2026-04-27T19:30:00.000Z',
+          student_temporary_access_until: {},
+        },
+      ],
+    })
+    expect(graceRes.status).toBe(200)
+    expect(await graceRes.json()).toMatchObject({
+      assignments: [
+        {
+          id: assignment.id,
+          temporary_access_until: '2026-04-27T18:00:00.000Z',
+          student_temporary_access_until: {},
+        },
+      ],
+    })
+  })
+
+  it('shows targeted assignments only to the assigned students in the same class', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `TAR${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'English 11',
+          teacher_name: 'Joseph Tan',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+    expect(classroomRes.status).toBe(201)
+
+    const wholeClassRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Whole class draft',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+        }),
+      }),
+      env,
+    )
+    const targetedRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Ada only draft',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          assigned_students: ['Ada Lovelace'],
+        }),
+      }),
+      env,
+    )
+
+    expect(wholeClassRes.status).toBe(201)
+    expect(targetedRes.status).toBe(201)
+
+    const adaRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    const graceRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Grace Hopper')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+
+    expect(adaRes.status).toBe(200)
+    const adaConfig = await adaRes.json()
+    expect(adaConfig.classroom.students).toEqual(['Ada Lovelace'])
+    expect(adaConfig.assignments.map((assignment) => assignment.title).sort()).toEqual([
+      'Ada only draft',
+      'Whole class draft',
+    ])
+
+    expect(graceRes.status).toBe(200)
+    const graceConfig = await graceRes.json()
+    expect(graceConfig.classroom.students).toEqual(['Ada Lovelace', 'Grace Hopper'])
+    expect(graceConfig.assignments.map((assignment) => assignment.title).sort()).toEqual([
+      'Whole class draft',
+    ])
+  })
+
+  it('applies per-student setting overrides in worker student config responses', async () => {
+    const env = makeEnv()
+    const { res: loginRes, cookie } = await loginTeacher(env)
+    const joinCode = `OVR${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    expect(loginRes.status).toBe(200)
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'English 11',
+          teacher_name: 'Joseph Tan',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+    expect(classroomRes.status).toBe(201)
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Differentiated write',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          policy: {
+            allow_dictation: false,
+            copy_paste_allowed: false,
+          },
+          editor_policy: {
+            font_family: 'arial',
+            font_size: 22,
+            line_height: 'relaxed',
+          },
+          browser_policy: {
+            browser_enabled: true,
+            home_url: 'https://www.gutenberg.org',
+            allowed_domains: ['gutenberg.org'],
+          },
+          student_overrides: {
+            'ada lovelace': {
+              student_name: 'Ada Lovelace',
+              policy: {
+                allow_dictation: true,
+                copy_paste_allowed: true,
+              },
+              editor_policy: {
+                font_size: 28,
+              },
+              browser_policy: {
+                browser_enabled: false,
+              },
+            },
+          },
+        }),
+      }),
+      env,
+    )
+
+    expect(assignmentRes.status).toBe(201)
+
+    const adaRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    const graceRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Grace Hopper')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+
+    const adaConfig = await adaRes.json()
+    const graceConfig = await graceRes.json()
+
+    expect(adaConfig.assignments[0]).toMatchObject({
+      student_overrides: {},
+      policy: {
+        allow_dictation: true,
+        copy_paste_allowed: true,
+      },
+      editor_policy: {
+        font_size: 28,
+      },
+      browser_policy: {
+        browser_enabled: false,
+      },
+    })
+    expect(graceConfig.assignments[0]).toMatchObject({
+      student_overrides: {},
+      policy: {
+        allow_dictation: false,
+        copy_paste_allowed: false,
+      },
+      editor_policy: {
+        font_size: 22,
+      },
+      browser_policy: {
+        browser_enabled: true,
+      },
+    })
   })
 })

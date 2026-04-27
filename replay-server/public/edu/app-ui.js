@@ -1,4 +1,6 @@
 export const LIVE_SESSION_STALE_MS = 15000
+export const RECENT_EDIT_WINDOW_MS = 5 * 60 * 1000
+export const RECENT_EDIT_BUCKET_MS = 60 * 1000
 
 export function parseTimestamp(value) {
   const parsed = Date.parse(String(value || ''))
@@ -27,6 +29,126 @@ export function sessionsForAssignment(sessions, classroomName, assignmentId) {
   return (sessions || []).filter(
     (session) => session.assignment_id === assignmentId && session.classroom === classroomName,
   )
+}
+
+function numericHistoryTimes(session) {
+  return (session?.document_history || [])
+    .map((entry) => Number(entry?.t))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+}
+
+export function recentEditActivity(
+  session,
+  {
+    windowMs = RECENT_EDIT_WINDOW_MS,
+    bucketMs = RECENT_EDIT_BUCKET_MS,
+  } = {},
+) {
+  const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
+  const buckets = Array.from({ length: bucketCount }, () => 0)
+  const times = numericHistoryTimes(session)
+  if (!times.length) {
+    return { totalEdits: 0, buckets, latestT: null }
+  }
+
+  const latestT = Math.max(...times)
+  let totalEdits = 0
+
+  times.forEach((t) => {
+    const ageMs = latestT - t
+    if (ageMs < 0 || ageMs > windowMs) {
+      return
+    }
+    totalEdits += 1
+    const reversedIndex = Math.min(bucketCount - 1, Math.floor(ageMs / bucketMs))
+    const bucketIndex = bucketCount - 1 - reversedIndex
+    buckets[bucketIndex] += 1
+  })
+
+  return { totalEdits, buckets, latestT }
+}
+
+export function aggregateRecentEditActivity(
+  sessions,
+  {
+    windowMs = RECENT_EDIT_WINDOW_MS,
+    bucketMs = RECENT_EDIT_BUCKET_MS,
+  } = {},
+) {
+  const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
+  const totals = Array.from({ length: bucketCount }, () => 0)
+  let totalEdits = 0
+  let activeStudents = 0
+
+  for (const session of sessions || []) {
+    const activity = recentEditActivity(session, { windowMs, bucketMs })
+    totalEdits += activity.totalEdits
+    if (activity.totalEdits > 0) {
+      activeStudents += 1
+    }
+    activity.buckets.forEach((count, index) => {
+      totals[index] += count
+    })
+  }
+
+  return {
+    totalEdits,
+    activeStudents,
+    buckets: totals,
+  }
+}
+
+function padDatePart(value) {
+  return String(value).padStart(2, '0')
+}
+
+export function todayAtLocalTime(hour, minute = 0, now = new Date()) {
+  const target = new Date(now)
+  target.setHours(hour, minute, 0, 0)
+  return target
+}
+
+export function localDateTimeInputValue(date) {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(
+    date.getHours(),
+  )}:${padDatePart(date.getMinutes())}`
+}
+
+export function todayAtLocalTimeIso(hour, minute = 0, now = new Date()) {
+  return todayAtLocalTime(hour, minute, now).toISOString()
+}
+
+export function reconcileTeacherNavigation({
+  classrooms = [],
+  assignments = [],
+  selectedClassroomId = null,
+  selectedAssignmentId = null,
+  currentView = 'classes',
+} = {}) {
+  const view = ['classes', 'assignments', 'assignment'].includes(currentView) ? currentView : 'classes'
+  const classroomExists = classrooms.some((classroom) => classroom.id === selectedClassroomId)
+  const nextClassroomId = classroomExists ? selectedClassroomId : null
+  const visibleAssignments = nextClassroomId
+    ? assignments.filter((assignment) => assignment.classroom_id === nextClassroomId)
+    : []
+  const assignmentExists = visibleAssignments.some((assignment) => assignment.id === selectedAssignmentId)
+  let nextAssignmentId = assignmentExists ? selectedAssignmentId : null
+  let nextView = view
+
+  if (!nextClassroomId) {
+    nextView = 'classes'
+    nextAssignmentId = null
+  } else if (nextView === 'assignment' && !nextAssignmentId) {
+    nextView = 'assignments'
+  } else if (nextView === 'classes') {
+    nextAssignmentId = null
+  }
+
+  return {
+    selectedClassroomId: nextClassroomId,
+    selectedAssignmentId: nextAssignmentId,
+    currentView: nextView,
+  }
 }
 
 export function activeSessionsForAssignment(sessions, classroomName, assignmentId, now = Date.now()) {

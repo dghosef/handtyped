@@ -14,6 +14,7 @@ import {
   buildAssignment,
   buildClassroom,
   buildEduReplay,
+  buildLiveSession,
   nowIso,
 } from './edu-schema.js'
 import {
@@ -395,24 +396,50 @@ export function createApp(sessionsDir, config = {}) {
     res.json(assignment)
   })
 
+  app.delete('/api/edu/assignments/:id', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getAssignment(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    await eduStore.deleteAssignment(req.params.id)
+    await eduStore.putAssignmentAudit(
+      buildAssignmentAuditRecord({
+        action: 'deleted',
+        previousAssignment: existing,
+        actor: session,
+      }),
+    )
+    res.json({ deleted: true, assignment_id: req.params.id })
+  })
+
   app.get('/api/edu/live-sessions', async (req, res) => {
     const session = await getTeacherSession(eduStore, req.headers.cookie)
     if (!session.authenticated) {
       return res.status(401).json({ error: 'Unauthorized', authenticated: false })
     }
     await ensureEduSeedData(eduStore)
-    res.json(await eduStore.listLiveSessions())
+    res.json((await eduStore.listLiveSessions()).map((item) => buildLiveSession(item)))
   })
 
   app.post('/api/edu/live-sessions', async (req, res) => {
     await ensureEduSeedData(eduStore)
-    const session = {
+    const nextId =
+      req.body?.id ||
+      `${req.body?.student_name || 'student'}:${req.body?.assignment_id || 'assignment'}`
+    const existing = await eduStore.getLiveSession(nextId)
+    const session = buildLiveSession({
+      ...existing,
       ...(req.body || {}),
-      id:
-        req.body?.id ||
-        `${req.body?.student_name || 'student'}:${req.body?.assignment_id || 'assignment'}`,
+      id: nextId,
+      grading:
+        req.body?.grading && typeof req.body.grading === 'object'
+          ? req.body.grading
+          : existing?.grading,
       updated_at: nowIso(),
-    }
+    })
     await eduStore.putLiveSession(session)
     res.status(201).json(session)
   })
@@ -425,7 +452,44 @@ export function createApp(sessionsDir, config = {}) {
     await ensureEduSeedData(eduStore)
     const liveSession = await eduStore.getLiveSession(req.params.id)
     if (!liveSession) return res.status(404).json({ error: 'Not found' })
-    res.json(liveSession)
+    res.json(buildLiveSession(liveSession))
+  })
+
+  app.put('/api/edu/live-sessions/:id/grading', async (req, res) => {
+    const teacherSession = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!teacherSession.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getLiveSession(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+
+    const grading = {
+      rubric_scores:
+        req.body?.rubric_scores && typeof req.body.rubric_scores === 'object'
+          ? { ...req.body.rubric_scores }
+          : {},
+      teacher_comment: String(req.body?.teacher_comment || ''),
+      suggested_revisions: String(req.body?.suggested_revisions || ''),
+      returned_for_revision: Boolean(req.body?.returned_for_revision),
+      grade_label: String(req.body?.grade_label || ''),
+      grade_score:
+        req.body?.grade_score === '' || req.body?.grade_score == null
+          ? null
+          : Number(req.body?.grade_score),
+      inline_annotations: Array.isArray(req.body?.inline_annotations) ? req.body.inline_annotations : [],
+      updated_at: nowIso(),
+      actor_id: teacherSession.teacher_id || null,
+      actor_name: teacherSession.teacher_name || null,
+      actor_email: teacherSession.teacher_email || null,
+    }
+    const updated = buildLiveSession({
+      ...existing,
+      grading,
+      updated_at: nowIso(),
+    })
+    await eduStore.putLiveSession(updated)
+    res.json(updated)
   })
 
   app.get('/api/edu/replays/:id', async (req, res) => {
@@ -448,7 +512,12 @@ export function createApp(sessionsDir, config = {}) {
 
   app.get('/api/edu/student/config', async (req, res) => {
     await ensureEduSeedData(eduStore)
-    res.json(await buildStudentConfig(eduStore, { joinCode: req.query.join_code || '' }))
+    res.json(
+      await buildStudentConfig(eduStore, {
+        joinCode: req.query.join_code || '',
+        studentName: req.query.student_name || '',
+      }),
+    )
   })
 
   app.get('/api/health', (_req, res) => {

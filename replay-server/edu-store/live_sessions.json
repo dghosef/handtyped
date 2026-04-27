@@ -49,7 +49,7 @@
   },
   {
     "id": "student:hamlet",
-    "assignment_id": "assignment_482d7fe6eec94ee7",
+    "assignment_id": "assignment_1b58cb6a168545c1",
     "assignment_title": "Hamlet timed write",
     "course": "AP Literature",
     "classroom": "AP Literature",
@@ -61,6 +61,8 @@
         "text": "Hamlet delays because certainty never arrives."
       }
     ],
+    "focus_events": [],
+    "keystroke_log": "",
     "current_url": null,
     "current_url_title": null,
     "url_history": [],
@@ -71,6 +73,86 @@
     "focused": true,
     "hid_active": true,
     "replay_session_id": "edu-replay-integration",
-    "updated_at": "2026-04-26T12:24:42.785Z"
+    "grading": {
+      "rubric_scores": {},
+      "teacher_comment": "",
+      "suggested_revisions": "",
+      "returned_for_revision": false,
+      "grade_label": "",
+      "grade_score": null,
+      "inline_annotations": [],
+      "updated_at": null,
+      "actor_id": null,
+      "actor_name": null,
+      "actor_email": null
+    },
+    "updated_at": "2026-04-27T20:37:32.348Z"
+  },
+  {
+    "id": "review:student",
+    "assignment_id": "assignment_748d59a43a5e41b2",
+    "assignment_title": "Live feedback essay",
+    "course": "Review Writing",
+    "classroom": "Review Writing",
+    "student_name": "Ada",
+    "current_text": "Hamlet delays because certainty never fully arrives for him.",
+    "document_history": [
+      {
+        "op": "insert",
+        "text": "Hamlet delays because certainty never fully arrives for him."
+      }
+    ],
+    "focus_events": [],
+    "keystroke_log": "",
+    "current_url": null,
+    "current_url_title": null,
+    "url_history": [],
+    "violation_count": 0,
+    "violations": [],
+    "last_activity_at": "2026-04-27T12:01:00Z",
+    "schedule_open": true,
+    "focused": true,
+    "hid_active": true,
+    "replay_session_id": null,
+    "grading": {
+      "rubric_scores": {
+        "claim": 3,
+        "evidence": 4
+      },
+      "teacher_comment": "Push the thesis one step further.",
+      "suggested_revisions": "Tighten the causal language in the opening sentence.",
+      "returned_for_revision": true,
+      "grade_label": "A-",
+      "grade_score": 91,
+      "inline_annotations": [
+        {
+          "id": "annotation_6ec4165236d649ee",
+          "type": "comment",
+          "start": 0,
+          "end": 14,
+          "quote": "Hamlet delays",
+          "note": "Clarify what kind of delay this is.",
+          "replacement": "",
+          "created_at": "2026-04-27T20:37:32.408Z",
+          "updated_at": "2026-04-27T20:37:32.408Z"
+        },
+        {
+          "id": "annotation_41c956b18bfa4102",
+          "type": "suggestion",
+          "start": 15,
+          "end": 22,
+          "quote": "because",
+          "note": "Try a tighter connector here.",
+          "replacement": "since",
+          "created_at": "2026-04-27T20:37:32.408Z",
+          "updated_at": "2026-04-27T20:37:32.408Z"
+        }
+      ],
+      "updated_at": "2026-04-27T20:37:32.408Z",
+      "actor_id": "teacher_default",
+      "actor_name": "Joseph Tan",
+      "actor_email": "teacher@edu.handtyped.app"
+    },
+    "updated_at": "2026-04-27T20:37:32.410Z"
   }
 ]

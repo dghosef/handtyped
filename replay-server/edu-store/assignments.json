@@ -1041,5 +1041,5517 @@
     "temporary_access_until": null,
     "created_at": "2026-04-26T12:24:42.776Z",
     "updated_at": "2026-04-26T12:24:42.776Z"
+  },
+  {
+    "id": "assignment_4056982c755a45dc",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_f98fcde0b0304913",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:40:27.325Z",
+    "updated_at": "2026-04-27T19:40:27.325Z"
+  },
+  {
+    "id": "assignment_a355efaaebae422d",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_06efaf7cebc540e2",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:42:27.705Z",
+    "updated_at": "2026-04-27T19:42:27.705Z"
+  },
+  {
+    "id": "assignment_fba8bfe4cb394b18",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_2fd2b4d8cf4b4fd0",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:42:27.746Z",
+    "updated_at": "2026-04-27T19:42:27.746Z"
+  },
+  {
+    "id": "assignment_52cb19399f0943dd",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_eb8371458307497c",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:42:49.186Z",
+    "updated_at": "2026-04-27T19:42:49.186Z"
+  },
+  {
+    "id": "assignment_c72cf647ec6b4f2b",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_1b428032d8534e37",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:42:49.325Z",
+    "updated_at": "2026-04-27T19:42:49.325Z"
+  },
+  {
+    "id": "assignment_25e3d75af4ac418a",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_9d8029ced85b415e",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:43:11.625Z",
+    "updated_at": "2026-04-27T19:43:11.625Z"
+  },
+  {
+    "id": "assignment_26abd46e4f3e4c3c",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_ff5f9a46a37f4976",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:43:11.680Z",
+    "updated_at": "2026-04-27T19:43:11.680Z"
+  },
+  {
+    "id": "assignment_502d77da4c3a4ee7",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_6e02b62fde6d4f2a",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:43:46.823Z",
+    "updated_at": "2026-04-27T19:43:46.823Z"
+  },
+  {
+    "id": "assignment_a549e3fd73044790",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_8f5f6bb442304063",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:43:46.878Z",
+    "updated_at": "2026-04-27T19:43:46.878Z"
+  },
+  {
+    "id": "assignment_572128784373429c",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_ce17509f3ab84534",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:44:13.276Z",
+    "updated_at": "2026-04-27T19:44:13.276Z"
+  },
+  {
+    "id": "assignment_75056e85220040f6",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_89349d8e3b484127",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "created_at": "2026-04-27T19:44:13.327Z",
+    "updated_at": "2026-04-27T19:44:13.327Z"
+  },
+  {
+    "id": "assignment_e62615877c6f483b",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_5d720c3f98d54e53",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T19:49:04.291Z",
+    "updated_at": "2026-04-27T19:49:04.291Z"
+  },
+  {
+    "id": "assignment_f937c05817334262",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_d01bf8e40d0c4367",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T19:49:04.335Z",
+    "updated_at": "2026-04-27T19:49:04.335Z"
+  },
+  {
+    "id": "assignment_40b61b944cbe4a0e",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_89a7ae7d02004fbd",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "created_at": "2026-04-27T19:49:04.390Z",
+    "updated_at": "2026-04-27T19:49:04.390Z"
+  },
+  {
+    "id": "assignment_a9a1a1b17e0a4b12",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_d19c4f7c55af49ae",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T19:49:29.967Z",
+    "updated_at": "2026-04-27T19:49:29.967Z"
+  },
+  {
+    "id": "assignment_92e611d0ee2141ad",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_82469363001a4590",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T19:49:30.051Z",
+    "updated_at": "2026-04-27T19:49:30.051Z"
+  },
+  {
+    "id": "assignment_8e0cf1cb76cf4b99",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_b5933f6b1b40461b",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "created_at": "2026-04-27T19:49:30.128Z",
+    "updated_at": "2026-04-27T19:49:30.128Z"
+  },
+  {
+    "id": "assignment_5c3987f33ab94049",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_81d18fa56d7f48eb",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T19:49:44.888Z",
+    "updated_at": "2026-04-27T19:49:44.888Z"
+  },
+  {
+    "id": "assignment_421bbb5f165b490d",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_febf847a8ec24aa8",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T19:49:44.938Z",
+    "updated_at": "2026-04-27T19:49:44.938Z"
+  },
+  {
+    "id": "assignment_5e612ea798df494a",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_f69c0eead43640da",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "created_at": "2026-04-27T19:49:44.993Z",
+    "updated_at": "2026-04-27T19:49:44.993Z"
+  },
+  {
+    "id": "assignment_7f754927dcd34691",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_7378056369684f5b",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:18.243Z",
+    "updated_at": "2026-04-27T20:02:18.243Z"
+  },
+  {
+    "id": "assignment_22ae080dacb14405",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_f0da8e2dc1014c85",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:18.327Z",
+    "updated_at": "2026-04-27T20:02:18.327Z"
+  },
+  {
+    "id": "assignment_cb0c6fd7a33b412f",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_f0da8e2dc1014c85",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_22ae080dacb14405"
+    ],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:18.331Z",
+    "updated_at": "2026-04-27T20:02:18.331Z"
+  },
+  {
+    "id": "assignment_2d8d052a276a4256",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_6a96bfc05b234f58",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:18.484Z",
+    "updated_at": "2026-04-27T20:02:18.484Z"
+  },
+  {
+    "id": "assignment_0953441e22af481a",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_70feb13bd4d64e05",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "created_at": "2026-04-27T20:02:18.777Z",
+    "updated_at": "2026-04-27T20:02:18.777Z"
+  },
+  {
+    "id": "assignment_dec06a8d52d44848",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_c154825c12b04fc0",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:26.487Z",
+    "updated_at": "2026-04-27T20:02:26.487Z"
+  },
+  {
+    "id": "assignment_d8d3ab6643014b70",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_b73e6f2cf512404c",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:26.572Z",
+    "updated_at": "2026-04-27T20:02:26.572Z"
+  },
+  {
+    "id": "assignment_8cc746ab64ca41ea",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_b73e6f2cf512404c",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_d8d3ab6643014b70"
+    ],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:26.576Z",
+    "updated_at": "2026-04-27T20:02:26.576Z"
+  },
+  {
+    "id": "assignment_bd581da8f59c4cb4",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_ad60ad03e03740b6",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:02:26.588Z",
+    "updated_at": "2026-04-27T20:02:26.588Z"
+  },
+  {
+    "id": "assignment_b2830de3cb2e4b2e",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_d6c7cbbf558d43b6",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "created_at": "2026-04-27T20:02:26.659Z",
+    "updated_at": "2026-04-27T20:02:26.659Z"
+  },
+  {
+    "id": "assignment_4faf92aecdcf4361",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_3f789db979d6419b",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:05:05.738Z",
+    "updated_at": "2026-04-27T20:05:05.738Z"
+  },
+  {
+    "id": "assignment_ac4e7f56a41847ca",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_b733630a5fa64442",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:05:05.827Z",
+    "updated_at": "2026-04-27T20:05:05.827Z"
+  },
+  {
+    "id": "assignment_3f721227d1c4453a",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_b733630a5fa64442",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_ac4e7f56a41847ca"
+    ],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:05:05.830Z",
+    "updated_at": "2026-04-27T20:05:05.830Z"
+  },
+  {
+    "id": "assignment_106127c452d744d1",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_063a7cfa0ebc4ff8",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:05:05.843Z",
+    "updated_at": "2026-04-27T20:05:05.843Z"
+  },
+  {
+    "id": "assignment_689fe6aafdcc416f",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_696348f6f8fb4532",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "created_at": "2026-04-27T20:05:05.929Z",
+    "updated_at": "2026-04-27T20:05:05.929Z"
+  },
+  {
+    "id": "assignment_6f4dd773b724436d",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_d029ca84b7b84e0b",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:05:05.947Z",
+    "updated_at": "2026-04-27T20:05:05.947Z"
+  },
+  {
+    "id": "assignment_b1cef83b20ad468f",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_d029ca84b7b84e0b",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "serif",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "created_at": "2026-04-27T20:05:05.951Z",
+    "updated_at": "2026-04-27T20:05:05.951Z"
+  },
+  {
+    "id": "assignment_c848a18bbb14486a",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_69f1c4f8b49f46a3",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.542Z",
+    "updated_at": "2026-04-27T20:17:56.542Z"
+  },
+  {
+    "id": "assignment_9bc86b789c654064",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_27d7f5f2d805492b",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.607Z",
+    "updated_at": "2026-04-27T20:17:56.607Z"
+  },
+  {
+    "id": "assignment_3a69ab20baf54ec0",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_27d7f5f2d805492b",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_9bc86b789c654064"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.611Z",
+    "updated_at": "2026-04-27T20:17:56.611Z"
+  },
+  {
+    "id": "assignment_5af46484f57f4741",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_fb141f243ab644df",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.621Z",
+    "updated_at": "2026-04-27T20:17:56.621Z"
+  },
+  {
+    "id": "assignment_a0a3c9df099749b0",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_e4edccae78dc408e",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.684Z",
+    "updated_at": "2026-04-27T20:17:56.684Z"
+  },
+  {
+    "id": "assignment_2b05510c47834175",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_b5c528cab1f14ba1",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.696Z",
+    "updated_at": "2026-04-27T20:17:56.696Z"
+  },
+  {
+    "id": "assignment_f8ce8061c11f4ba4",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_b5c528cab1f14ba1",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:17:56.701Z",
+    "updated_at": "2026-04-27T20:17:56.701Z"
+  },
+  {
+    "id": "assignment_1649f8314f034822",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_b9b837af4d494fc2",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.021Z",
+    "updated_at": "2026-04-27T20:21:09.021Z"
+  },
+  {
+    "id": "assignment_1c79bb6525504153",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_ee448c19f00641d1",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.101Z",
+    "updated_at": "2026-04-27T20:21:09.101Z"
+  },
+  {
+    "id": "assignment_71635df343f84338",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_ee448c19f00641d1",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_1c79bb6525504153"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.105Z",
+    "updated_at": "2026-04-27T20:21:09.105Z"
+  },
+  {
+    "id": "assignment_39ffdd2de16644d8",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_55b8c254ed034eaf",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.115Z",
+    "updated_at": "2026-04-27T20:21:09.115Z"
+  },
+  {
+    "id": "assignment_5f8dac5f5c034c75",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_5315f27191bc4917",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.190Z",
+    "updated_at": "2026-04-27T20:21:09.191Z"
+  },
+  {
+    "id": "assignment_79127dd5b7094d63",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_83ab030d94c546e1",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.205Z",
+    "updated_at": "2026-04-27T20:21:09.205Z"
+  },
+  {
+    "id": "assignment_dc927089253b4ba9",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_83ab030d94c546e1",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:09.209Z",
+    "updated_at": "2026-04-27T20:21:09.209Z"
+  },
+  {
+    "id": "assignment_85ff179188f842a9",
+    "title": "Differentiated write",
+    "course": "English 11",
+    "classroom_id": "classroom_520d6eabb3ec4b16",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {
+      "ada lovelace": {
+        "student_name": "Ada Lovelace",
+        "policy": {
+          "allow_dictation": true,
+          "copy_paste_allowed": true
+        },
+        "editor_policy": {
+          "font_size": 28
+        },
+        "browser_policy": {
+          "browser_enabled": false
+        }
+      }
+    },
+    "created_at": "2026-04-27T20:21:09.224Z",
+    "updated_at": "2026-04-27T20:21:09.224Z"
+  },
+  {
+    "id": "assignment_61d2a2e053f94f88",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_7efc15573dcb4675",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.745Z",
+    "updated_at": "2026-04-27T20:21:23.746Z"
+  },
+  {
+    "id": "assignment_1ce56697344240d5",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_2f960b129a7c4db4",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.808Z",
+    "updated_at": "2026-04-27T20:21:23.808Z"
+  },
+  {
+    "id": "assignment_7894202570894737",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_2f960b129a7c4db4",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_1ce56697344240d5"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.812Z",
+    "updated_at": "2026-04-27T20:21:23.812Z"
+  },
+  {
+    "id": "assignment_8a475d78f8cf43c3",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_958c2de07dbd446e",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.820Z",
+    "updated_at": "2026-04-27T20:21:23.820Z"
+  },
+  {
+    "id": "assignment_2e62f180383a41e8",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_ebdfec428bb94b96",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.874Z",
+    "updated_at": "2026-04-27T20:21:23.874Z"
+  },
+  {
+    "id": "assignment_d67092080da4413a",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_b4194c5742a04fe7",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.885Z",
+    "updated_at": "2026-04-27T20:21:23.885Z"
+  },
+  {
+    "id": "assignment_888e3d6be37446a4",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_b4194c5742a04fe7",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:21:23.888Z",
+    "updated_at": "2026-04-27T20:21:23.889Z"
+  },
+  {
+    "id": "assignment_1da7a4edbcb141ff",
+    "title": "Differentiated write",
+    "course": "English 11",
+    "classroom_id": "classroom_92d1527c95034254",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {
+      "ada lovelace": {
+        "student_name": "Ada Lovelace",
+        "policy": {
+          "allow_dictation": true,
+          "copy_paste_allowed": true
+        },
+        "editor_policy": {
+          "font_size": 28
+        },
+        "browser_policy": {
+          "browser_enabled": false
+        }
+      }
+    },
+    "created_at": "2026-04-27T20:21:23.900Z",
+    "updated_at": "2026-04-27T20:21:23.900Z"
+  },
+  {
+    "id": "assignment_5b26e316ee0c40a8",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_4f1fb3edd1d44558",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.353Z",
+    "updated_at": "2026-04-27T20:22:42.353Z"
+  },
+  {
+    "id": "assignment_2eaae026355c4d97",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_e2d561270e9c47ea",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.427Z",
+    "updated_at": "2026-04-27T20:22:42.427Z"
+  },
+  {
+    "id": "assignment_0ba335383bc94ebe",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_e2d561270e9c47ea",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_2eaae026355c4d97"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.431Z",
+    "updated_at": "2026-04-27T20:22:42.431Z"
+  },
+  {
+    "id": "assignment_cc5502c654894d60",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_b1bd1d5cfd9d49ab",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.444Z",
+    "updated_at": "2026-04-27T20:22:42.444Z"
+  },
+  {
+    "id": "assignment_ebaa7c2682684642",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_d0fe2e23481f4e3f",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.528Z",
+    "updated_at": "2026-04-27T20:22:42.528Z"
+  },
+  {
+    "id": "assignment_abad37f1f9b84af7",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_1c499c5b8e724f12",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.544Z",
+    "updated_at": "2026-04-27T20:22:42.544Z"
+  },
+  {
+    "id": "assignment_4f4f18bd181b4fd8",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_1c499c5b8e724f12",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:22:42.553Z",
+    "updated_at": "2026-04-27T20:22:42.553Z"
+  },
+  {
+    "id": "assignment_8a07f210e7e045f2",
+    "title": "Differentiated write",
+    "course": "English 11",
+    "classroom_id": "classroom_5326cf48226143d4",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {
+      "ada lovelace": {
+        "student_name": "Ada Lovelace",
+        "policy": {
+          "allow_dictation": true,
+          "copy_paste_allowed": true
+        },
+        "editor_policy": {
+          "font_size": 28
+        },
+        "browser_policy": {
+          "browser_enabled": false
+        }
+      }
+    },
+    "created_at": "2026-04-27T20:22:42.568Z",
+    "updated_at": "2026-04-27T20:22:42.568Z"
+  },
+  {
+    "id": "assignment_a9d833b12e1f4a99",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_a8e8397f7add4dba",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.081Z",
+    "updated_at": "2026-04-27T20:26:51.082Z"
+  },
+  {
+    "id": "assignment_549d2f00430a439a",
+    "title": "Live feedback essay",
+    "course": "Review Writing",
+    "classroom_id": "classroom_3170a59a9a6c476b",
+    "classroom_name": "Review Writing",
+    "prompt": "Draft quickly and revise from teacher feedback.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [
+      {
+        "id": "claim",
+        "title": "Claim",
+        "description": "Clear argument",
+        "points": 4
+      },
+      {
+        "id": "evidence",
+        "title": "Evidence",
+        "description": "Specific support",
+        "points": 4
+      }
+    ],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.130Z",
+    "updated_at": "2026-04-27T20:26:51.130Z"
+  },
+  {
+    "id": "assignment_0963ce41acbf444c",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_5628c0a3f9d24910",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.168Z",
+    "updated_at": "2026-04-27T20:26:51.168Z"
+  },
+  {
+    "id": "assignment_64421e38efb749bf",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_5628c0a3f9d24910",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_0963ce41acbf444c"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.173Z",
+    "updated_at": "2026-04-27T20:26:51.173Z"
+  },
+  {
+    "id": "assignment_5145b716c0414848",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_c29a872bdafc4346",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.183Z",
+    "updated_at": "2026-04-27T20:26:51.183Z"
+  },
+  {
+    "id": "assignment_d949a36668604198",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_f77863ae3ba7420c",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.243Z",
+    "updated_at": "2026-04-27T20:26:51.243Z"
+  },
+  {
+    "id": "assignment_688329ef45c340e1",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_9eff6948590443ed",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.254Z",
+    "updated_at": "2026-04-27T20:26:51.254Z"
+  },
+  {
+    "id": "assignment_b6bd0ae0329a4ec8",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_9eff6948590443ed",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:26:51.258Z",
+    "updated_at": "2026-04-27T20:26:51.258Z"
+  },
+  {
+    "id": "assignment_3e4d457a98a94908",
+    "title": "Differentiated write",
+    "course": "English 11",
+    "classroom_id": "classroom_8d45b6e605764684",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {
+      "ada lovelace": {
+        "student_name": "Ada Lovelace",
+        "policy": {
+          "allow_dictation": true,
+          "copy_paste_allowed": true
+        },
+        "editor_policy": {
+          "font_size": 28
+        },
+        "browser_policy": {
+          "browser_enabled": false
+        }
+      }
+    },
+    "created_at": "2026-04-27T20:26:51.271Z",
+    "updated_at": "2026-04-27T20:26:51.271Z"
+  },
+  {
+    "id": "assignment_a4579af27c2b4c57",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_0eaa11ad461043fb",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.096Z",
+    "updated_at": "2026-04-27T20:27:43.096Z"
+  },
+  {
+    "id": "assignment_e9564828e3d54574",
+    "title": "Live feedback essay",
+    "course": "Review Writing",
+    "classroom_id": "classroom_8b962d9dbbe24001",
+    "classroom_name": "Review Writing",
+    "prompt": "Draft quickly and revise from teacher feedback.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [
+      {
+        "id": "claim",
+        "title": "Claim",
+        "description": "Clear argument",
+        "points": 4
+      },
+      {
+        "id": "evidence",
+        "title": "Evidence",
+        "description": "Specific support",
+        "points": 4
+      }
+    ],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.146Z",
+    "updated_at": "2026-04-27T20:27:43.146Z"
+  },
+  {
+    "id": "assignment_d719971927974dbd",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_28f8343e8ba54181",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.185Z",
+    "updated_at": "2026-04-27T20:27:43.185Z"
+  },
+  {
+    "id": "assignment_5e0a02e6c0064d8d",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_28f8343e8ba54181",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_d719971927974dbd"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.189Z",
+    "updated_at": "2026-04-27T20:27:43.189Z"
+  },
+  {
+    "id": "assignment_edf2d0402e404ba7",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_1b7e8493dfd54ae1",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.199Z",
+    "updated_at": "2026-04-27T20:27:43.199Z"
+  },
+  {
+    "id": "assignment_8a24500c67b64170",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_a6c1157127304a52",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.262Z",
+    "updated_at": "2026-04-27T20:27:43.262Z"
+  },
+  {
+    "id": "assignment_31ef655950334643",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_c17fd85fe48c489c",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.277Z",
+    "updated_at": "2026-04-27T20:27:43.278Z"
+  },
+  {
+    "id": "assignment_ea4ec280c9854d4e",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_c17fd85fe48c489c",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:27:43.283Z",
+    "updated_at": "2026-04-27T20:27:43.284Z"
+  },
+  {
+    "id": "assignment_88215df262b94bfb",
+    "title": "Differentiated write",
+    "course": "English 11",
+    "classroom_id": "classroom_f442dc1d02a3450b",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {
+      "ada lovelace": {
+        "student_name": "Ada Lovelace",
+        "policy": {
+          "allow_dictation": true,
+          "copy_paste_allowed": true
+        },
+        "editor_policy": {
+          "font_size": 28
+        },
+        "browser_policy": {
+          "browser_enabled": false
+        }
+      }
+    },
+    "created_at": "2026-04-27T20:27:43.299Z",
+    "updated_at": "2026-04-27T20:27:43.299Z"
+  },
+  {
+    "id": "assignment_1b58cb6a168545c1",
+    "title": "Hamlet timed write",
+    "course": "AP Literature",
+    "classroom_id": "classroom_08a6bfb91b0b49d0",
+    "classroom_name": "AP Literature",
+    "prompt": "Write about indecision in Hamlet.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "sans",
+      "font_size": 24,
+      "line_height": "double"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.324Z",
+    "updated_at": "2026-04-27T20:37:32.324Z"
+  },
+  {
+    "id": "assignment_748d59a43a5e41b2",
+    "title": "Live feedback essay",
+    "course": "Review Writing",
+    "classroom_id": "classroom_db0a69c767e1498a",
+    "classroom_name": "Review Writing",
+    "prompt": "Draft quickly and revise from teacher feedback.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [
+      {
+        "id": "claim",
+        "title": "Claim",
+        "description": "Clear argument",
+        "points": 4
+      },
+      {
+        "id": "evidence",
+        "title": "Evidence",
+        "description": "Specific support",
+        "points": 4
+      }
+    ],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.401Z",
+    "updated_at": "2026-04-27T20:37:32.402Z"
+  },
+  {
+    "id": "assignment_343a80ea544946b7",
+    "title": "Draft one",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_ce2128a8ee304e33",
+    "classroom_name": "Linked Literature",
+    "prompt": "Write your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.442Z",
+    "updated_at": "2026-04-27T20:37:32.442Z"
+  },
+  {
+    "id": "assignment_ab875faab7824421",
+    "title": "Draft two",
+    "course": "Linked Literature",
+    "classroom_id": "classroom_ce2128a8ee304e33",
+    "classroom_name": "Linked Literature",
+    "prompt": "Revise with access to your first draft.",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [
+      "assignment_343a80ea544946b7"
+    ],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.447Z",
+    "updated_at": "2026-04-27T20:37:32.447Z"
+  },
+  {
+    "id": "assignment_011d7e82ebaa4f0d",
+    "title": "Notebook check-in",
+    "course": "Silent Reading",
+    "classroom_id": "classroom_1600c7d8a7274c3a",
+    "classroom_name": "Silent Reading",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.458Z",
+    "updated_at": "2026-04-27T20:37:32.458Z"
+  },
+  {
+    "id": "assignment_52da68d19ada48cd",
+    "title": "Timed Write",
+    "course": "Extensions",
+    "classroom_id": "classroom_657bbab1345f4045",
+    "classroom_name": "Extensions",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": "2026-04-27T18:00:00.000Z",
+    "student_temporary_access_until": {
+      "ada lovelace": "2026-04-27T19:30:00.000Z"
+    },
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.521Z",
+    "updated_at": "2026-04-27T20:37:32.521Z"
+  },
+  {
+    "id": "assignment_117fda11a49f4a35",
+    "title": "Whole class draft",
+    "course": "English 11",
+    "classroom_id": "classroom_3ce939e6666a4a59",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.536Z",
+    "updated_at": "2026-04-27T20:37:32.536Z"
+  },
+  {
+    "id": "assignment_d2b552a0c8b94d31",
+    "title": "Ada only draft",
+    "course": "English 11",
+    "classroom_id": "classroom_3ce939e6666a4a59",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [
+      "Ada Lovelace"
+    ],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {},
+    "created_at": "2026-04-27T20:37:32.540Z",
+    "updated_at": "2026-04-27T20:37:32.540Z"
+  },
+  {
+    "id": "assignment_60d6dffb6b2d485c",
+    "title": "Differentiated write",
+    "course": "English 11",
+    "classroom_id": "classroom_4f81d5242a504031",
+    "classroom_name": "English 11",
+    "prompt": "",
+    "instructions": "",
+    "starter_document": "",
+    "windows": [
+      {
+        "label": "Writing window",
+        "days": {
+          "monday": true,
+          "tuesday": true,
+          "wednesday": true,
+          "thursday": true,
+          "friday": true,
+          "saturday": false,
+          "sunday": false
+        },
+        "end_date": null,
+        "start_hour": 10,
+        "start_minute": 0,
+        "end_hour": 11,
+        "end_minute": 0
+      }
+    ],
+    "policy": {
+      "allow_dictation": false,
+      "copy_paste_allowed": false,
+      "printing_allowed": false,
+      "export_allowed": false,
+      "images_allowed": false,
+      "citations_required": false,
+      "require_lockdown": false,
+      "require_fullscreen": false
+    },
+    "editor_policy": {
+      "font_family": "arial",
+      "font_size": 22,
+      "line_height": "relaxed"
+    },
+    "browser_policy": {
+      "browser_enabled": true,
+      "home_url": "https://www.gutenberg.org",
+      "allowed_domains": [
+        "gutenberg.org"
+      ],
+      "log_all_navigation": true
+    },
+    "assigned_students": [],
+    "linked_assignment_ids": [],
+    "rubric": [],
+    "temporary_access_until": null,
+    "student_temporary_access_until": {},
+    "student_overrides": {
+      "ada lovelace": {
+        "student_name": "Ada Lovelace",
+        "policy": {
+          "allow_dictation": true,
+          "copy_paste_allowed": true
+        },
+        "editor_policy": {
+          "font_size": 28
+        },
+        "browser_policy": {
+          "browser_enabled": false
+        }
+      }
+    },
+    "created_at": "2026-04-27T20:37:32.554Z",
+    "updated_at": "2026-04-27T20:37:32.554Z"
   }
 ]

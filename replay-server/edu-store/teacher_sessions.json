@@ -2239,5 +2239,221 @@
     "provider": "password",
     "created_at": "2026-04-27T20:37:32.550Z",
     "expires_at": "2026-04-28T08:37:32.550Z"
+  },
+  {
+    "id": "teacher_session_25c9f48278da436c",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.528Z",
+    "expires_at": "2026-04-28T09:03:01.528Z"
+  },
+  {
+    "id": "teacher_session_40104d15e13045fe",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "google",
+    "created_at": "2026-04-27T21:03:01.537Z",
+    "expires_at": "2026-04-28T09:03:01.537Z"
+  },
+  {
+    "id": "teacher_session_13db73e38e114a8d",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.612Z",
+    "expires_at": "2026-04-28T09:03:01.612Z"
+  },
+  {
+    "id": "teacher_session_640f63a61be945b1",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.663Z",
+    "expires_at": "2026-04-28T09:03:01.663Z"
+  },
+  {
+    "id": "teacher_session_a3a21c4987b44a7a",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.714Z",
+    "expires_at": "2026-04-28T09:03:01.714Z"
+  },
+  {
+    "id": "teacher_session_af46bb7ee2c741ce",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.749Z",
+    "expires_at": "2026-04-28T09:03:01.749Z"
+  },
+  {
+    "id": "teacher_session_6618a69574fd4c55",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.787Z",
+    "expires_at": "2026-04-28T09:03:01.787Z"
+  },
+  {
+    "id": "teacher_session_8d1f0f9d553643ca",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.817Z",
+    "expires_at": "2026-04-28T09:03:01.817Z"
+  },
+  {
+    "id": "teacher_session_f5467a2b03494ead",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.836Z",
+    "expires_at": "2026-04-28T09:03:01.836Z"
+  },
+  {
+    "id": "teacher_session_64d0088ab66641d4",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:01.960Z",
+    "expires_at": "2026-04-28T09:03:01.960Z"
+  },
+  {
+    "id": "teacher_session_bc56d10d360f4ab3",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:02.010Z",
+    "expires_at": "2026-04-28T09:03:02.010Z"
+  },
+  {
+    "id": "teacher_session_768a58e9ee1648d6",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:03:02.057Z",
+    "expires_at": "2026-04-28T09:03:02.057Z"
+  },
+  {
+    "id": "teacher_session_94cdcb2b56f944e8",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.316Z",
+    "expires_at": "2026-04-28T09:07:28.316Z"
+  },
+  {
+    "id": "teacher_session_e06c040d07474213",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "google",
+    "created_at": "2026-04-27T21:07:28.321Z",
+    "expires_at": "2026-04-28T09:07:28.321Z"
+  },
+  {
+    "id": "teacher_session_e48ebb4d4c974950",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.356Z",
+    "expires_at": "2026-04-28T09:07:28.356Z"
+  },
+  {
+    "id": "teacher_session_b01fba6650d044c4",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.392Z",
+    "expires_at": "2026-04-28T09:07:28.392Z"
+  },
+  {
+    "id": "teacher_session_5ac095db9c2d4c0c",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.424Z",
+    "expires_at": "2026-04-28T09:07:28.424Z"
+  },
+  {
+    "id": "teacher_session_c7e994a36f524862",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.441Z",
+    "expires_at": "2026-04-28T09:07:28.441Z"
+  },
+  {
+    "id": "teacher_session_e2fd225690e64ce3",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.467Z",
+    "expires_at": "2026-04-28T09:07:28.467Z"
+  },
+  {
+    "id": "teacher_session_2d52e4c866104a71",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.483Z",
+    "expires_at": "2026-04-28T09:07:28.483Z"
+  },
+  {
+    "id": "teacher_session_7a6bcd6dce1d4487",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.494Z",
+    "expires_at": "2026-04-28T09:07:28.494Z"
+  },
+  {
+    "id": "teacher_session_b30067816a2e444d",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.540Z",
+    "expires_at": "2026-04-28T09:07:28.540Z"
+  },
+  {
+    "id": "teacher_session_98e4276fc2834934",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.556Z",
+    "expires_at": "2026-04-28T09:07:28.556Z"
+  },
+  {
+    "id": "teacher_session_2082974d7b0e4612",
+    "teacher_id": "teacher_default",
+    "teacher_name": "Joseph Tan",
+    "teacher_email": "teacher@edu.handtyped.app",
+    "provider": "password",
+    "created_at": "2026-04-27T21:07:28.578Z",
+    "expires_at": "2026-04-28T09:07:28.578Z"
   }
 ]

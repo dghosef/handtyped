@@ -1,11 +1,13 @@
 import {
   aggregateRecentEditActivity,
   assignmentViewMeta,
+  buildAfterSchoolRanges,
   deriveSessionRisk,
   formatWindowSummary,
   localDateTimeInputValue,
-  recentEditActivity,
+  nextLocalTimeAtOrAfter,
   reconcileTeacherNavigation,
+  replayLocalDateInputValue,
   sessionStatusLabel,
   sessionsForAssignment,
   sortSessionsForDisplay,
@@ -13,6 +15,7 @@ import {
   todayAtLocalTime,
   todayAtLocalTimeIso,
 } from './app-ui.js'
+import { buildAttributedDocument } from '../replay-view.js'
 
 const DASHBOARD_REFRESH_MS = 2000
 
@@ -28,11 +31,13 @@ let sessionFilter = 'all'
 let sessionSearch = ''
 let assignmentStudentOverrideDrafts = []
 let selectedReviewSessionId = null
+let reviewWorkspaceOpen = false
 let reviewState = null
 let reviewSaveTimer = null
 let reviewSaveInFlight = false
 let reviewSavePromise = null
 let selectedAnnotationId = null
+const reviewReplayCache = new Map()
 
 const elements = {
   authPanel: document.getElementById('auth-panel'),
@@ -91,6 +96,7 @@ const elements = {
   overviewEditsMeta: document.getElementById('overview-edits-meta'),
   assignmentAuditList: document.getElementById('assignment-audit-list'),
   reviewWorkspace: document.getElementById('review-workspace'),
+  reviewLayout: document.getElementById('review-layout'),
   reviewWorkspaceEmpty: document.getElementById('review-workspace-empty'),
   reviewWorkspaceContent: document.getElementById('review-workspace-content'),
   reviewWorkspaceTitle: document.getElementById('review-workspace-title'),
@@ -108,6 +114,11 @@ const elements = {
   reviewSelectionCount: document.getElementById('review-selection-count'),
   reviewSelectionPanel: document.getElementById('review-selection-panel'),
   reviewSelectionQuote: document.getElementById('review-selection-quote'),
+  reviewHighlightDate: document.getElementById('review-highlight-date'),
+  reviewHighlightAfterSchoolDay: document.getElementById('review-highlight-after-school-day'),
+  reviewHighlightAfterSchoolAll: document.getElementById('review-highlight-after-school-all'),
+  reviewHighlightClear: document.getElementById('review-highlight-clear'),
+  reviewHighlightMeta: document.getElementById('review-highlight-meta'),
   reviewCommentMode: document.getElementById('review-comment-mode'),
   reviewSuggestMode: document.getElementById('review-suggest-mode'),
   reviewComposer: document.getElementById('review-composer'),
@@ -119,6 +130,7 @@ const elements = {
   reviewCancelAnnotation: document.getElementById('review-cancel-annotation'),
   reviewAnnotationMeta: document.getElementById('review-annotation-meta'),
   reviewAnnotationList: document.getElementById('review-annotation-list'),
+  reviewCloseButton: document.getElementById('review-close-button'),
 }
 
 const STUDENT_OVERRIDE_BOOLEAN_FIELDS = [
@@ -273,6 +285,11 @@ function createReviewStateFromSession(session) {
     composerMode: '',
     composerNote: '',
     composerReplacement: '',
+    replayLoadState: 'idle',
+    replayError: '',
+    replayData: null,
+    highlightMode: 'none',
+    highlightDate: '',
   }
 }
 
@@ -715,11 +732,7 @@ async function extendSelectedAssignmentToToday(hour, minute = 0) {
     return
   }
 
-  const target = todayAtLocalTime(hour, minute)
-  if (target.getTime() < Date.now()) {
-    window.alert('The selected time today has already passed.')
-    return
-  }
+  const target = nextLocalTimeAtOrAfter(hour, minute)
 
   const updatedAssignment = await request(`/api/edu/assignments/${assignment.id}`, {
     method: 'PUT',
@@ -768,7 +781,7 @@ async function extendSelectedAssignmentForStudentToToday(studentName, hour, minu
     body: JSON.stringify({
       student_temporary_access_until: {
         ...(assignment.student_temporary_access_until || {}),
-        [normalizedKey]: todayAtLocalTimeIso(hour, minute),
+        [normalizedKey]: target.toISOString(),
       },
     }),
   })
@@ -1040,43 +1053,14 @@ function renderAssignmentStage() {
   })
 }
 
-function summarizeViolations(session) {
-  const items = (session.violations || []).slice(0, 3)
-  if (!items.length) {
-    return '<li>No violations recorded.</li>'
-  }
-  return items
-    .map((item) => `<li>${escapeHtml(item.detail || item.kind || 'Policy event')}</li>`)
-    .join('')
-}
-
 function summarizeUrls(session) {
   const items = (session.url_history || []).slice(-4)
   if (!items.length) {
     return '<li>No recent browser visits.</li>'
   }
-  return items.map((item) => `<li>${escapeHtml(item.url || '(unknown url)')}</li>`).join('')
-}
-
-function renderEditActivitySparkline(activity) {
-  const maxCount = Math.max(1, ...activity.buckets)
-  const bars = activity.buckets
-    .map((count, index) => {
-      const height = count > 0 ? Math.max(12, Math.round((count / maxCount) * 100)) : 8
-      return `<span class="edit-activity-bar" style="height:${height}%" title="Minute ${index + 1}: ${count} edit${
-        count === 1 ? '' : 's'
-      }"></span>`
-    })
+  return items
+    .map((item) => `<li class="${item?.allowed === false ? 'student-url-illegal' : ''}">${escapeHtml(item.url || '(unknown url)')}</li>`)
     .join('')
-  const label = activity.totalEdits
-    ? `${activity.totalEdits} edit${activity.totalEdits === 1 ? '' : 's'} in the last 5 minutes`
-    : 'No recent edits in the last 5 minutes'
-  return `
-    <div class="edit-activity-block">
-      <div class="edit-activity-meta">${escapeHtml(label)}</div>
-      <div class="edit-activity-graph" aria-label="${escapeHtml(label)}">${bars}</div>
-    </div>
-  `
 }
 
 function selectedSessionReviewSummary(session, assignment) {
@@ -1329,6 +1313,196 @@ function annotationDisplayState(annotation, text) {
   }
 }
 
+function reviewHighlightRangesForState(session, assignment) {
+  if (!reviewState?.replayData?.attributedDocument) {
+    return []
+  }
+  const replay = reviewState.replayData.replay || {}
+  const insertedAtMs = reviewState.replayData.attributedDocument.chars.map((entry) => entry.insertedAtMs)
+  const offsetMinutes = Number(replay.recorded_timezone_offset_minutes || 0)
+
+  switch (reviewState.highlightMode) {
+    case 'after-school-day':
+      return buildAfterSchoolRanges(insertedAtMs, assignment, {
+        dateInput: reviewState.highlightDate,
+        offsetMinutes,
+      })
+    case 'after-school-all':
+      return buildAfterSchoolRanges(insertedAtMs, assignment, {
+        allDates: true,
+        offsetMinutes,
+      })
+    default:
+      return []
+  }
+}
+
+function reviewHighlightIndexSet(text, ranges) {
+  if (!reviewState?.replayData?.attributedDocument || !Array.isArray(ranges) || !ranges.length) {
+    return new Set()
+  }
+  const attributed = reviewState.replayData.attributedDocument
+  if (attributed.text !== String(text || '')) {
+    return new Set()
+  }
+  const active = new Set()
+  attributed.chars.forEach((entry, index) => {
+    const insertedAtMs = Number(entry?.insertedAtMs)
+    if (!Number.isFinite(insertedAtMs)) {
+      return
+    }
+    if (ranges.some((range) => insertedAtMs >= range.startMs && insertedAtMs <= range.endMs)) {
+      active.add(index)
+    }
+  })
+  return active
+}
+
+function renderIndexedSlice(text, start, end, annotation, highlightIndexes) {
+  let html = ''
+  let cursor = start
+
+  while (cursor < end) {
+    const highlighted = highlightIndexes.has(cursor)
+    let next = cursor + 1
+    while (next < end && highlightIndexes.has(next) === highlighted) {
+      next += 1
+    }
+
+    const classes = []
+    if (annotation) {
+      classes.push(
+        'review-highlight',
+        annotation.type === 'suggestion' ? 'review-highlight-suggestion' : 'review-highlight-comment',
+      )
+      if (annotation.stale) {
+        classes.push('review-highlight-stale')
+      }
+      if (annotation.id === selectedAnnotationId) {
+        classes.push('is-selected')
+      }
+    }
+    if (highlighted) {
+      classes.push('review-highlight-time')
+    }
+
+    const content = escapeHtml(String(text || '').slice(cursor, next))
+    if (!classes.length) {
+      html += content
+    } else {
+      const annotationAttr = annotation ? ` data-annotation-id="${escapeHtml(annotation.id)}"` : ''
+      html += `<span class="${classes.join(' ')}"${annotationAttr}>${content}</span>`
+    }
+    cursor = next
+  }
+
+  return html
+}
+
+function renderReviewHighlightUi(session, assignment) {
+  if (!reviewState || !elements.reviewHighlightMeta) {
+    return
+  }
+
+  if (elements.reviewHighlightDate) {
+    elements.reviewHighlightDate.value = reviewState.highlightDate
+  }
+
+  const noReplay = !session?.replay_session_id
+  const loading = reviewState.replayLoadState === 'loading'
+  const ready = reviewState.replayLoadState === 'ready'
+  const disablePresets = noReplay || loading || !ready
+  if (elements.reviewHighlightAfterSchoolDay) {
+    elements.reviewHighlightAfterSchoolDay.disabled = disablePresets || !reviewState.highlightDate
+  }
+  if (elements.reviewHighlightAfterSchoolAll) {
+    elements.reviewHighlightAfterSchoolAll.disabled = disablePresets
+  }
+  if (elements.reviewHighlightClear) {
+    elements.reviewHighlightClear.disabled = !reviewState.highlightMode
+  }
+
+  if (noReplay) {
+    elements.reviewHighlightMeta.textContent = 'No replay is available for this student yet, so time-based highlighting is unavailable.'
+    return
+  }
+  if (reviewState.replayLoadState === 'error') {
+    elements.reviewHighlightMeta.textContent = reviewState.replayError || 'Could not load replay data for time-based highlighting.'
+    return
+  }
+  if (loading || reviewState.replayLoadState === 'idle') {
+    elements.reviewHighlightMeta.textContent = 'Loading replay data for time-based highlighting…'
+    return
+  }
+
+  const ranges = reviewHighlightRangesForState(session, assignment)
+  const highlights = reviewHighlightIndexSet(session.current_text || '', ranges)
+  if (reviewState.highlightMode && !highlights.size) {
+    elements.reviewHighlightMeta.textContent = 'No surviving characters matched that after-school filter.'
+    return
+  }
+  if (reviewState.highlightMode === 'after-school-day') {
+    elements.reviewHighlightMeta.textContent = `${highlights.size} surviving character${highlights.size === 1 ? '' : 's'} highlighted from after school on ${reviewState.highlightDate}.`
+    return
+  }
+  if (reviewState.highlightMode === 'after-school-all') {
+    elements.reviewHighlightMeta.textContent = `${highlights.size} surviving character${highlights.size === 1 ? '' : 's'} highlighted from after-school writing across the replay.`
+    return
+  }
+  elements.reviewHighlightMeta.textContent = 'Pick a day or use all after school to highlight the surviving text added outside class time.'
+}
+
+async function loadReviewReplayData(session) {
+  if (!reviewState || !session || reviewState.replayLoadState === 'loading' || reviewState.replayLoadState === 'ready') {
+    return
+  }
+  if (!session.replay_session_id) {
+    reviewState.replayLoadState = 'missing'
+    reviewState.replayError = ''
+    return
+  }
+
+  reviewState.replayLoadState = 'loading'
+  reviewState.replayError = ''
+  renderReviewHighlightUi(session, getSelectedAssignment())
+
+  try {
+    let cached = reviewReplayCache.get(session.replay_session_id)
+    if (!cached) {
+      const replay = await request(`/api/edu/replays/${encodeURIComponent(session.replay_session_id)}`)
+      cached = {
+        replay,
+        attributedDocument: buildAttributedDocument({
+          ...replay,
+          doc_history: replay.document_history || [],
+          doc_text: replay.current_text || '',
+        }),
+      }
+      reviewReplayCache.set(session.replay_session_id, cached)
+    }
+
+    if (!reviewState || reviewState.sessionId !== session.id) {
+      return
+    }
+    reviewState.replayData = cached
+    reviewState.replayLoadState = 'ready'
+    if (!reviewState.highlightDate) {
+      reviewState.highlightDate = replayLocalDateInputValue(
+        cached.attributedDocument.firstInsertedAtMs || cached.attributedDocument.lastInsertedAtMs,
+        Number(cached.replay.recorded_timezone_offset_minutes || 0),
+      )
+    }
+    renderReviewWorkspace(getSelectedAssignment())
+  } catch (error) {
+    if (!reviewState || reviewState.sessionId !== session.id) {
+      return
+    }
+    reviewState.replayLoadState = 'error'
+    reviewState.replayError = error.message || 'Could not load replay data.'
+    renderReviewHighlightUi(session, getSelectedAssignment())
+  }
+}
+
 function renderDraftSurface(text, annotations) {
   const safeText = String(text || '')
   if (!safeText) {
@@ -1336,6 +1510,7 @@ function renderDraftSurface(text, annotations) {
     return
   }
 
+  const highlightIndexes = reviewHighlightIndexSet(safeText, reviewHighlightRangesForState(currentReviewSession(), getSelectedAssignment()))
   const displayAnnotations = annotations
     .map((annotation) => annotationDisplayState(annotation, safeText))
     .sort((a, b) => a.start - b.start || a.end - b.end)
@@ -1346,27 +1521,13 @@ function renderDraftSurface(text, annotations) {
     const start = Math.max(0, Math.min(annotation.start, safeText.length))
     const end = Math.max(start, Math.min(annotation.end, safeText.length))
     if (start > cursor) {
-      parts.push(escapeHtml(safeText.slice(cursor, start)))
+      parts.push(renderIndexedSlice(safeText, cursor, start, null, highlightIndexes))
     }
-    const classes = [
-      'review-highlight',
-      annotation.type === 'suggestion' ? 'review-highlight-suggestion' : 'review-highlight-comment',
-    ]
-    if (annotation.stale) {
-      classes.push('review-highlight-stale')
-    }
-    if (annotation.id === selectedAnnotationId) {
-      classes.push('is-selected')
-    }
-    parts.push(
-      `<span class="${classes.join(' ')}" data-annotation-id="${escapeHtml(annotation.id)}">${escapeHtml(
-        safeText.slice(start, end) || annotation.quote,
-      )}</span>`,
-    )
+    parts.push(renderIndexedSlice(safeText, start, end, annotation, highlightIndexes))
     cursor = end
   }
   if (cursor < safeText.length) {
-    parts.push(escapeHtml(safeText.slice(cursor)))
+    parts.push(renderIndexedSlice(safeText, cursor, safeText.length, null, highlightIndexes))
   }
   elements.reviewDraftSurface.innerHTML = parts.join('')
 }
@@ -1512,6 +1673,11 @@ function renderAssignmentAudits() {
 
 function renderReviewWorkspace(selectedAssignment) {
   if (!elements.reviewWorkspace) return
+  elements.reviewLayout?.classList.toggle('is-review-open', reviewWorkspaceOpen)
+  elements.reviewWorkspace.hidden = !reviewWorkspaceOpen
+  if (!reviewWorkspaceOpen) {
+    return
+  }
   const session = currentReviewSession()
   if (!session || !selectedAssignment) {
     reviewState = null
@@ -1541,6 +1707,7 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.reviewDraftMeta.textContent = session.current_text
     ? `Live draft is ${String(session.current_text).length} characters. Select text to anchor comments or suggestions.`
     : 'The student draft is still empty.'
+  renderReviewHighlightUi(session, selectedAssignment)
   renderReviewRubric(selectedAssignment)
   renderDraftSurface(session.current_text, reviewState.inlineAnnotations)
   elements.reviewDraftSurface.querySelectorAll('[data-annotation-id]').forEach((node) => {
@@ -1552,6 +1719,7 @@ function renderReviewWorkspace(selectedAssignment) {
   renderReviewAnnotationList(session)
   renderReviewSelectionUi()
   renderReviewSyncStatus()
+  void loadReviewReplayData(session)
 }
 
 function readReviewDraftSelection() {
@@ -1581,9 +1749,25 @@ function handleReviewDraftSelection() {
 }
 
 async function selectReviewSession(sessionId) {
-  if (!sessionId || selectedReviewSessionId === sessionId) return
+  if (!sessionId) return
   await flushReviewSave()
+  reviewWorkspaceOpen = true
+  elements.reviewWorkspace?.removeAttribute('hidden')
+  if (selectedReviewSessionId === sessionId) {
+    renderStudentCards()
+    return
+  }
   selectedReviewSessionId = sessionId
+  reviewState = null
+  selectedAnnotationId = null
+  renderStudentCards()
+}
+
+async function closeReviewWorkspace() {
+  await flushReviewSave()
+  reviewWorkspaceOpen = false
+  elements.reviewWorkspace?.setAttribute('hidden', '')
+  selectedReviewSessionId = null
   reviewState = null
   selectedAnnotationId = null
   renderStudentCards()
@@ -1629,8 +1813,6 @@ function sessionMatchesFilter(session) {
       return risk.needsAttention
     case 'active':
       return risk.active
-    case 'violations':
-      return risk.violationCount > 0
     case 'offline':
       return !risk.active
     default:
@@ -1665,8 +1847,9 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   }
 
   if (selectedReviewSessionId && !matchingSessions.some((session) => session.id === selectedReviewSessionId)) {
-    selectedReviewSessionId = matchingSessions[0]?.id || null
-    reviewState = selectedReviewSessionId ? createReviewStateFromSession(currentReviewSession()) : null
+    selectedReviewSessionId = null
+    reviewWorkspaceOpen = false
+    reviewState = null
     selectedAnnotationId = null
   }
 
@@ -1684,24 +1867,11 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
     .map((session) => {
       const now = Date.now()
       const risk = deriveSessionRisk(session, now)
-      const activity = recentEditActivity(session)
       const replayLink = session.replay_session_id
         ? `<a class="button button-secondary small-button" href="/edu/replay/${escapeHtml(session.replay_session_id)}" target="_blank" rel="noreferrer">Replay</a>`
         : ''
-      const studentExtension = studentSpecificExtensionFor(selectedAssignment, session.student_name)
-      const badges = [
-        badge(sessionStatusLabel(session, now), risk.active ? (session.focused ? 'good' : 'warn') : 'danger'),
-      ]
-      const reviewSummary = selectedSessionReviewSummary(session, selectedAssignment)
-      if (risk.violationCount > 0) {
-        badges.push(badge(`${risk.violationCount} violation${risk.violationCount === 1 ? '' : 's'}`, 'danger'))
-      }
-      if (!session.hid_active) {
-        badges.push(badge('HID waiting', 'warn'))
-      }
-      if (studentExtension) {
-        badges.push(badge(`Extended until ${new Date(studentExtension).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'good'))
-      }
+      const statusLabel = risk.active ? 'Active' : 'Offline'
+      const statusTone = risk.active ? (session.focused ? 'good' : 'warn') : 'danger'
 
       return `
         <article
@@ -1713,29 +1883,20 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
               <h2>${escapeHtml(session.student_name)}</h2>
               <div class="student-meta">Last activity ${escapeHtml(timeAgoLabel(session.last_activity_at, now))}</div>
             </div>
-            <div class="student-badges">${badges.join('')}</div>
+            <div class="student-badges">${badge(statusLabel, statusTone)}</div>
           </div>
           <div class="student-card-body">
             <div class="student-section">
-              <div class="section-label">Triage</div>
-              <div class="student-meta">${escapeHtml(risk.reasons.join(' • ') || 'No active concerns.')}</div>
-            </div>
-            <div class="student-section">
-              <div class="section-label">Edit activity</div>
-              ${renderEditActivitySparkline(activity)}
+              <div class="section-label">Status</div>
+              <div class="student-meta">${escapeHtml(statusLabel)}</div>
             </div>
             <div class="student-section">
               <div class="section-label">Current writing</div>
               <div class="student-text">${escapeHtml(session.current_text || '(empty)')}</div>
             </div>
-            ${reviewSummary}
             <div class="student-section">
               <div class="section-label">Recent browser URLs</div>
               <ul class="student-urls">${summarizeUrls(session)}</ul>
-            </div>
-            <div class="student-section">
-              <div class="section-label">Violations</div>
-              <ul class="student-violations">${summarizeViolations(session)}</ul>
             </div>
           </div>
           <div class="student-card-footer">
@@ -1778,20 +1939,16 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   })
 
   elements.sessionGrid.querySelectorAll('[data-review-session]').forEach((card) => {
-    card.addEventListener('click', async (event) => {
+    card.addEventListener('click', (event) => {
       if (event.target.closest('button, a')) return
-      try {
-        await selectReviewSession(card.dataset.reviewSession)
-      } catch (error) {
-        window.alert(`Could not switch review sessions: ${error.message}`)
+      selectedReviewSessionId = card.dataset.reviewSession || null
+      selectedAnnotationId = null
+      if (reviewWorkspaceOpen) {
+        reviewState = selectedReviewSessionId ? createReviewStateFromSession(currentReviewSession()) : null
       }
+      renderStudentCards({ skipReviewWorkspace: true })
     })
   })
-
-  if (!selectedReviewSessionId) {
-    selectedReviewSessionId = visibleSessions[0]?.id || null
-    reviewState = selectedReviewSessionId ? createReviewStateFromSession(currentReviewSession()) : null
-  }
 
   if (!skipReviewWorkspace) {
     renderReviewWorkspace(selectedAssignment)
@@ -2363,6 +2520,30 @@ function wireReviewWorkspace() {
     renderStudentCards({ skipReviewWorkspace: true })
   })
 
+  elements.reviewHighlightDate?.addEventListener('input', () => {
+    if (!reviewState) return
+    reviewState.highlightDate = elements.reviewHighlightDate.value
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightAfterSchoolDay?.addEventListener('click', () => {
+    if (!reviewState) return
+    reviewState.highlightMode = 'after-school-day'
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightAfterSchoolAll?.addEventListener('click', () => {
+    if (!reviewState) return
+    reviewState.highlightMode = 'after-school-all'
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightClear?.addEventListener('click', () => {
+    if (!reviewState) return
+    reviewState.highlightMode = 'none'
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
   elements.reviewDraftSurface?.addEventListener('mouseup', handleReviewDraftSelection)
   elements.reviewDraftSurface?.addEventListener('keyup', handleReviewDraftSelection)
 
@@ -2370,6 +2551,13 @@ function wireReviewWorkspace() {
   elements.reviewSuggestMode?.addEventListener('click', () => beginReviewComposer('suggestion'))
   elements.reviewCancelAnnotation?.addEventListener('click', clearReviewComposer)
   elements.reviewAddAnnotation?.addEventListener('click', addReviewAnnotation)
+  elements.reviewCloseButton?.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    closeReviewWorkspace().catch((error) => {
+      window.alert(`Could not close review: ${error.message}`)
+    })
+  })
 
   window.addEventListener('beforeunload', () => {
     if (reviewSaveTimer) {

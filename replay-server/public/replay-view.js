@@ -385,6 +385,10 @@ export function escapeHtml(text) {
     .replace(/'/g, '&#39;')
 }
 
+function toAttributedChars(text, insertedAtMs) {
+  return Array.from(String(text || '')).map((char) => ({ char, insertedAtMs }))
+}
+
 function renderPlainTextHtml(markdown) {
   const text = String(markdown || '')
   if (!text) return ''
@@ -474,6 +478,142 @@ export function renderMarkdownInto(container, markdown, options = {}) {
 
   const host = findCursorHost(container)
   host.appendChild(cursorEl)
+}
+
+export function buildAttributedDocument(session = {}) {
+  const history = Array.isArray(session?.doc_history) ? session.doc_history : []
+  const originWallMs = getReplayOriginWallMs(session)
+  const sortedHistory = history
+    .slice()
+    .sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
+
+  let chars = []
+  let latestRawT = 0
+
+  const absoluteFromRawT = (rawT) => {
+    const normalizedRawT = Math.max(0, Number(rawT) || 0)
+    latestRawT = Math.max(latestRawT, normalizedRawT)
+    return Number.isFinite(originWallMs) ? originWallMs + normalizedRawT : null
+  }
+
+  const applySnapshot = (nextText, rawT) => {
+    const nextChars = Array.from(String(nextText || ''))
+    const previousChars = chars.map((entry) => entry.char)
+    let prefix = 0
+
+    while (
+      prefix < previousChars.length &&
+      prefix < nextChars.length &&
+      previousChars[prefix] === nextChars[prefix]
+    ) {
+      prefix += 1
+    }
+
+    let previousSuffix = previousChars.length
+    let nextSuffix = nextChars.length
+    while (
+      previousSuffix > prefix &&
+      nextSuffix > prefix &&
+      previousChars[previousSuffix - 1] === nextChars[nextSuffix - 1]
+    ) {
+      previousSuffix -= 1
+      nextSuffix -= 1
+    }
+
+    chars = [
+      ...chars.slice(0, prefix),
+      ...toAttributedChars(nextChars.slice(prefix, nextSuffix).join(''), absoluteFromRawT(rawT)),
+      ...chars.slice(previousSuffix),
+    ]
+  }
+
+  for (const entry of sortedHistory) {
+    if (!entry || typeof entry !== 'object') {
+      continue
+    }
+
+    const rawT = Math.max(0, Number(entry.t) || 0)
+
+    if (typeof entry.text === 'string') {
+      applySnapshot(entry.text, rawT)
+      continue
+    }
+
+    if (Number.isInteger(entry.pos) && typeof entry.ins === 'string') {
+      const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
+      const delCount = typeof entry.del === 'string'
+        ? Array.from(entry.del).length
+        : Math.max(0, Number(entry.del) || 0)
+      chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT)))
+    }
+  }
+
+  const finalText = String(session?.doc_text || '')
+  if (chars.map((entry) => entry.char).join('') !== finalText) {
+    applySnapshot(finalText, latestRawT)
+  }
+
+  const insertedAtValues = chars
+    .map((entry) => entry.insertedAtMs)
+    .filter((value) => Number.isFinite(value))
+
+  return {
+    text: chars.map((entry) => entry.char).join(''),
+    chars,
+    originWallMs,
+    firstInsertedAtMs: insertedAtValues.length ? Math.min(...insertedAtValues) : originWallMs,
+    lastInsertedAtMs: insertedAtValues.length ? Math.max(...insertedAtValues) : originWallMs,
+  }
+}
+
+export function renderInsertedRangeHtml(attributedDocument, startMs, endMs, className = 'insert-highlight') {
+  return renderInsertedRangesHtml(attributedDocument, [{ startMs, endMs }], className)
+}
+
+export function renderInsertedRangesHtml(attributedDocument, ranges = [], className = 'insert-highlight') {
+  const chars = Array.isArray(attributedDocument?.chars) ? attributedDocument.chars : []
+  const normalizedRanges = (Array.isArray(ranges) ? ranges : [])
+    .map((range) => {
+      const startMs = Number(range?.startMs)
+      const endMs = Number(range?.endMs)
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        return null
+      }
+      return {
+        startMs: Math.min(startMs, endMs),
+        endMs: Math.max(startMs, endMs),
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startMs - b.startMs)
+  let html = ''
+  let buffer = ''
+  let inHighlight = false
+
+  const flush = () => {
+    if (!buffer) {
+      return
+    }
+    html += inHighlight ? `<mark class="${className}">${buffer}</mark>` : buffer
+    buffer = ''
+  }
+
+  for (const entry of chars) {
+    const insertedAtMs = Number(entry?.insertedAtMs)
+    const shouldHighlight = Number.isFinite(insertedAtMs) && normalizedRanges.some((range) =>
+      insertedAtMs >= range.startMs && insertedAtMs <= range.endMs,
+    )
+
+    if (shouldHighlight !== inHighlight) {
+      flush()
+      inHighlight = shouldHighlight
+    }
+
+    buffer += escapeHtml(entry?.char || '')
+  }
+
+  flush()
+  return html
 }
 
 export function documentWithAttribution(text, url) {

@@ -111,7 +111,6 @@
             <button class="button button-secondary small-button" type="button" data-filter="all">All students</button>
             <button class="button button-secondary small-button" type="button" data-filter="attention">Needs attention</button>
             <button class="button button-secondary small-button" type="button" data-filter="active">Active only</button>
-            <button class="button button-secondary small-button" type="button" data-filter="violations">Violations</button>
             <button class="button button-secondary small-button" type="button" data-filter="offline">Offline / stale</button>
           </div>
           <label class="monitoring-search">
@@ -119,12 +118,10 @@
             <input id="session-search-input" type="search" placeholder="Filter by student name" />
           </label>
         </section>
-        <section class="review-layout">
+        <section class="review-layout" id="review-layout">
           <section class="student-grid" id="session-grid"></section>
-          <aside class="teacher-panel review-workspace" id="review-workspace">
-            <div class="review-workspace-empty" id="review-workspace-empty">
-              Select a student to grade, comment on the live draft, and leave suggestions.
-            </div>
+          <aside class="teacher-panel review-workspace" id="review-workspace" hidden>
+            <div class="review-workspace-empty" id="review-workspace-empty"></div>
             <div id="review-workspace-content" hidden>
               <div class="review-workspace-header">
                 <div>
@@ -132,8 +129,59 @@
                   <h3 id="review-workspace-title">Live draft review</h3>
                   <p class="muted" id="review-workspace-meta"></p>
                 </div>
-                <div class="review-sync-pill" id="review-sync-status">Saved</div>
+                <div class="review-workspace-actions">
+                  <div class="review-sync-pill" id="review-sync-status">Saved</div>
+                  <button class="button button-secondary small-button" id="review-close-button" type="button">Close review</button>
+                </div>
               </div>
+
+              <section class="review-card">
+                <div class="review-card-header">
+                  <div>
+                    <div class="section-label">Teacher mode editor</div>
+                    <div class="student-meta" id="review-draft-meta">Live draft updates appear here.</div>
+                  </div>
+                  <div class="review-selection-count" id="review-selection-count">No text selected</div>
+                </div>
+                <div class="review-time-tools">
+                  <div class="review-time-tools-row">
+                    <label class="review-time-field">
+                      <span>Day</span>
+                      <input id="review-highlight-date" type="date" />
+                    </label>
+                    <div class="review-time-actions">
+                      <button class="button button-secondary small-button" id="review-highlight-after-school-day" type="button">After school on day</button>
+                      <button class="button button-secondary small-button" id="review-highlight-after-school-all" type="button">All after school</button>
+                      <button class="button button-secondary small-button" id="review-highlight-clear" type="button">Clear highlight</button>
+                    </div>
+                  </div>
+                  <div class="student-meta" id="review-highlight-meta">Replay-based time highlighting appears here when a replay is available.</div>
+                </div>
+                <div class="review-draft-surface" id="review-draft-surface" tabindex="0" aria-label="Student draft review surface"></div>
+                <div class="review-selection-panel" id="review-selection-panel">
+                  <div class="section-label">Selected text</div>
+                  <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment or suggestion.</div>
+                  <div class="review-selection-actions">
+                    <button class="button button-secondary small-button" id="review-comment-mode" type="button">Comment</button>
+                    <button class="button button-secondary small-button" id="review-suggest-mode" type="button">Suggest</button>
+                  </div>
+                </div>
+                <div class="review-composer" id="review-composer" hidden>
+                  <div class="section-label" id="review-composer-label">New annotation</div>
+                  <label id="review-replacement-field" hidden>
+                    <span>Suggested replacement</span>
+                    <textarea id="review-composer-replacement" rows="2" placeholder="Replace the selected text with..."></textarea>
+                  </label>
+                  <label>
+                    <span>Note</span>
+                    <textarea id="review-composer-note" rows="3" placeholder="What should the student notice here?"></textarea>
+                  </label>
+                  <div class="review-selection-actions">
+                    <button class="button small-button" id="review-add-annotation" type="button">Add to draft</button>
+                    <button class="button button-secondary small-button" id="review-cancel-annotation" type="button">Cancel</button>
+                  </div>
+                </div>
+              </section>
 
               <div class="review-grade-grid">
                 <label>
@@ -168,40 +216,6 @@
 
               <section class="review-card">
                 <div class="review-card-header">
-                  <div>
-                    <div class="section-label">Teacher mode editor</div>
-                    <div class="student-meta" id="review-draft-meta">Live draft updates appear here.</div>
-                  </div>
-                  <div class="review-selection-count" id="review-selection-count">No text selected</div>
-                </div>
-                <div class="review-draft-surface" id="review-draft-surface" tabindex="0" aria-label="Student draft review surface"></div>
-                <div class="review-selection-panel" id="review-selection-panel">
-                  <div class="section-label">Selected text</div>
-                  <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment or suggestion.</div>
-                  <div class="review-selection-actions">
-                    <button class="button button-secondary small-button" id="review-comment-mode" type="button">Comment</button>
-                    <button class="button button-secondary small-button" id="review-suggest-mode" type="button">Suggest</button>
-                  </div>
-                </div>
-                <div class="review-composer" id="review-composer" hidden>
-                  <div class="section-label" id="review-composer-label">New annotation</div>
-                  <label id="review-replacement-field" hidden>
-                    <span>Suggested replacement</span>
-                    <textarea id="review-composer-replacement" rows="2" placeholder="Replace the selected text with..."></textarea>
-                  </label>
-                  <label>
-                    <span>Note</span>
-                    <textarea id="review-composer-note" rows="3" placeholder="What should the student notice here?"></textarea>
-                  </label>
-                  <div class="review-selection-actions">
-                    <button class="button small-button" id="review-add-annotation" type="button">Add to draft</button>
-                    <button class="button button-secondary small-button" id="review-cancel-annotation" type="button">Cancel</button>
-                  </div>
-                </div>
-              </section>
-
-              <section class="review-card">
-                <div class="review-card-header">
                   <div class="section-label">Inline comments and suggestions</div>
                   <div class="student-meta" id="review-annotation-meta">No inline notes yet.</div>
                 </div>
@@ -211,12 +225,6 @@
           </aside>
         </section>
         <section class="teacher-panel audit-panel" id="assignment-audit-panel">
-          <div class="stage-header">
-            <div>
-              <div class="section-label">Assignment timeline</div>
-              <h3>Recent teacher changes</h3>
-            </div>
-          </div>
           <div id="assignment-audit-list" class="audit-list"></div>
         </section>
       </section>

@@ -500,7 +500,11 @@ export function createApp(sessionsDir, config = {}) {
     await ensureEduSeedData(eduStore)
     const replay = await eduStore.getReplay(req.params.id)
     if (!replay) return res.status(404).json({ error: 'Not found' })
-    res.json(replay)
+    const assignment = replay.assignment_id ? await eduStore.getAssignment(replay.assignment_id) : null
+    res.json({
+      ...replay,
+      assignment: assignment || null,
+    })
   })
 
   app.post('/api/edu/replays', async (req, res) => {

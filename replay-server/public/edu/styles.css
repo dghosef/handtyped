@@ -791,13 +791,17 @@ textarea {
 
 .review-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
 
+.review-layout.is-review-open {
+  grid-template-columns: minmax(320px, 1.1fr) minmax(360px, 0.9fr);
+}
+
 .review-layout .student-grid {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .review-workspace {
@@ -806,6 +810,10 @@ textarea {
   padding: 18px;
   position: sticky;
   top: 20px;
+}
+
+.review-workspace[hidden] {
+  display: none !important;
 }
 
 .review-workspace-empty {
@@ -821,6 +829,13 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   align-items: start;
+  flex-wrap: wrap;
+}
+
+.review-workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -906,6 +921,34 @@ textarea {
   line-height: 1.75;
   font-size: 1rem;
   font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.review-time-tools {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.review-time-tools-row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.review-time-field {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.review-time-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .review-draft-surface:focus {
@@ -1020,6 +1063,11 @@ textarea {
   background: rgba(59, 130, 246, 0.18);
 }
 
+.review-highlight-time {
+  background: rgba(245, 158, 11, 0.22);
+  box-shadow: inset 0 -2px 0 rgba(217, 119, 6, 0.42);
+}
+
 .review-highlight-suggestion {
   background: rgba(168, 85, 247, 0.14);
   box-shadow: inset 0 -2px 0 rgba(168, 85, 247, 0.4);
@@ -1127,6 +1175,11 @@ textarea {
   color: var(--muted);
 }
 
+.student-url-illegal {
+  color: #991b1b;
+  font-weight: 600;
+}
+
 .student-violations {
   color: #991b1b;
 }
@@ -1136,6 +1189,12 @@ textarea {
   border-top: 1px solid var(--line);
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.student-card-footer > .button {
+  flex: 1 1 160px;
+  min-width: 0;
 }
 
 .student-card-risk-high {

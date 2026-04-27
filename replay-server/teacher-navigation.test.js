@@ -4,14 +4,18 @@ import path from 'node:path'
 
 import {
   aggregateRecentEditActivity,
+  buildAfterSchoolRanges,
   localDateTimeInputValue,
+  nextLocalTimeAtOrAfter,
   recentEditActivity,
   reconcileTeacherNavigation,
+  replayLocalDateInputValue,
   todayAtLocalTime,
   todayAtLocalTimeIso,
 } from './public/edu/app-ui.js'
 
 const teacherAppHtml = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.html'), 'utf8')
+const teacherStylesCss = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'styles.css'), 'utf8')
 
 const classrooms = [
   { id: 'english-11', name: 'English 11' },
@@ -28,9 +32,30 @@ describe('teacher navigation', () => {
   it('renders class and assignment selection as separate top-level pages', () => {
     expect(teacherAppHtml).toContain('<section id="classes-view">')
     expect(teacherAppHtml).toContain('<section id="assignments-view" hidden>')
+    expect(teacherAppHtml).toContain('<section class="review-layout" id="review-layout">')
+    expect(teacherAppHtml).toContain('<aside class="teacher-panel review-workspace" id="review-workspace" hidden>')
+    expect(teacherAppHtml).toContain('id="review-close-button"')
+    expect(teacherAppHtml).not.toContain('data-filter="violations"')
+    expect(teacherAppHtml).toContain('id="review-highlight-date"')
+    expect(teacherAppHtml).toContain('id="review-highlight-after-school-day"')
+    expect(teacherAppHtml).toContain('id="review-highlight-after-school-all"')
+    expect(teacherAppHtml.indexOf('Teacher mode editor')).toBeLessThan(teacherAppHtml.indexOf('Rubric and feedback'))
     expect(teacherAppHtml.indexOf('<section id="assignments-view" hidden>')).toBeGreaterThan(
       teacherAppHtml.indexOf('</section>\n\n      <!-- Assignments View -->'),
     )
+  })
+
+  it('forces hidden review workspaces to stay fully collapsed', () => {
+    expect(teacherStylesCss).toContain('.review-workspace[hidden]')
+    expect(teacherStylesCss).toContain('display: none !important;')
+  })
+
+  it('keeps student previews in a grid beside the review workspace', () => {
+    expect(teacherStylesCss).toContain('.review-layout .student-grid')
+    expect(teacherStylesCss).toContain('repeat(auto-fit, minmax(280px, 1fr))')
+    expect(teacherStylesCss).toContain('.review-layout.is-review-open')
+    expect(teacherStylesCss).toContain('.student-card-footer > .button')
+    expect(teacherStylesCss).toContain('flex-wrap: wrap;')
   })
 
   it('does not auto-select the first classroom or assignment on the classes page', () => {
@@ -87,6 +112,60 @@ describe('teacher navigation', () => {
 
     expect(localDateTimeInputValue(target)).toBe('2026-04-27T14:30')
     expect(todayAtLocalTimeIso(14, 30, now)).toBe(target.toISOString())
+  })
+
+  it('rolls a student quick extension forward to tomorrow when today has already passed', () => {
+    const now = new Date(2026, 3, 27, 18, 5, 0)
+    const target = nextLocalTimeAtOrAfter(15, 30, now)
+
+    expect(localDateTimeInputValue(target)).toBe('2026-04-28T15:30')
+  })
+
+  it('formats replay-local dates and builds after-school ranges from assignment windows', () => {
+    const assignment = {
+      windows: [
+        {
+          label: 'Class block',
+          days: {
+            monday: true,
+            tuesday: true,
+            wednesday: true,
+            thursday: true,
+            friday: true,
+            saturday: false,
+            sunday: false,
+          },
+          start_hour: 10,
+          start_minute: 0,
+          end_hour: 15,
+          end_minute: 15,
+        },
+      ],
+    }
+    const insertedAtMs = [
+      Date.UTC(2026, 3, 27, 20, 0),
+      Date.UTC(2026, 3, 28, 21, 30),
+    ]
+
+    expect(replayLocalDateInputValue(insertedAtMs[0], -240)).toBe('2026-04-27')
+    expect(
+      buildAfterSchoolRanges(insertedAtMs, assignment, {
+        offsetMinutes: -240,
+        dateInput: '2026-04-27',
+      }),
+    ).toEqual([
+      {
+        date: '2026-04-27',
+        startMs: Date.UTC(2026, 3, 27, 19, 15),
+        endMs: Date.UTC(2026, 3, 28, 3, 59, 59, 999),
+      },
+    ])
+    expect(
+      buildAfterSchoolRanges(insertedAtMs, assignment, {
+        offsetMinutes: -240,
+        allDates: true,
+      }).map((range) => range.date),
+    ).toEqual(['2026-04-27', '2026-04-28'])
   })
 
   it('derives recent edit activity buckets from relative document-history timestamps', () => {

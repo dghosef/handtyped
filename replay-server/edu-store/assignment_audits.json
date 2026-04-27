@@ -15693,5 +15693,2431 @@
     },
     "created_at": "2026-04-27T20:37:32.555Z",
     "updated_at": "2026-04-27T20:37:32.555Z"
+  },
+  {
+    "id": "assignment_audit_146c426061f043c7",
+    "assignment_id": "assignment_06bb578759ea4359",
+    "classroom_id": "classroom_7857453114684404",
+    "assignment_title": "Hamlet timed write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Hamlet timed write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Hamlet timed write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_06bb578759ea4359",
+      "title": "Hamlet timed write",
+      "course": "AP Literature",
+      "classroom_id": "classroom_7857453114684404",
+      "classroom_name": "AP Literature",
+      "prompt": "Write about indecision in Hamlet.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "sans",
+        "font_size": 24,
+        "line_height": "double"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.622Z",
+      "updated_at": "2026-04-27T21:03:01.622Z"
+    },
+    "created_at": "2026-04-27T21:03:01.624Z",
+    "updated_at": "2026-04-27T21:03:01.624Z"
+  },
+  {
+    "id": "assignment_audit_9228170e06cf431b",
+    "assignment_id": "assignment_426267919bb742f2",
+    "classroom_id": "classroom_d7e2a1c2b81b4c83",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_426267919bb742f2",
+      "title": "Draft one",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d7e2a1c2b81b4c83",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Start with a quick draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.670Z",
+      "updated_at": "2026-04-27T21:03:01.670Z"
+    },
+    "created_at": "2026-04-27T21:03:01.671Z",
+    "updated_at": "2026-04-27T21:03:01.671Z"
+  },
+  {
+    "id": "assignment_audit_acc6d48b1e8a473e",
+    "assignment_id": "assignment_426267919bb742f2",
+    "classroom_id": "classroom_d7e2a1c2b81b4c83",
+    "assignment_title": "Draft two",
+    "action": "updated",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Updated 3 settings",
+    "changes": [
+      {
+        "label": "Title",
+        "before": "Draft one",
+        "after": "Draft two"
+      },
+      {
+        "label": "Prompt",
+        "before": "Start with a quick draft.",
+        "after": "Revised prompt for the same class."
+      },
+      {
+        "label": "Writing windows",
+        "before": [
+          {
+            "label": "Writing window",
+            "days": {
+              "monday": true,
+              "tuesday": true,
+              "wednesday": true,
+              "thursday": true,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": null,
+            "start_hour": 10,
+            "start_minute": 0,
+            "end_hour": 11,
+            "end_minute": 0
+          }
+        ],
+        "after": [
+          {
+            "label": "Updated window",
+            "days": {
+              "monday": true,
+              "tuesday": false,
+              "wednesday": true,
+              "thursday": false,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": "2026-05-30",
+            "start_hour": 9,
+            "start_minute": 15,
+            "end_hour": 10,
+            "end_minute": 45
+          }
+        ]
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_426267919bb742f2",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d7e2a1c2b81b4c83",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.670Z",
+      "updated_at": "2026-04-27T21:03:01.680Z"
+    },
+    "created_at": "2026-04-27T21:03:01.682Z",
+    "updated_at": "2026-04-27T21:03:01.682Z"
+  },
+  {
+    "id": "assignment_audit_01a2520ca7744850",
+    "assignment_id": "assignment_426267919bb742f2",
+    "classroom_id": "classroom_d7e2a1c2b81b4c83",
+    "assignment_title": "Draft two",
+    "action": "deleted",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Deleted assignment \"Draft two\"",
+    "changes": [
+      {
+        "label": "Assignment deleted",
+        "before": "Draft two",
+        "after": null
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_426267919bb742f2",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d7e2a1c2b81b4c83",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.670Z",
+      "updated_at": "2026-04-27T21:03:01.680Z"
+    },
+    "created_at": "2026-04-27T21:03:01.696Z",
+    "updated_at": "2026-04-27T21:03:01.696Z"
+  },
+  {
+    "id": "assignment_audit_b6c2849c1fdd41eb",
+    "assignment_id": "assignment_d0059f0068ec4bac",
+    "classroom_id": "classroom_f0438fd028e34b7f",
+    "assignment_title": "Live feedback essay",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Live feedback essay\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Live feedback essay"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_d0059f0068ec4bac",
+      "title": "Live feedback essay",
+      "course": "Review Writing",
+      "classroom_id": "classroom_f0438fd028e34b7f",
+      "classroom_name": "Review Writing",
+      "prompt": "Draft quickly and revise from teacher feedback.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [
+        {
+          "id": "claim",
+          "title": "Claim",
+          "description": "Clear argument",
+          "points": 4
+        },
+        {
+          "id": "evidence",
+          "title": "Evidence",
+          "description": "Specific support",
+          "points": 4
+        }
+      ],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.722Z",
+      "updated_at": "2026-04-27T21:03:01.722Z"
+    },
+    "created_at": "2026-04-27T21:03:01.725Z",
+    "updated_at": "2026-04-27T21:03:01.725Z"
+  },
+  {
+    "id": "assignment_audit_76b9f382090b45d0",
+    "assignment_id": "assignment_79ae3441c9e3468b",
+    "classroom_id": "classroom_cf83838cd02c4a5e",
+    "assignment_title": "Delete me",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Delete me\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Delete me"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_79ae3441c9e3468b",
+      "title": "Delete me",
+      "course": "Delete Literature",
+      "classroom_id": "classroom_cf83838cd02c4a5e",
+      "classroom_name": "Delete Literature",
+      "prompt": "This assignment should be removable.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.757Z",
+      "updated_at": "2026-04-27T21:03:01.757Z"
+    },
+    "created_at": "2026-04-27T21:03:01.759Z",
+    "updated_at": "2026-04-27T21:03:01.759Z"
+  },
+  {
+    "id": "assignment_audit_a434a325a9444c0e",
+    "assignment_id": "assignment_79ae3441c9e3468b",
+    "classroom_id": "classroom_cf83838cd02c4a5e",
+    "assignment_title": "Delete me",
+    "action": "deleted",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Deleted assignment \"Delete me\"",
+    "changes": [
+      {
+        "label": "Assignment deleted",
+        "before": "Delete me",
+        "after": null
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_79ae3441c9e3468b",
+      "title": "Delete me",
+      "course": "Delete Literature",
+      "classroom_id": "classroom_cf83838cd02c4a5e",
+      "classroom_name": "Delete Literature",
+      "prompt": "This assignment should be removable.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.757Z",
+      "updated_at": "2026-04-27T21:03:01.757Z"
+    },
+    "created_at": "2026-04-27T21:03:01.766Z",
+    "updated_at": "2026-04-27T21:03:01.766Z"
+  },
+  {
+    "id": "assignment_audit_23c2ddb50ed844a1",
+    "assignment_id": "assignment_26bae50130f04c62",
+    "classroom_id": "classroom_7249fa1341e2484d",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_26bae50130f04c62",
+      "title": "Draft one",
+      "course": "Linked Literature",
+      "classroom_id": "classroom_7249fa1341e2484d",
+      "classroom_name": "Linked Literature",
+      "prompt": "Write your first draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.793Z",
+      "updated_at": "2026-04-27T21:03:01.793Z"
+    },
+    "created_at": "2026-04-27T21:03:01.795Z",
+    "updated_at": "2026-04-27T21:03:01.795Z"
+  },
+  {
+    "id": "assignment_audit_7301b0b4f51a4de0",
+    "assignment_id": "assignment_8bcedf8d3b89433d",
+    "classroom_id": "classroom_7249fa1341e2484d",
+    "assignment_title": "Draft two",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft two\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft two"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_8bcedf8d3b89433d",
+      "title": "Draft two",
+      "course": "Linked Literature",
+      "classroom_id": "classroom_7249fa1341e2484d",
+      "classroom_name": "Linked Literature",
+      "prompt": "Revise with access to your first draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [
+        "assignment_26bae50130f04c62"
+      ],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.805Z",
+      "updated_at": "2026-04-27T21:03:01.805Z"
+    },
+    "created_at": "2026-04-27T21:03:01.806Z",
+    "updated_at": "2026-04-27T21:03:01.806Z"
+  },
+  {
+    "id": "assignment_audit_21daca5b848041f6",
+    "assignment_id": "assignment_508dfec5c35a4eaa",
+    "classroom_id": "classroom_c9ea5e981bb74abf",
+    "assignment_title": "Notebook check-in",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Notebook check-in\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Notebook check-in"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_508dfec5c35a4eaa",
+      "title": "Notebook check-in",
+      "course": "Silent Reading",
+      "classroom_id": "classroom_c9ea5e981bb74abf",
+      "classroom_name": "Silent Reading",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.824Z",
+      "updated_at": "2026-04-27T21:03:01.824Z"
+    },
+    "created_at": "2026-04-27T21:03:01.825Z",
+    "updated_at": "2026-04-27T21:03:01.825Z"
+  },
+  {
+    "id": "assignment_audit_a85a123d2d8046b5",
+    "assignment_id": "assignment_a2a7c8f4eedc402f",
+    "classroom_id": "classroom_9d867c9b269e4461",
+    "assignment_title": "Timed Write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Timed Write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Timed Write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_a2a7c8f4eedc402f",
+      "title": "Timed Write",
+      "course": "Extensions",
+      "classroom_id": "classroom_9d867c9b269e4461",
+      "classroom_name": "Extensions",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": "2026-04-27T18:00:00.000Z",
+      "student_temporary_access_until": {
+        "ada lovelace": "2026-04-27T19:30:00.000Z"
+      },
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:01.986Z",
+      "updated_at": "2026-04-27T21:03:01.986Z"
+    },
+    "created_at": "2026-04-27T21:03:01.988Z",
+    "updated_at": "2026-04-27T21:03:01.988Z"
+  },
+  {
+    "id": "assignment_audit_4ba0d18fc01041ef",
+    "assignment_id": "assignment_28aed8db618d40b2",
+    "classroom_id": "classroom_0f5faa3834f44aa5",
+    "assignment_title": "Whole class draft",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Whole class draft\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Whole class draft"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_28aed8db618d40b2",
+      "title": "Whole class draft",
+      "course": "English 11",
+      "classroom_id": "classroom_0f5faa3834f44aa5",
+      "classroom_name": "English 11",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:02.024Z",
+      "updated_at": "2026-04-27T21:03:02.024Z"
+    },
+    "created_at": "2026-04-27T21:03:02.026Z",
+    "updated_at": "2026-04-27T21:03:02.026Z"
+  },
+  {
+    "id": "assignment_audit_47c1933263e04647",
+    "assignment_id": "assignment_333afc4ce11a4c24",
+    "classroom_id": "classroom_0f5faa3834f44aa5",
+    "assignment_title": "Ada only draft",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Ada only draft\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Ada only draft"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_333afc4ce11a4c24",
+      "title": "Ada only draft",
+      "course": "English 11",
+      "classroom_id": "classroom_0f5faa3834f44aa5",
+      "classroom_name": "English 11",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [
+        "Ada Lovelace"
+      ],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:03:02.032Z",
+      "updated_at": "2026-04-27T21:03:02.033Z"
+    },
+    "created_at": "2026-04-27T21:03:02.035Z",
+    "updated_at": "2026-04-27T21:03:02.035Z"
+  },
+  {
+    "id": "assignment_audit_2607628909e64e3f",
+    "assignment_id": "assignment_1b574ac984b54cf0",
+    "classroom_id": "classroom_28b4c0761f374fff",
+    "assignment_title": "Differentiated write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Differentiated write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Differentiated write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_1b574ac984b54cf0",
+      "title": "Differentiated write",
+      "course": "English 11",
+      "classroom_id": "classroom_28b4c0761f374fff",
+      "classroom_name": "English 11",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": false,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {
+        "ada lovelace": {
+          "student_name": "Ada Lovelace",
+          "policy": {
+            "allow_dictation": true,
+            "copy_paste_allowed": true
+          },
+          "editor_policy": {
+            "font_size": 28
+          },
+          "browser_policy": {
+            "browser_enabled": false
+          }
+        }
+      },
+      "created_at": "2026-04-27T21:03:02.064Z",
+      "updated_at": "2026-04-27T21:03:02.064Z"
+    },
+    "created_at": "2026-04-27T21:03:02.065Z",
+    "updated_at": "2026-04-27T21:03:02.065Z"
+  },
+  {
+    "id": "assignment_audit_f629ad48a1794acd",
+    "assignment_id": "assignment_61038c4e51184f25",
+    "classroom_id": "classroom_0234b2036b3a4df8",
+    "assignment_title": "Hamlet timed write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Hamlet timed write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Hamlet timed write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_61038c4e51184f25",
+      "title": "Hamlet timed write",
+      "course": "AP Literature",
+      "classroom_id": "classroom_0234b2036b3a4df8",
+      "classroom_name": "AP Literature",
+      "prompt": "Write about indecision in Hamlet.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "sans",
+        "font_size": 24,
+        "line_height": "double"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.363Z",
+      "updated_at": "2026-04-27T21:07:28.363Z"
+    },
+    "created_at": "2026-04-27T21:07:28.366Z",
+    "updated_at": "2026-04-27T21:07:28.366Z"
+  },
+  {
+    "id": "assignment_audit_04dd00a5d9c14be0",
+    "assignment_id": "assignment_fd6db2db724f41a6",
+    "classroom_id": "classroom_d8da9e35997b411a",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_fd6db2db724f41a6",
+      "title": "Draft one",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d8da9e35997b411a",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Start with a quick draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.397Z",
+      "updated_at": "2026-04-27T21:07:28.397Z"
+    },
+    "created_at": "2026-04-27T21:07:28.398Z",
+    "updated_at": "2026-04-27T21:07:28.398Z"
+  },
+  {
+    "id": "assignment_audit_ceae8bb6e3dd473b",
+    "assignment_id": "assignment_fd6db2db724f41a6",
+    "classroom_id": "classroom_d8da9e35997b411a",
+    "assignment_title": "Draft two",
+    "action": "updated",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Updated 3 settings",
+    "changes": [
+      {
+        "label": "Title",
+        "before": "Draft one",
+        "after": "Draft two"
+      },
+      {
+        "label": "Prompt",
+        "before": "Start with a quick draft.",
+        "after": "Revised prompt for the same class."
+      },
+      {
+        "label": "Writing windows",
+        "before": [
+          {
+            "label": "Writing window",
+            "days": {
+              "monday": true,
+              "tuesday": true,
+              "wednesday": true,
+              "thursday": true,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": null,
+            "start_hour": 10,
+            "start_minute": 0,
+            "end_hour": 11,
+            "end_minute": 0
+          }
+        ],
+        "after": [
+          {
+            "label": "Updated window",
+            "days": {
+              "monday": true,
+              "tuesday": false,
+              "wednesday": true,
+              "thursday": false,
+              "friday": true,
+              "saturday": false,
+              "sunday": false
+            },
+            "end_date": "2026-05-30",
+            "start_hour": 9,
+            "start_minute": 15,
+            "end_hour": 10,
+            "end_minute": 45
+          }
+        ]
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_fd6db2db724f41a6",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d8da9e35997b411a",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.397Z",
+      "updated_at": "2026-04-27T21:07:28.406Z"
+    },
+    "created_at": "2026-04-27T21:07:28.407Z",
+    "updated_at": "2026-04-27T21:07:28.407Z"
+  },
+  {
+    "id": "assignment_audit_36f795008f004c3a",
+    "assignment_id": "assignment_fd6db2db724f41a6",
+    "classroom_id": "classroom_d8da9e35997b411a",
+    "assignment_title": "Draft two",
+    "action": "deleted",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Deleted assignment \"Draft two\"",
+    "changes": [
+      {
+        "label": "Assignment deleted",
+        "before": "Draft two",
+        "after": null
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_fd6db2db724f41a6",
+      "title": "Draft two",
+      "course": "Realtime Literature",
+      "classroom_id": "classroom_d8da9e35997b411a",
+      "classroom_name": "Realtime Literature",
+      "prompt": "Revised prompt for the same class.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Updated window",
+          "days": {
+            "monday": true,
+            "tuesday": false,
+            "wednesday": true,
+            "thursday": false,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": "2026-05-30",
+          "start_hour": 9,
+          "start_minute": 15,
+          "end_hour": 10,
+          "end_minute": 45
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.397Z",
+      "updated_at": "2026-04-27T21:07:28.406Z"
+    },
+    "created_at": "2026-04-27T21:07:28.416Z",
+    "updated_at": "2026-04-27T21:07:28.416Z"
+  },
+  {
+    "id": "assignment_audit_6164abf7c5e7435c",
+    "assignment_id": "assignment_cfc51298158b4e82",
+    "classroom_id": "classroom_72f66ff21e3c40bd",
+    "assignment_title": "Live feedback essay",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Live feedback essay\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Live feedback essay"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_cfc51298158b4e82",
+      "title": "Live feedback essay",
+      "course": "Review Writing",
+      "classroom_id": "classroom_72f66ff21e3c40bd",
+      "classroom_name": "Review Writing",
+      "prompt": "Draft quickly and revise from teacher feedback.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [
+        {
+          "id": "claim",
+          "title": "Claim",
+          "description": "Clear argument",
+          "points": 4
+        },
+        {
+          "id": "evidence",
+          "title": "Evidence",
+          "description": "Specific support",
+          "points": 4
+        }
+      ],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.428Z",
+      "updated_at": "2026-04-27T21:07:28.428Z"
+    },
+    "created_at": "2026-04-27T21:07:28.429Z",
+    "updated_at": "2026-04-27T21:07:28.429Z"
+  },
+  {
+    "id": "assignment_audit_cf078567ae834104",
+    "assignment_id": "assignment_e7cf5047373f47bd",
+    "classroom_id": "classroom_f9b6577a742c49d5",
+    "assignment_title": "Delete me",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Delete me\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Delete me"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_e7cf5047373f47bd",
+      "title": "Delete me",
+      "course": "Delete Literature",
+      "classroom_id": "classroom_f9b6577a742c49d5",
+      "classroom_name": "Delete Literature",
+      "prompt": "This assignment should be removable.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.444Z",
+      "updated_at": "2026-04-27T21:07:28.444Z"
+    },
+    "created_at": "2026-04-27T21:07:28.445Z",
+    "updated_at": "2026-04-27T21:07:28.445Z"
+  },
+  {
+    "id": "assignment_audit_538af0d1b1a7444c",
+    "assignment_id": "assignment_e7cf5047373f47bd",
+    "classroom_id": "classroom_f9b6577a742c49d5",
+    "assignment_title": "Delete me",
+    "action": "deleted",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Deleted assignment \"Delete me\"",
+    "changes": [
+      {
+        "label": "Assignment deleted",
+        "before": "Delete me",
+        "after": null
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_e7cf5047373f47bd",
+      "title": "Delete me",
+      "course": "Delete Literature",
+      "classroom_id": "classroom_f9b6577a742c49d5",
+      "classroom_name": "Delete Literature",
+      "prompt": "This assignment should be removable.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.444Z",
+      "updated_at": "2026-04-27T21:07:28.444Z"
+    },
+    "created_at": "2026-04-27T21:07:28.451Z",
+    "updated_at": "2026-04-27T21:07:28.451Z"
+  },
+  {
+    "id": "assignment_audit_6abeaccabfc24d62",
+    "assignment_id": "assignment_abb4ca0d94b7413f",
+    "classroom_id": "classroom_95ab9627d02f4977",
+    "assignment_title": "Draft one",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft one\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft one"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_abb4ca0d94b7413f",
+      "title": "Draft one",
+      "course": "Linked Literature",
+      "classroom_id": "classroom_95ab9627d02f4977",
+      "classroom_name": "Linked Literature",
+      "prompt": "Write your first draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.471Z",
+      "updated_at": "2026-04-27T21:07:28.471Z"
+    },
+    "created_at": "2026-04-27T21:07:28.472Z",
+    "updated_at": "2026-04-27T21:07:28.472Z"
+  },
+  {
+    "id": "assignment_audit_9fd0b34d9e1547c0",
+    "assignment_id": "assignment_1db13d8a35b745ef",
+    "classroom_id": "classroom_95ab9627d02f4977",
+    "assignment_title": "Draft two",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Draft two\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Draft two"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_1db13d8a35b745ef",
+      "title": "Draft two",
+      "course": "Linked Literature",
+      "classroom_id": "classroom_95ab9627d02f4977",
+      "classroom_name": "Linked Literature",
+      "prompt": "Revise with access to your first draft.",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [
+        "assignment_abb4ca0d94b7413f"
+      ],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.475Z",
+      "updated_at": "2026-04-27T21:07:28.475Z"
+    },
+    "created_at": "2026-04-27T21:07:28.476Z",
+    "updated_at": "2026-04-27T21:07:28.476Z"
+  },
+  {
+    "id": "assignment_audit_7092cb095cfb437c",
+    "assignment_id": "assignment_0f679800b07a45ad",
+    "classroom_id": "classroom_d6dc3254040c4863",
+    "assignment_title": "Notebook check-in",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Notebook check-in\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Notebook check-in"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_0f679800b07a45ad",
+      "title": "Notebook check-in",
+      "course": "Silent Reading",
+      "classroom_id": "classroom_d6dc3254040c4863",
+      "classroom_name": "Silent Reading",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.488Z",
+      "updated_at": "2026-04-27T21:07:28.488Z"
+    },
+    "created_at": "2026-04-27T21:07:28.488Z",
+    "updated_at": "2026-04-27T21:07:28.488Z"
+  },
+  {
+    "id": "assignment_audit_7c9328805c3e4003",
+    "assignment_id": "assignment_b96e50e8fe884727",
+    "classroom_id": "classroom_b6961ba1616a4835",
+    "assignment_title": "Timed Write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Timed Write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Timed Write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_b96e50e8fe884727",
+      "title": "Timed Write",
+      "course": "Extensions",
+      "classroom_id": "classroom_b6961ba1616a4835",
+      "classroom_name": "Extensions",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": "2026-04-27T18:00:00.000Z",
+      "student_temporary_access_until": {
+        "ada lovelace": "2026-04-27T19:30:00.000Z"
+      },
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.545Z",
+      "updated_at": "2026-04-27T21:07:28.545Z"
+    },
+    "created_at": "2026-04-27T21:07:28.546Z",
+    "updated_at": "2026-04-27T21:07:28.546Z"
+  },
+  {
+    "id": "assignment_audit_dc4f6bd9f7df4d1e",
+    "assignment_id": "assignment_f91f246f76874095",
+    "classroom_id": "classroom_6e9b340e20c048c7",
+    "assignment_title": "Whole class draft",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Whole class draft\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Whole class draft"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_f91f246f76874095",
+      "title": "Whole class draft",
+      "course": "English 11",
+      "classroom_id": "classroom_6e9b340e20c048c7",
+      "classroom_name": "English 11",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.561Z",
+      "updated_at": "2026-04-27T21:07:28.561Z"
+    },
+    "created_at": "2026-04-27T21:07:28.562Z",
+    "updated_at": "2026-04-27T21:07:28.562Z"
+  },
+  {
+    "id": "assignment_audit_734cc21404024561",
+    "assignment_id": "assignment_1bae35d07ebd4efd",
+    "classroom_id": "classroom_6e9b340e20c048c7",
+    "assignment_title": "Ada only draft",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Ada only draft\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Ada only draft"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_1bae35d07ebd4efd",
+      "title": "Ada only draft",
+      "course": "English 11",
+      "classroom_id": "classroom_6e9b340e20c048c7",
+      "classroom_name": "English 11",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [
+        "Ada Lovelace"
+      ],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {},
+      "created_at": "2026-04-27T21:07:28.568Z",
+      "updated_at": "2026-04-27T21:07:28.568Z"
+    },
+    "created_at": "2026-04-27T21:07:28.569Z",
+    "updated_at": "2026-04-27T21:07:28.569Z"
+  },
+  {
+    "id": "assignment_audit_975cd7b2a3684434",
+    "assignment_id": "assignment_fe926a1d30034a9e",
+    "classroom_id": "classroom_f4811a1d51a14d1d",
+    "assignment_title": "Differentiated write",
+    "action": "created",
+    "actor_id": "teacher_default",
+    "actor_name": "Joseph Tan",
+    "actor_email": "teacher@edu.handtyped.app",
+    "summary": "Created assignment \"Differentiated write\"",
+    "changes": [
+      {
+        "label": "Assignment created",
+        "before": null,
+        "after": "Differentiated write"
+      }
+    ],
+    "snapshot": {
+      "id": "assignment_fe926a1d30034a9e",
+      "title": "Differentiated write",
+      "course": "English 11",
+      "classroom_id": "classroom_f4811a1d51a14d1d",
+      "classroom_name": "English 11",
+      "prompt": "",
+      "instructions": "",
+      "starter_document": "",
+      "windows": [
+        {
+          "label": "Writing window",
+          "days": {
+            "monday": true,
+            "tuesday": true,
+            "wednesday": true,
+            "thursday": true,
+            "friday": true,
+            "saturday": false,
+            "sunday": false
+          },
+          "end_date": null,
+          "start_hour": 10,
+          "start_minute": 0,
+          "end_hour": 11,
+          "end_minute": 0
+        }
+      ],
+      "policy": {
+        "allow_dictation": false,
+        "allow_offline_editing": true,
+        "copy_paste_allowed": false,
+        "printing_allowed": false,
+        "export_allowed": false,
+        "images_allowed": false,
+        "citations_required": false,
+        "require_lockdown": true,
+        "require_fullscreen": false
+      },
+      "editor_policy": {
+        "font_family": "arial",
+        "font_size": 22,
+        "line_height": "relaxed"
+      },
+      "browser_policy": {
+        "browser_enabled": true,
+        "home_url": "https://www.gutenberg.org",
+        "allowed_domains": [
+          "gutenberg.org"
+        ],
+        "log_all_navigation": true
+      },
+      "assigned_students": [],
+      "linked_assignment_ids": [],
+      "rubric": [],
+      "temporary_access_until": null,
+      "student_temporary_access_until": {},
+      "student_overrides": {
+        "ada lovelace": {
+          "student_name": "Ada Lovelace",
+          "policy": {
+            "allow_dictation": true,
+            "copy_paste_allowed": true
+          },
+          "editor_policy": {
+            "font_size": 28
+          },
+          "browser_policy": {
+            "browser_enabled": false
+          }
+        }
+      },
+      "created_at": "2026-04-27T21:07:28.584Z",
+      "updated_at": "2026-04-27T21:07:28.584Z"
+    },
+    "created_at": "2026-04-27T21:07:28.585Z",
+    "updated_at": "2026-04-27T21:07:28.585Z"
   }
 ]

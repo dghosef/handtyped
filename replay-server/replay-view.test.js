@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildFocusSegments,
+  buildAttributedDocument,
   buildInactiveSpans,
   buildTimelineGapMarkers,
   buildSyntheticHistory,
@@ -20,6 +21,8 @@ import {
   parseKeydowns,
   parseFocusEvents,
   parseHistory,
+  renderInsertedRangeHtml,
+  renderInsertedRangesHtml,
   renderMarkdownToHtml,
 } from './public/replay-view.js'
 import fs from 'node:fs'
@@ -50,10 +53,23 @@ describe('replay history start state', () => {
     expect(eduAppJs).not.toContain('href="/replay/${escapeHtml(')
   })
 
+  it('adds teacher time-window controls for inserted-text highlighting', () => {
+    expect(eduReplayPageHtml).toContain('Highlight inserted text by time')
+    expect(eduReplayPageHtml).toContain('id="highlight-start"')
+    expect(eduReplayPageHtml).toContain('id="highlight-end"')
+    expect(eduReplayPageHtml).toContain('id="highlight-after-school"')
+    expect(eduReplayPageHtml).toContain('id="highlight-outside-window"')
+    expect(eduReplayPageHtml).toContain('buildAttributedDocument')
+    expect(eduReplayPageHtml).toContain('renderInsertedRangeHtml')
+    expect(eduReplayPageHtml).toContain('renderInsertedRangesHtml')
+    expect(eduReplayPageHtml).toContain('id="highlight-doc"')
+  })
+
   it('hides numeric risk scores from teacher student cards', () => {
     expect(eduAppJs).not.toContain('Risk ${risk.score}')
     expect(eduAppJs).toContain('student-card-risk-${risk.score')
-    expect(eduAppJs).toContain("risk.reasons.join(' • ')")
+    expect(eduAppJs).toContain('const statusLabel = risk.active ? \'Active\' : \'Offline\'')
+    expect(eduAppJs).not.toContain("risk.reasons.join(' • ')")
   })
 
   it('uses the homepage header font for the replay title', () => {
@@ -188,6 +204,67 @@ describe('replay history start state', () => {
     expect(history[1].text).toBe('hs')
     expect(findHistoryIndex(history, 0)).toBe(0)
     expect(findHistoryIndex(history, 1)).toBe(1)
+  })
+
+  it('tracks surviving characters by their insertion time across edits', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'axc',
+      doc_history: [
+        { t: 1000, pos: 0, del: '', ins: 'abc' },
+        { t: 2000, pos: 1, del: 'b', ins: 'x' },
+      ],
+    })
+
+    const start = attributed.originWallMs + 1500
+    const end = attributed.originWallMs + 2500
+    const html = renderInsertedRangeHtml(attributed, start, end)
+
+    expect(attributed.text).toBe('axc')
+    expect(attributed.chars.map((entry) => entry.insertedAtMs)).toEqual([
+      attributed.originWallMs + 1000,
+      attributed.originWallMs + 2000,
+      attributed.originWallMs + 1000,
+    ])
+    expect(html).toBe('a<mark class="insert-highlight">x</mark>c')
+  })
+
+  it('treats snapshot replacements as newly inserted characters in the selected range', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'hello there',
+      doc_history: [
+        { t: 1000, text: 'hello world' },
+        { t: 5000, text: 'hello there' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      attributed.originWallMs + 4500,
+      attributed.originWallMs + 5500,
+    )
+
+    expect(html).toBe('hello <mark class="insert-highlight">there</mark>')
+  })
+
+  it('supports highlighting multiple separated inserted-time ranges', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'abcde',
+      doc_history: [
+        { t: 1000, pos: 0, del: '', ins: 'ab' },
+        { t: 2000, pos: 2, del: '', ins: 'c' },
+        { t: 3000, pos: 3, del: '', ins: 'de' },
+      ],
+    })
+
+    const html = renderInsertedRangesHtml(attributed, [
+      { startMs: attributed.originWallMs + 900, endMs: attributed.originWallMs + 1100 },
+      { startMs: attributed.originWallMs + 2900, endMs: attributed.originWallMs + 3100 },
+    ])
+
+    expect(html).toBe('<mark class="insert-highlight">ab</mark>c<mark class="insert-highlight">de</mark>')
   })
 
   it('keeps synthetic history timestamps tied to the captured typing time', () => {

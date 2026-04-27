@@ -102,16 +102,78 @@ function padDatePart(value) {
   return String(value).padStart(2, '0')
 }
 
+function replayShiftedDate(absoluteMs, offsetMinutes = 0) {
+  return new Date(Number(absoluteMs || 0) + Number(offsetMinutes || 0) * 60_000)
+}
+
+function parseDateInputParts(dateInput) {
+  const match = String(dateInput || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) {
+    return null
+  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null
+  }
+  return { year, month, day }
+}
+
+function replayAbsoluteMsForDateTime(dateInput, hour = 0, minute = 0, offsetMinutes = 0, second = 0, millisecond = 0) {
+  const parts = parseDateInputParts(dateInput)
+  if (!parts) {
+    return null
+  }
+  return Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    Number(hour) || 0,
+    Number(minute) || 0,
+    Number(second) || 0,
+    Number(millisecond) || 0,
+  ) - Number(offsetMinutes || 0) * 60_000
+}
+
+function replayDayKeyForDateInput(dateInput) {
+  const parts = parseDateInputParts(dateInput)
+  if (!parts) {
+    return null
+  }
+  return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][
+    new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay()
+  ]
+}
+
 export function todayAtLocalTime(hour, minute = 0, now = new Date()) {
   const target = new Date(now)
   target.setHours(hour, minute, 0, 0)
   return target
 }
 
+export function nextLocalTimeAtOrAfter(hour, minute = 0, now = new Date()) {
+  const target = todayAtLocalTime(hour, minute, now)
+  if (target.getTime() >= now.getTime()) {
+    return target
+  }
+  const next = new Date(target)
+  next.setDate(next.getDate() + 1)
+  return next
+}
+
 export function localDateTimeInputValue(date) {
   return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(
     date.getHours(),
   )}:${padDatePart(date.getMinutes())}`
+}
+
+export function replayLocalDateInputValue(absoluteMs, offsetMinutes = 0) {
+  if (!Number.isFinite(Number(absoluteMs))) {
+    return ''
+  }
+  const shifted = replayShiftedDate(absoluteMs, offsetMinutes)
+  return `${shifted.getUTCFullYear()}-${padDatePart(shifted.getUTCMonth() + 1)}-${padDatePart(shifted.getUTCDate())}`
 }
 
 export function todayAtLocalTimeIso(hour, minute = 0, now = new Date()) {
@@ -264,4 +326,63 @@ export function formatWindowSummary(assignment) {
   const daysLabel = activeDays.length ? activeDays.join(', ') : 'No days selected'
   const endDate = window.end_date ? ` until ${window.end_date}` : ''
   return `${daysLabel} • ${start}–${end}${endDate}`
+}
+
+export function assignmentWindowForReplayDate(assignment, dateInput, offsetMinutes = 0) {
+  const window = assignment?.windows?.[0]
+  if (!window) {
+    return null
+  }
+  const dayKey = replayDayKeyForDateInput(dateInput)
+  if (!dayKey) {
+    return null
+  }
+  if (window.days && window.days[dayKey] === false) {
+    return null
+  }
+  if (window.end_date && String(dateInput) > String(window.end_date)) {
+    return null
+  }
+  const startMs = replayAbsoluteMsForDateTime(dateInput, window.start_hour, window.start_minute, offsetMinutes)
+  const endMs = replayAbsoluteMsForDateTime(dateInput, window.end_hour, window.end_minute, offsetMinutes)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return null
+  }
+  return {
+    startMs,
+    endMs,
+    label: String(window.label || 'Writing window'),
+  }
+}
+
+export function buildAfterSchoolRanges(
+  insertedAtMs,
+  assignment,
+  {
+    dateInput = '',
+    offsetMinutes = 0,
+    allDates = false,
+    fallbackHour = 15,
+  } = {},
+) {
+  const values = Array.isArray(insertedAtMs)
+    ? insertedAtMs.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : []
+  const dates = dateInput
+    ? [dateInput]
+    : allDates
+      ? [...new Set(values.map((value) => replayLocalDateInputValue(value, offsetMinutes)).filter(Boolean))]
+      : []
+
+  return dates
+    .map((date) => {
+      const window = assignmentWindowForReplayDate(assignment, date, offsetMinutes)
+      const startMs = window?.endMs ?? replayAbsoluteMsForDateTime(date, fallbackHour, 0, offsetMinutes)
+      const endMs = replayAbsoluteMsForDateTime(date, 23, 59, offsetMinutes, 59, 999)
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+        return null
+      }
+      return { startMs, endMs, date }
+    })
+    .filter(Boolean)
 }

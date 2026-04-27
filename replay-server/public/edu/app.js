@@ -64,7 +64,6 @@ const elements = {
   assignmentModalTitle: document.getElementById('assignment-modal-title'),
   assignmentFormSubmit: document.getElementById('assignment-form-submit'),
   assignmentFormCancel: document.getElementById('assignment-form-cancel'),
-  assignmentScheduleSummaryText: document.getElementById('assignment-schedule-summary-text'),
   assignmentValidationErrors: document.getElementById('assignment-validation-errors'),
   assignmentValidationWarnings: document.getElementById('assignment-validation-warnings'),
   assignmentAssignedOptions: document.getElementById('assignment-assigned-options'),
@@ -124,13 +123,13 @@ const elements = {
 
 const STUDENT_OVERRIDE_BOOLEAN_FIELDS = [
   ['allow_dictation', 'Allow dictation'],
+  ['allow_offline_editing', 'Allow offline editing'],
   ['copy_paste_allowed', 'Allow copy/paste'],
   ['printing_allowed', 'Allow printing'],
   ['export_allowed', 'Allow export'],
   ['images_allowed', 'Allow images'],
   ['citations_required', 'Require citations'],
   ['require_lockdown', 'Require lockdown'],
-  ['require_fullscreen', 'Require fullscreen'],
   ['browser_enabled', 'Enable study browser'],
 ]
 
@@ -324,13 +323,13 @@ function createStudentOverrideDraft(input = {}) {
     temporary_access_until: String(input.temporary_access_until || ''),
     policy: {
       allow_dictation: input.policy?.allow_dictation || 'default',
+      allow_offline_editing: input.policy?.allow_offline_editing || 'default',
       copy_paste_allowed: input.policy?.copy_paste_allowed || 'default',
       printing_allowed: input.policy?.printing_allowed || 'default',
       export_allowed: input.policy?.export_allowed || 'default',
       images_allowed: input.policy?.images_allowed || 'default',
       citations_required: input.policy?.citations_required || 'default',
       require_lockdown: input.policy?.require_lockdown || 'default',
-      require_fullscreen: input.policy?.require_fullscreen || 'default',
       browser_enabled: input.policy?.browser_enabled || 'default',
     },
     editor_policy: {
@@ -366,13 +365,13 @@ function currentStudentOverrideDrafts() {
       temporary_access_until: card.querySelector('[data-override-temp-value]')?.value || '',
       policy: {
         allow_dictation: card.querySelector('[data-override-policy="allow_dictation"]')?.value,
+        allow_offline_editing: card.querySelector('[data-override-policy="allow_offline_editing"]')?.value,
         copy_paste_allowed: card.querySelector('[data-override-policy="copy_paste_allowed"]')?.value,
         printing_allowed: card.querySelector('[data-override-policy="printing_allowed"]')?.value,
         export_allowed: card.querySelector('[data-override-policy="export_allowed"]')?.value,
         images_allowed: card.querySelector('[data-override-policy="images_allowed"]')?.value,
         citations_required: card.querySelector('[data-override-policy="citations_required"]')?.value,
         require_lockdown: card.querySelector('[data-override-policy="require_lockdown"]')?.value,
-        require_fullscreen: card.querySelector('[data-override-policy="require_fullscreen"]')?.value,
         browser_enabled: card.querySelector('[data-override-policy="browser_enabled"]')?.value,
       },
       editor_policy: {
@@ -645,13 +644,13 @@ function draftsFromAssignmentStudentOverrides(assignment) {
       temporary_access_until: temporaryOverrides[key] ? localDateTimeInputValue(temporaryOverrides[key]) : '',
       policy: {
         allow_dictation: boolOverrideValue(settings.policy?.allow_dictation),
+        allow_offline_editing: boolOverrideValue(settings.policy?.allow_offline_editing),
         copy_paste_allowed: boolOverrideValue(settings.policy?.copy_paste_allowed),
         printing_allowed: boolOverrideValue(settings.policy?.printing_allowed),
         export_allowed: boolOverrideValue(settings.policy?.export_allowed),
         images_allowed: boolOverrideValue(settings.policy?.images_allowed),
         citations_required: boolOverrideValue(settings.policy?.citations_required),
         require_lockdown: boolOverrideValue(settings.policy?.require_lockdown),
-        require_fullscreen: boolOverrideValue(settings.policy?.require_fullscreen),
         browser_enabled: boolOverrideValue(settings.browser_policy?.browser_enabled),
       },
       editor_policy: {
@@ -1979,16 +1978,11 @@ function validateAssignmentDraft() {
     }
   }
 
-  const summary = `${dayLabel(days)} • ${String(form.get('window_start_time') || '')}–${String(
-    form.get('window_end_time') || '',
-  )}${form.get('window_end_date') ? ` until ${String(form.get('window_end_date'))}` : ''}`
-
-  return { errors, warnings, summary }
+  return { errors, warnings }
 }
 
 function updateAssignmentFormGuidance() {
-  const { errors, warnings, summary } = validateAssignmentDraft()
-  elements.assignmentScheduleSummaryText.textContent = summary
+  const { errors, warnings } = validateAssignmentDraft()
   renderValidationList(elements.assignmentValidationErrors, errors)
   renderValidationList(elements.assignmentValidationWarnings, warnings)
   elements.assignmentFormSubmit.disabled = errors.length > 0
@@ -2112,6 +2106,7 @@ function resetAssignmentModal() {
   elements.assignmentFormSubmit.textContent = 'Create assignment'
   elements.assignmentFormCancel.hidden = true
   elements.assignmentForm.reset()
+  elements.assignmentForm.elements.namedItem('require_lockdown').checked = true
   elements.assignmentForm.elements.namedItem('editor_font_family').value = 'arial'
   elements.assignmentForm.elements.namedItem('editor_font_size').value = '22'
   elements.assignmentForm.elements.namedItem('editor_line_height').value = 'relaxed'
@@ -2159,13 +2154,13 @@ function populateAssignmentModalForEdit(assignment) {
 
   if (assignment.policy) {
     form.allow_dictation.checked = assignment.policy.allow_dictation ?? false
+    form.allow_offline_editing.checked = assignment.policy.allow_offline_editing ?? true
     form.copy_paste_allowed.checked = assignment.policy.copy_paste_allowed ?? false
     form.printing_allowed.checked = assignment.policy.printing_allowed ?? false
     form.export_allowed.checked = assignment.policy.export_allowed ?? false
     form.images_allowed.checked = assignment.policy.images_allowed ?? false
     form.citations_required.checked = assignment.policy.citations_required ?? false
     form.require_lockdown.checked = assignment.policy.require_lockdown ?? false
-    form.require_fullscreen.checked = assignment.policy.require_fullscreen ?? false
   }
 
   if (assignment.editor_policy) {
@@ -2266,13 +2261,14 @@ function wireForms() {
         student_temporary_access_until: studentOverrides.studentTemporaryAccessUntil,
         policy: {
           allow_dictation: form.get('allow_dictation') === 'on',
+          allow_offline_editing: form.get('allow_offline_editing') === 'on',
           copy_paste_allowed: form.get('copy_paste_allowed') === 'on',
           printing_allowed: form.get('printing_allowed') === 'on',
           export_allowed: form.get('export_allowed') === 'on',
           images_allowed: form.get('images_allowed') === 'on',
           citations_required: form.get('citations_required') === 'on',
           require_lockdown: form.get('require_lockdown') === 'on',
-          require_fullscreen: form.get('require_fullscreen') === 'on',
+          require_fullscreen: form.get('require_lockdown') === 'on',
         },
         editor_policy: {
           font_family: String(form.get('editor_font_family') || 'serif'),

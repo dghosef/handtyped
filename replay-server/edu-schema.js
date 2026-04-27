@@ -27,6 +27,7 @@ function normalizeStudentPolicyOverride(input = {}) {
   const output = {}
   for (const key of [
     'allow_dictation',
+    'allow_offline_editing',
     'copy_paste_allowed',
     'printing_allowed',
     'export_allowed',
@@ -205,12 +206,13 @@ export function buildAssignment(input = {}) {
       : [buildAssignmentWindow()],
     policy: {
       allow_dictation: Boolean(input.policy?.allow_dictation),
+      allow_offline_editing: input.policy?.allow_offline_editing ?? true,
       copy_paste_allowed: Boolean(input.policy?.copy_paste_allowed),
       printing_allowed: Boolean(input.policy?.printing_allowed),
       export_allowed: Boolean(input.policy?.export_allowed),
       images_allowed: Boolean(input.policy?.images_allowed),
       citations_required: Boolean(input.policy?.citations_required),
-      require_lockdown: input.policy?.require_lockdown ?? false,
+      require_lockdown: input.policy?.require_lockdown ?? true,
       require_fullscreen: input.policy?.require_fullscreen ?? false,
     },
     editor_policy: {

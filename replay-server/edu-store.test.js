@@ -185,12 +185,13 @@ describe('createD1EduStore', () => {
     await expect(store.getClassroom(classroom.id)).resolves.toBeNull()
   })
 
-  it('stores the printing policy flag on assignments', async () => {
+  it('stores policy flags on assignments', async () => {
     const store = createD1EduStore(new FakeD1Database())
     const assignment = buildAssignment({
       id: 'assignment-printing',
       title: 'Printing rules',
       policy: {
+        allow_offline_editing: false,
         copy_paste_allowed: false,
         printing_allowed: true,
         require_lockdown: false,
@@ -203,6 +204,7 @@ describe('createD1EduStore', () => {
     await expect(store.getAssignment(assignment.id)).resolves.toMatchObject({
       id: 'assignment-printing',
       policy: {
+        allow_offline_editing: false,
         printing_allowed: true,
       },
     })
@@ -329,6 +331,7 @@ describe('createD1EduStore', () => {
       classroom_name: classroom.name,
       policy: {
         allow_dictation: false,
+        allow_offline_editing: true,
         copy_paste_allowed: false,
         require_lockdown: true,
       },
@@ -347,6 +350,7 @@ describe('createD1EduStore', () => {
           student_name: 'Ada Lovelace',
           policy: {
             allow_dictation: true,
+            allow_offline_editing: false,
             copy_paste_allowed: true,
           },
           editor_policy: {
@@ -378,6 +382,7 @@ describe('createD1EduStore', () => {
       student_overrides: {},
       policy: {
         allow_dictation: true,
+        allow_offline_editing: false,
         copy_paste_allowed: true,
         require_lockdown: true,
       },
@@ -398,6 +403,7 @@ describe('createD1EduStore', () => {
       student_overrides: {},
       policy: {
         allow_dictation: false,
+        allow_offline_editing: true,
         copy_paste_allowed: false,
         require_lockdown: true,
       },

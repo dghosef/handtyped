@@ -296,10 +296,6 @@
             <input name="window_end_date" type="date" />
           </label>
         </fieldset>
-        <div class="form-callout" id="assignment-schedule-summary">
-          <div class="section-label">Schedule summary</div>
-          <p class="muted" id="assignment-schedule-summary-text">Choose days and times to generate a summary.</p>
-        </div>
         <fieldset class="form-fieldset">
           <legend>Temporary access override</legend>
           <div class="selector-row">
@@ -319,6 +315,10 @@
           <label class="checkbox-label">
             <input type="checkbox" name="allow_dictation" />
             <span>Allow voice dictation inside the student app</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="allow_offline_editing" checked />
+            <span>Allow students to keep editing if the app loses connection to Handtyped</span>
           </label>
           <label class="checkbox-label">
             <input type="checkbox" name="copy_paste_allowed" />
@@ -341,12 +341,8 @@
             <span>Require citations before final submission</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" name="require_lockdown" />
+            <input type="checkbox" name="require_lockdown" checked />
             <span>Lock the student Mac to Handtyped only while editing</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" name="require_fullscreen" />
-            <span>Open the student app in fullscreen</span>
           </label>
         </fieldset>
         <fieldset class="form-fieldset">

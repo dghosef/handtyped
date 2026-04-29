@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { buildStudentConfig, createD1EduStore } from './edu-store.js'
+import { mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
+import { buildStudentConfig, createD1EduStore, createNodeEduStore } from './edu-store.js'
 import { buildAssignment, buildClassroom, buildTeacher } from './edu-schema.js'
 
 class FakeD1PreparedStatement {
@@ -193,7 +196,7 @@ describe('createD1EduStore', () => {
       policy: {
         allow_offline_editing: false,
         copy_paste_allowed: false,
-        printing_allowed: true,
+        export_allowed: true,
         require_lockdown: false,
         require_fullscreen: false,
       },
@@ -205,7 +208,7 @@ describe('createD1EduStore', () => {
       id: 'assignment-printing',
       policy: {
         allow_offline_editing: false,
-        printing_allowed: true,
+        export_allowed: true,
       },
     })
   })
@@ -321,6 +324,41 @@ describe('createD1EduStore', () => {
     })
   })
 
+  it('matches targeted assignments case-insensitively and avoids duplicate roster entries', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({
+      id: 'class-targeted-normalized',
+      name: 'English 11',
+      join_code: 'ENG12',
+      students: ['Ada Lovelace'],
+    })
+    const targeted = buildAssignment({
+      id: 'assignment-normalized',
+      title: 'Ada only draft',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      assigned_students: [' ada lovelace ', 'ADA LOVELACE'],
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(targeted)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: 'eng12',
+      studentName: '  Ada Lovelace  ',
+    })
+    const graceConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Grace Hopper',
+    })
+
+    expect(adaConfig.assignments.map((item) => item.id)).toEqual(['assignment-normalized'])
+    expect(graceConfig.assignments).toEqual([])
+    await expect(store.getClassroom(classroom.id)).resolves.toMatchObject({
+      students: ['Ada Lovelace', 'Grace Hopper'],
+    })
+  })
+
   it('merges student-specific setting overrides into the student config assignment', async () => {
     const store = createD1EduStore(new FakeD1Database())
     const classroom = buildClassroom({ id: 'class-overrides', name: 'English 11', join_code: 'OVR11' })
@@ -418,5 +456,166 @@ describe('createD1EduStore', () => {
         allowed_domains: ['gutenberg.org'],
       },
     })
+  })
+
+  it('keeps base settings when a student override only changes a few fields', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-override-fallbacks', name: 'English 11', join_code: 'OVR12' })
+    const assignment = buildAssignment({
+      id: 'assignment-override-fallbacks',
+      title: 'Targeted supports',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      temporary_access_until: '2026-04-27T18:00:00.000Z',
+      policy: {
+        allow_dictation: false,
+        allow_offline_editing: true,
+        copy_paste_allowed: false,
+        require_lockdown: true,
+      },
+      editor_policy: {
+        font_family: 'arial',
+        font_size: 22,
+        line_height: 'relaxed',
+      },
+      browser_policy: {
+        browser_enabled: true,
+        home_url: 'https://www.gutenberg.org',
+        allowed_domains: ['gutenberg.org'],
+      },
+      student_overrides: {
+        'ada lovelace': {
+          student_name: 'Ada Lovelace',
+          temporary_access_until: '2026-04-27T19:30:00.000Z',
+          policy: {
+            allow_dictation: true,
+          },
+          editor_policy: {
+            font_size: 28,
+          },
+          browser_policy: {
+            browser_enabled: false,
+          },
+        },
+      },
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(assignment)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    const graceConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Grace Hopper',
+    })
+
+    expect(adaConfig.assignments[0]).toMatchObject({
+      id: 'assignment-override-fallbacks',
+      temporary_access_until: '2026-04-27T19:30:00.000Z',
+      student_overrides: {},
+      policy: {
+        allow_dictation: true,
+        allow_offline_editing: true,
+        copy_paste_allowed: false,
+        require_lockdown: true,
+      },
+      editor_policy: {
+        font_family: 'arial',
+        font_size: 28,
+        line_height: 'relaxed',
+      },
+      browser_policy: {
+        browser_enabled: false,
+        home_url: 'https://www.gutenberg.org',
+        allowed_domains: ['gutenberg.org'],
+      },
+    })
+
+    expect(graceConfig.assignments[0]).toMatchObject({
+      id: 'assignment-override-fallbacks',
+      temporary_access_until: '2026-04-27T18:00:00.000Z',
+      student_overrides: {},
+      policy: {
+        allow_dictation: false,
+        allow_offline_editing: true,
+        copy_paste_allowed: false,
+        require_lockdown: true,
+      },
+      editor_policy: {
+        font_family: 'arial',
+        font_size: 22,
+        line_height: 'relaxed',
+      },
+      browser_policy: {
+        browser_enabled: true,
+        home_url: 'https://www.gutenberg.org',
+        allowed_domains: ['gutenberg.org'],
+      },
+    })
+  })
+})
+
+describe('createNodeEduStore', () => {
+  it('repeated updates keep only the newest assignment record per id', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'handtyped-edu-store-'))
+    try {
+      const store = createNodeEduStore(dir)
+      const original = buildAssignment({
+        id: 'assignment-repeat',
+        title: 'Original title',
+        updated_at: '2026-04-25T13:00:00.000Z',
+      })
+      const updated = buildAssignment({
+        ...original,
+        title: 'Updated title',
+        updated_at: '2026-04-25T13:05:00.000Z',
+      })
+
+      await store.putAssignment(original)
+      await store.putAssignment(updated)
+      await store.putAssignment(updated)
+
+      const assignments = await store.listAssignments()
+      expect(assignments).toHaveLength(1)
+      expect(assignments[0].id).toBe('assignment-repeat')
+      expect(assignments[0].title).toBe('Updated title')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('repeated deletes are idempotent for classrooms and assignments', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'handtyped-edu-store-'))
+    try {
+      const store = createNodeEduStore(dir)
+      const classroom = buildClassroom({
+        id: 'classroom-repeat-delete',
+        name: 'English 11',
+        join_code: 'ENG11',
+      })
+      const assignment = buildAssignment({
+        id: 'assignment-repeat-delete',
+        classroom_id: classroom.id,
+        classroom_name: classroom.name,
+      })
+
+      await store.putClassroom(classroom)
+      await store.putAssignment(assignment)
+
+      await store.deleteAssignment(assignment.id)
+      await store.deleteAssignment(assignment.id)
+      await store.deleteClassroom(classroom.id)
+      await store.deleteClassroom(classroom.id)
+
+      await expect(store.getAssignment(assignment.id)).resolves.toBeNull()
+      await expect(store.getClassroom(classroom.id)).resolves.toBeNull()
+      await expect(store.listAssignments()).resolves.toEqual([])
+      await expect(store.listClassrooms()).resolves.toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

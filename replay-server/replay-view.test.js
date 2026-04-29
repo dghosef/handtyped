@@ -18,6 +18,7 @@ import {
   getRawDurationFromHistory,
   getReplayOriginWallMs,
   findHistoryIndex,
+  latestTextFromHistory,
   parseKeydowns,
   parseFocusEvents,
   parseHistory,
@@ -51,6 +52,7 @@ describe('replay history start state', () => {
   it('links teacher replay actions to the edu replay route', () => {
     expect(eduAppJs).toContain('href="/edu/replay/${escapeHtml(')
     expect(eduAppJs).not.toContain('href="/replay/${escapeHtml(')
+    expect(eduAppJs).toContain('displaySessionText(session')
   })
 
   it('adds teacher time-window controls for inserted-text highlighting', () => {
@@ -172,6 +174,19 @@ describe('replay history start state', () => {
     expect(findHistoryIndex(history, 1420)).toBe(0)
   })
 
+  it('reconstructs text from legacy op-based replay history entries', () => {
+    const session = {
+      doc_history: [
+        { op: 'insert', text: 'Hello' },
+        { op: 'insert', text: ' world' },
+      ],
+      doc_text: '',
+    }
+
+    expect(latestTextFromHistory(session)).toBe('Hello world')
+    expect(parseHistory(session, []).map((entry) => entry.text)).toEqual(['Hello', 'Hello world'])
+  })
+
   it('preserves intentional trailing blank lines before the replay attribution footer', () => {
     const text = documentWithAttribution('Line one\n\n', 'https://replay.handtyped.app/abc123')
 
@@ -267,6 +282,155 @@ describe('replay history start state', () => {
     expect(html).toBe('<mark class="insert-highlight">ab</mark>c<mark class="insert-highlight">de</mark>')
   })
 
+  it('treats fake timestamp boundaries as inclusive for inserted-text highlighting', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'abc',
+      doc_history: [
+        { t: 1000, pos: 0, del: '', ins: 'a' },
+        { t: 2000, pos: 1, del: '', ins: 'b' },
+        { t: 3000, pos: 2, del: '', ins: 'c' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      attributed.originWallMs + 2000,
+      attributed.originWallMs + 3000,
+    )
+
+    expect(html).toBe('a<mark class="insert-highlight">bc</mark>')
+  })
+
+  it('highlights only in-class insertions across fake before, during, and after-school timestamps', () => {
+    const originWallMs = Date.UTC(2026, 3, 24, 13, 50, 0)
+    const attributed = buildAttributedDocument({
+      start_wall_ns: originWallMs * 1e6,
+      doc_text: 'Before During After',
+      doc_history: [
+        { t: 0, pos: 0, del: '', ins: 'Before ' },
+        { t: 15 * 60 * 1000, pos: 7, del: '', ins: 'During ' },
+        { t: 80 * 60 * 1000, pos: 14, del: '', ins: 'After' },
+      ],
+    })
+
+    const classStartMs = originWallMs + 10 * 60 * 1000
+    const classEndMs = originWallMs + 60 * 60 * 1000
+    const html = renderInsertedRangeHtml(attributed, classStartMs, classEndMs)
+
+    expect(html).toBe('Before <mark class="insert-highlight">During </mark>After')
+  })
+
+  it('supports outside-window highlighting for fake before-class and after-school insertions', () => {
+    const originWallMs = Date.UTC(2026, 3, 24, 13, 50, 0)
+    const attributed = buildAttributedDocument({
+      start_wall_ns: originWallMs * 1e6,
+      doc_text: 'Before During After',
+      doc_history: [
+        { t: 0, pos: 0, del: '', ins: 'Before ' },
+        { t: 15 * 60 * 1000, pos: 7, del: '', ins: 'During ' },
+        { t: 80 * 60 * 1000, pos: 14, del: '', ins: 'After' },
+      ],
+    })
+
+    const classStartMs = originWallMs + 10 * 60 * 1000
+    const classEndMs = originWallMs + 60 * 60 * 1000
+    const html = renderInsertedRangesHtml(attributed, [
+      { startMs: originWallMs, endMs: classStartMs },
+      { startMs: classEndMs, endMs: originWallMs + 80 * 60 * 1000 },
+    ])
+
+    expect(html).toBe('<mark class="insert-highlight">Before </mark>During <mark class="insert-highlight">After</mark>')
+  })
+
+  it('highlights only surviving after-school text when later in-class revisions delete earlier after-school writing', () => {
+    const originWallMs = Date.UTC(2026, 3, 24, 19, 0, 0)
+    const attributed = buildAttributedDocument({
+      start_wall_ns: originWallMs * 1e6,
+      doc_text: 'Class After',
+      doc_history: [
+        { t: 0, pos: 0, del: '', ins: 'Draft' },
+        { t: 30 * 60 * 1000, pos: 0, del: 'Draft', ins: 'Class ' },
+        { t: 4 * 60 * 60 * 1000, pos: 6, del: '', ins: 'After' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      originWallMs + (3 * 60 * 60 * 1000),
+      originWallMs + (5 * 60 * 60 * 1000),
+    )
+
+    expect(attributed.text).toBe('Class After')
+    expect(html).toBe('Class <mark class="insert-highlight">After</mark>')
+  })
+
+  it('does not highlight surviving text when the selected after-school window misses every inserted timestamp', () => {
+    const originWallMs = Date.UTC(2026, 3, 24, 14, 0, 0)
+    const attributed = buildAttributedDocument({
+      start_wall_ns: originWallMs * 1e6,
+      doc_text: 'During only',
+      doc_history: [
+        { t: 20 * 60 * 1000, pos: 0, del: '', ins: 'During only' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      originWallMs + (2 * 60 * 60 * 1000),
+      originWallMs + (3 * 60 * 60 * 1000),
+    )
+
+    expect(html).toBe('During only')
+  })
+
+  it('supports all-after-school highlighting across multiple replay-local days', () => {
+    const firstDayOriginMs = Date.UTC(2026, 3, 24, 19, 30, 0)
+    const attributed = buildAttributedDocument({
+      start_wall_ns: firstDayOriginMs * 1e6,
+      doc_text: 'NightOne DayTwo',
+      doc_history: [
+        { t: 0, pos: 0, del: '', ins: 'NightOne ' },
+        { t: 25 * 60 * 60 * 1000, pos: 9, del: '', ins: 'DayTwo' },
+      ],
+    })
+
+    const html = renderInsertedRangesHtml(attributed, [
+      {
+        startMs: Date.UTC(2026, 3, 24, 19, 0),
+        endMs: Date.UTC(2026, 3, 25, 3, 59, 59, 999),
+      },
+      {
+        startMs: Date.UTC(2026, 3, 25, 19, 0),
+        endMs: Date.UTC(2026, 3, 26, 3, 59, 59, 999),
+      },
+    ])
+
+    expect(html).toBe('<mark class="insert-highlight">NightOne DayTwo</mark>')
+  })
+
+  it('treats the after-school boundary as inclusive for edits exactly at class end', () => {
+    const originWallMs = Date.UTC(2026, 3, 24, 14, 0, 0)
+    const classEndOffsetMs = 60 * 60 * 1000
+    const attributed = buildAttributedDocument({
+      start_wall_ns: originWallMs * 1e6,
+      doc_text: 'BeforeEdgeAfter',
+      doc_history: [
+        { t: classEndOffsetMs - 1, pos: 0, del: '', ins: 'Before' },
+        { t: classEndOffsetMs, pos: 6, del: '', ins: 'Edge' },
+        { t: classEndOffsetMs + 1, pos: 10, del: '', ins: 'After' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      originWallMs + classEndOffsetMs,
+      originWallMs + classEndOffsetMs + 1,
+    )
+
+    expect(html).toBe('Before<mark class="insert-highlight">EdgeAfter</mark>')
+  })
+
   it('keeps synthetic history timestamps tied to the captured typing time', () => {
     const history = buildSyntheticHistory('Hi', [{ t: 0 }, { t: 10 }])
 
@@ -296,6 +460,61 @@ describe('replay history start state', () => {
       { t: 12, weight: 1 },
       { t: 140, weight: 1 },
     ])
+  })
+
+  it('keeps replay history monotonic across a fake reopen sequence with later deltas', () => {
+    const history = parseHistory(
+      {
+        doc_text: 'Draft one\n\nDraft two',
+        doc_history: [
+          { t: 100, pos: 0, del: '', ins: 'Draft one' },
+          { t: 400, pos: 9, del: '', ins: '\n\n' },
+          { t: 401, text: 'Draft one\n\n' },
+          { t: 1200, pos: 11, del: '', ins: 'Draft two' },
+        ],
+      },
+      [],
+    )
+
+    expect(history.map((entry) => entry.text)).toEqual([
+      'Draft one',
+      'Draft one\n\n',
+      'Draft one\n\n',
+      'Draft one\n\nDraft two',
+    ])
+    expect(history[0].t).toBeLessThan(history[1].t)
+    expect(history[1].t).toBeLessThan(history[2].t)
+    expect(history[2].t).toBeLessThan(history[3].t)
+    expect(history[history.length - 1].text).toBe('Draft one\n\nDraft two')
+  })
+
+  it('keeps reopen snapshots from restarting earlier partial text during later replay reconstruction', () => {
+    const history = parseHistory(
+      {
+        doc_text: 'Draft one revised\n\nDraft two',
+        doc_history: [
+          { t: 100, pos: 0, del: '', ins: 'Draft one' },
+          { t: 350, pos: 9, del: '', ins: '\n\n' },
+          { t: 351, text: 'Draft one\n\n' },
+          { t: 1200, pos: 6, del: 'one', ins: 'one revised' },
+          { t: 1201, text: 'Draft one revised\n\n' },
+          { t: 2200, pos: 19, del: '', ins: 'Draft two' },
+        ],
+      },
+      [],
+    )
+
+    expect(history.map((entry) => entry.text)).toEqual([
+      'Draft one',
+      'Draft one\n\n',
+      'Draft one\n\n',
+      'Draft one revised\n\n',
+      'Draft one revised\n\n',
+      'Draft one revised\n\nDraft two',
+    ])
+    expect(new Set(history.map((entry) => entry.t)).size).toBe(history.length)
+    expect(history.slice(3).map((entry) => entry.text)).not.toContain('Draft one')
+    expect(history[history.length - 1].text).toBe('Draft one revised\n\nDraft two')
   })
 
   it('falls back to keydown timing when no replay history is available', () => {

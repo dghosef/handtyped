@@ -26,8 +26,25 @@ export function sessionStatusLabel(session, now = Date.now()) {
 }
 
 export function sessionsForAssignment(sessions, classroomName, assignmentId) {
-  return (sessions || []).filter(
-    (session) => session.assignment_id === assignmentId && session.classroom === classroomName,
+  if (!assignmentId) {
+    return []
+  }
+  return (sessions || []).filter((session) => session.assignment_id === assignmentId)
+}
+
+export function dashboardDeltaNeedsFullRefresh(currentState, delta) {
+  if (!currentState || !delta?.summary) {
+    return false
+  }
+
+  const currentLiveCount = Array.isArray(currentState.live_sessions) ? currentState.live_sessions.length : 0
+  const currentAuditCount = Array.isArray(currentState.assignment_audits) ? currentState.assignment_audits.length : 0
+  const nextLiveCount = Number(delta.summary.live_sessions)
+  const nextAuditCount = Number(delta.summary.audits_recorded)
+
+  return (
+    Number.isFinite(nextLiveCount) && nextLiveCount < currentLiveCount ||
+    Number.isFinite(nextAuditCount) && nextAuditCount < currentAuditCount
   )
 }
 
@@ -44,6 +61,14 @@ export function recentEditActivity(
     bucketMs = RECENT_EDIT_BUCKET_MS,
   } = {},
 ) {
+  if (Number.isFinite(Number(session?.recent_edit_count))) {
+    const totalEdits = Math.max(0, Number(session.recent_edit_count))
+    return {
+      totalEdits,
+      buckets: [totalEdits],
+      latestT: totalEdits > 0 ? totalEdits : null,
+    }
+  }
   const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
   const buckets = Array.from({ length: bucketCount }, () => 0)
   const times = numericHistoryTimes(session)
@@ -96,6 +121,47 @@ export function aggregateRecentEditActivity(
     activeStudents,
     buckets: totals,
   }
+}
+
+export function applyLiveReplayUpdates(baseReplay, updates) {
+  const replay = {
+    ...(baseReplay || {}),
+    ...(updates || {}),
+  }
+  const existingHistory = Array.isArray(baseReplay?.document_history) ? baseReplay.document_history : []
+  const existingUrlHistory = Array.isArray(baseReplay?.url_history) ? baseReplay.url_history : []
+  const events = Array.isArray(updates?.events) ? updates.events : []
+
+  replay.document_history = [...existingHistory]
+  replay.url_history = [...existingUrlHistory]
+
+  for (const event of events) {
+    if (Array.isArray(event?.document_history_tail) && event.document_history_tail.length) {
+      replay.document_history.push(...event.document_history_tail)
+    }
+    if (Array.isArray(event?.url_history_tail) && event.url_history_tail.length) {
+      replay.url_history.push(...event.url_history_tail)
+    }
+    if (typeof event?.current_text === 'string') {
+      replay.current_text = event.current_text
+    }
+    if (Object.hasOwn(event || {}, 'current_url')) {
+      replay.current_url = event.current_url ?? null
+    }
+    if (Object.hasOwn(event || {}, 'current_url_title')) {
+      replay.current_url_title = event.current_url_title ?? null
+    }
+    if (event?.last_activity_at) {
+      replay.last_activity_at = event.last_activity_at
+    }
+  }
+
+  replay.last_seq = Math.max(
+    Number(baseReplay?.last_seq ?? 0) || 0,
+    Number(updates?.last_seq ?? 0) || 0,
+  )
+  replay.events = []
+  return replay
 }
 
 function padDatePart(value) {
@@ -178,6 +244,41 @@ export function replayLocalDateInputValue(absoluteMs, offsetMinutes = 0) {
 
 export function todayAtLocalTimeIso(hour, minute = 0, now = new Date()) {
   return todayAtLocalTime(hour, minute, now).toISOString()
+}
+
+export function assignmentIsOpenNow(assignment, now = new Date()) {
+  const current = now instanceof Date ? now : new Date(now)
+  const currentMs = current.getTime()
+  const temporaryAccessUntil = Date.parse(String(assignment?.temporary_access_until || ''))
+  if (Number.isFinite(temporaryAccessUntil) && temporaryAccessUntil >= currentMs) {
+    return true
+  }
+
+  const window = assignment?.windows?.[0]
+  if (!window) {
+    return false
+  }
+
+  const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const dayKey = dayKeys[current.getDay()]
+  if (window.days && window.days[dayKey] === false) {
+    return false
+  }
+  if (window.end_date) {
+    const endDate = new Date(`${window.end_date}T23:59:59.999`)
+    if (!Number.isNaN(endDate.getTime()) && currentMs > endDate.getTime()) {
+      return false
+    }
+  }
+
+  const startMinutes = Number(window.start_hour || 0) * 60 + Number(window.start_minute || 0)
+  const endMinutes = Number(window.end_hour || 0) * 60 + Number(window.end_minute || 0)
+  const currentMinutes = current.getHours() * 60 + current.getMinutes()
+
+  if (startMinutes <= endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes
+  }
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes
 }
 
 export function reconcileTeacherNavigation({

@@ -1,7 +1,10 @@
 import {
+  applyLiveReplayUpdates,
   aggregateRecentEditActivity,
+  assignmentIsOpenNow,
   assignmentViewMeta,
   buildAfterSchoolRanges,
+  dashboardDeltaNeedsFullRefresh,
   deriveSessionRisk,
   formatWindowSummary,
   localDateTimeInputValue,
@@ -15,13 +18,17 @@ import {
   todayAtLocalTime,
   todayAtLocalTimeIso,
 } from './app-ui.js'
-import { buildAttributedDocument } from '../replay-view.js'
+import { buildAttributedDocument, latestTextFromHistory } from '../replay-view.js'
 
-const DASHBOARD_REFRESH_MS = 2000
+const DASHBOARD_IDLE_REFRESH_MS = 15000
+const DASHBOARD_REVIEW_REFRESH_MS = 1000
+const ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS = 5000
+const ASSIGNMENT_VIEW_AUDIT_REFRESH_MS = 15000
 
 let dashboardState = null
 let refreshTimer = null
 let refreshInFlight = false
+let refreshQueued = false
 let selectedClassroomId = null
 let selectedAssignmentId = null
 let currentView = 'classes'
@@ -38,9 +45,13 @@ let reviewSaveInFlight = false
 let reviewSavePromise = null
 let selectedAnnotationId = null
 const reviewReplayCache = new Map()
+let dashboardVisibilityRefreshBound = false
+let lastAssignmentViewSummaryRefreshAt = 0
+let lastAssignmentViewAuditRefreshAt = 0
 
 const elements = {
   authPanel: document.getElementById('auth-panel'),
+  feedbackButton: document.getElementById('feedback-button'),
   logoutButton: document.getElementById('logout-button'),
   classesView: document.getElementById('classes-view'),
   assignmentsView: document.getElementById('assignments-view'),
@@ -61,28 +72,25 @@ const elements = {
   deleteAssignmentButton: document.getElementById('delete-assignment-button'),
   quickExtendButton: document.getElementById('quick-extend-button'),
   quickExtendTime: document.getElementById('quick-extend-time'),
+  quickExtendStatus: document.getElementById('quick-extend-status'),
   classroomForm: document.getElementById('classroom-form'),
   assignmentForm: document.getElementById('assignment-form'),
-  assignmentCourseSelect: document.getElementById('assignment-course-select'),
   assignmentIdInput: document.getElementById('assignment-id-input'),
   assignmentModalLabel: document.getElementById('assignment-modal-label'),
   assignmentModalTitle: document.getElementById('assignment-modal-title'),
   assignmentFormSubmit: document.getElementById('assignment-form-submit'),
   assignmentFormCancel: document.getElementById('assignment-form-cancel'),
-  assignmentValidationErrors: document.getElementById('assignment-validation-errors'),
-  assignmentValidationWarnings: document.getElementById('assignment-validation-warnings'),
   assignmentAssignedOptions: document.getElementById('assignment-assigned-options'),
-  assignmentAssignedExtra: document.getElementById('assignment-assigned-extra'),
   assignmentStudentOverrideList: document.getElementById('assignment-student-override-list'),
-  assignmentStudentOverrideSuggestions: document.getElementById('assignment-student-override-suggestions'),
   assignmentAddStudentOverride: document.getElementById('assignment-add-student-override'),
   assignmentLinkedOptions: document.getElementById('assignment-linked-options'),
   assignmentRubricList: document.getElementById('assignment-rubric-list'),
   assignmentAddRubric: document.getElementById('assignment-add-rubric'),
-  tempAccessTime: document.getElementById('temp-access-time'),
-  tempAccessTimeButton: document.getElementById('temp-access-time-button'),
   classroomModal: document.getElementById('classroom-modal'),
   assignmentModal: document.getElementById('assignment-modal'),
+  feedbackModal: document.getElementById('feedback-modal'),
+  feedbackForm: document.getElementById('feedback-form'),
+  feedbackFormCancel: document.getElementById('feedback-form-cancel'),
   modalCloseButtons: document.querySelectorAll('[data-close-modal]'),
   overviewStudents: document.getElementById('overview-students'),
   overviewStudentsMeta: document.getElementById('overview-students-meta'),
@@ -94,7 +102,7 @@ const elements = {
   overviewOfflineMeta: document.getElementById('overview-offline-meta'),
   overviewEdits: document.getElementById('overview-edits'),
   overviewEditsMeta: document.getElementById('overview-edits-meta'),
-  assignmentAuditList: document.getElementById('assignment-audit-list'),
+  accessRequestList: document.getElementById('access-request-list'),
   reviewWorkspace: document.getElementById('review-workspace'),
   reviewLayout: document.getElementById('review-layout'),
   reviewWorkspaceEmpty: document.getElementById('review-workspace-empty'),
@@ -107,7 +115,6 @@ const elements = {
   reviewRubricTotal: document.getElementById('review-rubric-total'),
   reviewRubricList: document.getElementById('review-rubric-list'),
   reviewTeacherComment: document.getElementById('review-teacher-comment'),
-  reviewSuggestedRevisions: document.getElementById('review-suggested-revisions'),
   reviewReturned: document.getElementById('review-returned'),
   reviewDraftMeta: document.getElementById('review-draft-meta'),
   reviewDraftSurface: document.getElementById('review-draft-surface'),
@@ -131,17 +138,18 @@ const elements = {
   reviewAnnotationMeta: document.getElementById('review-annotation-meta'),
   reviewAnnotationList: document.getElementById('review-annotation-list'),
   reviewCloseButton: document.getElementById('review-close-button'),
+  reviewBackButton: document.getElementById('review-back-button'),
 }
 
 const STUDENT_OVERRIDE_BOOLEAN_FIELDS = [
   ['allow_dictation', 'Allow dictation'],
   ['allow_offline_editing', 'Allow offline editing'],
   ['copy_paste_allowed', 'Allow copy/paste'],
-  ['printing_allowed', 'Allow printing'],
   ['export_allowed', 'Allow export'],
   ['images_allowed', 'Allow images'],
-  ['citations_required', 'Require citations'],
-  ['require_lockdown', 'Require lockdown'],
+  ['require_lockdown', 'Keep in Handtyped'],
+  ['require_permission_to_rejoin', 'Require teacher re-entry'],
+  ['show_rubric_to_student', 'Show rubric to student'],
   ['browser_enabled', 'Enable study browser'],
 ]
 
@@ -152,7 +160,7 @@ const STUDENT_OVERRIDE_FONT_OPTIONS = [
   ['mono', 'Mono'],
 ]
 
-const STUDENT_OVERRIDE_FONT_SIZE_OPTIONS = ['16', '18', '20', '22', '24', '28', '32']
+const STUDENT_OVERRIDE_FONT_SIZE_OPTIONS = Array.from({ length: 91 }, (_, index) => String(index + 10))
 
 const STUDENT_OVERRIDE_LINE_HEIGHT_OPTIONS = [
   ['single', 'Single'],
@@ -160,6 +168,17 @@ const STUDENT_OVERRIDE_LINE_HEIGHT_OPTIONS = [
   ['one-half', '1.5'],
   ['double', 'Double'],
 ]
+
+function buildReviewReplayCacheEntry(replay) {
+  return {
+    replay,
+    attributedDocument: buildAttributedDocument({
+      ...replay,
+      doc_history: replay.document_history || [],
+      doc_text: replay.current_text || '',
+    }),
+  }
+}
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -214,6 +233,21 @@ function currentReviewSession() {
   return getLiveSessions().find((session) => session.id === selectedReviewSessionId) || null
 }
 
+function displaySessionText(session, replayData = null) {
+  const direct = String(session?.current_text || '')
+  if (direct) {
+    return direct
+  }
+  const replayText = String(replayData?.attributedDocument?.text || '')
+  if (replayText) {
+    return replayText
+  }
+  return latestTextFromHistory({
+    doc_history: Array.isArray(session?.document_history) ? session.document_history : [],
+    doc_text: '',
+  })
+}
+
 function normalizedInlineAnnotation(annotation = {}) {
   const start = Math.max(0, Number(annotation.start ?? 0) || 0)
   const end = Math.max(start, Number(annotation.end ?? start) || start)
@@ -239,7 +273,6 @@ function normalizedSessionGrading(session = {}) {
     rubric_scores:
       grading.rubric_scores && typeof grading.rubric_scores === 'object' ? { ...grading.rubric_scores } : {},
     teacher_comment: String(grading.teacher_comment || ''),
-    suggested_revisions: String(grading.suggested_revisions || ''),
     returned_for_revision: Boolean(grading.returned_for_revision),
     grade_label: String(grading.grade_label || ''),
     grade_score:
@@ -274,7 +307,6 @@ function createReviewStateFromSession(session) {
     gradeScore: grading.grade_score,
     rubricScores: { ...grading.rubric_scores },
     teacherComment: grading.teacher_comment,
-    suggestedRevisions: grading.suggested_revisions,
     returnedForRevision: grading.returned_for_revision,
     inlineAnnotations: grading.inline_annotations,
     updatedAt: grading.updated_at,
@@ -311,7 +343,13 @@ function getSelectedAssignmentAudits() {
   return getAssignmentAudits().filter((audit) => audit.assignment_id === selectedAssignmentId)
 }
 
+function resetAssignmentViewRefreshState() {
+  lastAssignmentViewSummaryRefreshAt = 0
+  lastAssignmentViewAuditRefreshAt = 0
+}
+
 function syncSelectionState() {
+  const previousAssignmentId = selectedAssignmentId
   const nextSelection = reconcileTeacherNavigation({
     classrooms: getClassrooms(),
     assignments: getAssignments(),
@@ -322,6 +360,9 @@ function syncSelectionState() {
   selectedClassroomId = nextSelection.selectedClassroomId
   selectedAssignmentId = nextSelection.selectedAssignmentId
   currentView = nextSelection.currentView
+  if (previousAssignmentId !== selectedAssignmentId) {
+    resetAssignmentViewRefreshState()
+  }
 }
 
 function badge(text, tone = 'default') {
@@ -342,21 +383,23 @@ function createStudentOverrideDraft(input = {}) {
       allow_dictation: input.policy?.allow_dictation || 'default',
       allow_offline_editing: input.policy?.allow_offline_editing || 'default',
       copy_paste_allowed: input.policy?.copy_paste_allowed || 'default',
-      printing_allowed: input.policy?.printing_allowed || 'default',
       export_allowed: input.policy?.export_allowed || 'default',
       images_allowed: input.policy?.images_allowed || 'default',
-      citations_required: input.policy?.citations_required || 'default',
       require_lockdown: input.policy?.require_lockdown || 'default',
+      require_permission_to_rejoin: input.policy?.require_permission_to_rejoin || 'default',
+      show_rubric_to_student: input.policy?.show_rubric_to_student || 'default',
       browser_enabled: input.policy?.browser_enabled || 'default',
     },
     editor_policy: {
       font_family: input.editor_policy?.font_family || 'default',
       font_size: input.editor_policy?.font_size || 'default',
       line_height: input.editor_policy?.line_height || 'default',
+      font_locked: input.editor_policy?.font_locked || 'default',
     },
     browser_policy: {
       home_url_enabled: Boolean(input.browser_policy?.home_url_enabled),
       home_url: String(input.browser_policy?.home_url || ''),
+      mode: input.browser_policy?.mode === 'blacklist' ? 'blacklist' : 'whitelist',
       allowed_domains_enabled: Boolean(input.browser_policy?.allowed_domains_enabled),
       allowed_domains: String(input.browser_policy?.allowed_domains || ''),
     },
@@ -384,39 +427,65 @@ function currentStudentOverrideDrafts() {
         allow_dictation: card.querySelector('[data-override-policy="allow_dictation"]')?.value,
         allow_offline_editing: card.querySelector('[data-override-policy="allow_offline_editing"]')?.value,
         copy_paste_allowed: card.querySelector('[data-override-policy="copy_paste_allowed"]')?.value,
-        printing_allowed: card.querySelector('[data-override-policy="printing_allowed"]')?.value,
         export_allowed: card.querySelector('[data-override-policy="export_allowed"]')?.value,
         images_allowed: card.querySelector('[data-override-policy="images_allowed"]')?.value,
-        citations_required: card.querySelector('[data-override-policy="citations_required"]')?.value,
         require_lockdown: card.querySelector('[data-override-policy="require_lockdown"]')?.value,
+        require_permission_to_rejoin: card.querySelector('[data-override-policy="require_permission_to_rejoin"]')?.value,
+        show_rubric_to_student: card.querySelector('[data-override-policy="show_rubric_to_student"]')?.value,
         browser_enabled: card.querySelector('[data-override-policy="browser_enabled"]')?.value,
       },
       editor_policy: {
         font_family: card.querySelector('[data-override-editor="font_family"]')?.value,
         font_size: card.querySelector('[data-override-editor="font_size"]')?.value,
         line_height: card.querySelector('[data-override-editor="line_height"]')?.value,
+        font_locked: card.querySelector('[data-override-editor="font_locked"]')?.value,
       },
       browser_policy: {
         home_url_enabled: card.querySelector('[data-override-home-enabled]')?.checked,
         home_url: card.querySelector('[data-override-home-value]')?.value || '',
+        mode: card.querySelector('[data-override-browser-mode]')?.value || 'whitelist',
         allowed_domains_enabled: card.querySelector('[data-override-domains-enabled]')?.checked,
         allowed_domains: card.querySelector('[data-override-domains-value]')?.value || '',
       },
     }))
 }
 
-function renderStudentOverrideSuggestions() {
-  if (!elements.assignmentStudentOverrideSuggestions) return
-  elements.assignmentStudentOverrideSuggestions.innerHTML = knownStudentsForClassroom()
-    .map((studentName) => `<option value="${escapeHtml(studentName)}"></option>`)
-    .join('')
+function studentOverrideNameOptions(drafts = assignmentStudentOverrideDrafts) {
+  return [...new Set([
+    ...knownStudentsForClassroom(),
+    ...drafts.map((draft) => String(draft?.student_name || '').trim()).filter(Boolean),
+  ])].sort((a, b) => a.localeCompare(b))
 }
 
-function overrideBooleanSelect(field, label, value) {
+function nextStudentOverrideName(drafts = assignmentStudentOverrideDrafts) {
+  const usedNames = new Set(drafts.map((draft) => normalizeStudentOverrideKey(draft.student_name)).filter(Boolean))
+  return studentOverrideNameOptions(drafts).find((studentName) => !usedNames.has(normalizeStudentOverrideKey(studentName))) || ''
+}
+
+function studentOverrideNameSelect(draft, options) {
+  const selectedValue = String(draft.student_name || '').trim()
+  return `
+    <label>
+      <span>Student</span>
+      <select data-override-student-name>
+        <option value=""${selectedValue ? '' : ' selected'} disabled>Choose a student</option>
+        ${options
+          .map((studentName) => `
+            <option value="${escapeHtml(studentName)}"${studentName === selectedValue ? ' selected' : ''}>
+              ${escapeHtml(studentName)}
+            </option>
+          `)
+          .join('')}
+      </select>
+    </label>
+  `
+}
+
+function overrideBooleanSelect(field, label, value, attributeName = 'policy') {
   return `
     <label>
       <span>${escapeHtml(label)}</span>
-      <select data-override-policy="${escapeHtml(field)}">
+      <select data-override-${escapeHtml(attributeName)}="${escapeHtml(field)}">
         <option value="default"${value === 'default' ? ' selected' : ''}>Use default</option>
         <option value="true"${value === 'true' ? ' selected' : ''}>Allow</option>
         <option value="false"${value === 'false' ? ' selected' : ''}>Block</option>
@@ -445,10 +514,14 @@ function overrideSelect(field, label, value, options, attributeName) {
 
 function renderStudentOverrideCards(drafts = assignmentStudentOverrideDrafts) {
   assignmentStudentOverrideDrafts = drafts.map((draft) => createStudentOverrideDraft(draft))
-  renderStudentOverrideSuggestions()
+  const studentOptions = studentOverrideNameOptions(assignmentStudentOverrideDrafts)
 
   if (!elements.assignmentStudentOverrideList) {
     return
+  }
+
+  if (elements.assignmentAddStudentOverride) {
+    elements.assignmentAddStudentOverride.disabled = studentOptions.length === 0
   }
 
   if (!assignmentStudentOverrideDrafts.length) {
@@ -461,16 +534,7 @@ function renderStudentOverrideCards(drafts = assignmentStudentOverrideDrafts) {
     .map((draft) => `
       <article class="student-override-card" data-student-override-id="${escapeHtml(draft.id)}">
         <div class="student-override-header">
-          <label>
-            <span>Student name</span>
-            <input
-              type="text"
-              list="assignment-student-override-suggestions"
-              data-override-student-name
-              placeholder="Ada Lovelace"
-              value="${escapeHtml(draft.student_name)}"
-            />
-          </label>
+          ${studentOverrideNameSelect(draft, studentOptions)}
           <button class="button button-secondary small-button" type="button" data-remove-student-override="${escapeHtml(draft.id)}">
             Remove
           </button>
@@ -497,6 +561,7 @@ function renderStudentOverrideCards(drafts = assignmentStudentOverrideDrafts) {
         </div>
         <div class="student-override-grid">
           ${overrideSelect('font_family', 'Font', draft.editor_policy.font_family, STUDENT_OVERRIDE_FONT_OPTIONS, 'editor')}
+          ${overrideBooleanSelect('font_locked', 'Lock font', draft.editor_policy.font_locked, 'editor')}
           ${overrideSelect(
             'font_size',
             'Font size',
@@ -525,8 +590,15 @@ function renderStudentOverrideCards(drafts = assignmentStudentOverrideDrafts) {
             <input type="checkbox" data-override-domains-enabled ${draft.browser_policy.allowed_domains_enabled ? 'checked' : ''} />
             <span>Override allowed domains</span>
           </label>
+          <label>
+            <span>Browser mode</span>
+            <select data-override-browser-mode>
+              <option value="whitelist"${draft.browser_policy.mode === 'whitelist' ? ' selected' : ''}>Allow only listed</option>
+              <option value="blacklist"${draft.browser_policy.mode === 'blacklist' ? ' selected' : ''}>Block listed</option>
+            </select>
+          </label>
           <label class="student-override-full">
-            <span>Allowed domains (one per line)</span>
+            <span>URLs or domains (one per line)</span>
             <textarea
               rows="3"
               data-override-domains-value
@@ -616,6 +688,9 @@ function selectedStudentOverridesFromForm() {
     if (draft.editor_policy.line_height !== 'default') {
       editorPolicy.line_height = draft.editor_policy.line_height
     }
+    if (draft.editor_policy.font_locked !== 'default') {
+      editorPolicy.font_locked = draft.editor_policy.font_locked === 'true'
+    }
 
     const browserPolicy = {}
     if (draft.policy.browser_enabled !== 'default') {
@@ -625,6 +700,7 @@ function selectedStudentOverridesFromForm() {
       browserPolicy.home_url = draft.browser_policy.home_url
     }
     if (draft.browser_policy.allowed_domains_enabled) {
+      browserPolicy.mode = draft.browser_policy.mode === 'blacklist' ? 'blacklist' : 'whitelist'
       browserPolicy.allowed_domains = draft.browser_policy.allowed_domains
         .split('\n')
         .map((value) => value.trim())
@@ -663,21 +739,23 @@ function draftsFromAssignmentStudentOverrides(assignment) {
         allow_dictation: boolOverrideValue(settings.policy?.allow_dictation),
         allow_offline_editing: boolOverrideValue(settings.policy?.allow_offline_editing),
         copy_paste_allowed: boolOverrideValue(settings.policy?.copy_paste_allowed),
-        printing_allowed: boolOverrideValue(settings.policy?.printing_allowed),
         export_allowed: boolOverrideValue(settings.policy?.export_allowed),
         images_allowed: boolOverrideValue(settings.policy?.images_allowed),
-        citations_required: boolOverrideValue(settings.policy?.citations_required),
         require_lockdown: boolOverrideValue(settings.policy?.require_lockdown),
+        require_permission_to_rejoin: boolOverrideValue(settings.policy?.require_permission_to_rejoin),
+        show_rubric_to_student: boolOverrideValue(settings.policy?.show_rubric_to_student),
         browser_enabled: boolOverrideValue(settings.browser_policy?.browser_enabled),
       },
       editor_policy: {
         font_family: settings.editor_policy?.font_family || 'default',
         font_size: settings.editor_policy?.font_size ? String(settings.editor_policy.font_size) : 'default',
         line_height: settings.editor_policy?.line_height || 'default',
+        font_locked: boolOverrideValue(settings.editor_policy?.font_locked),
       },
       browser_policy: {
         home_url_enabled: Object.hasOwn(settings.browser_policy || {}, 'home_url'),
         home_url: settings.browser_policy?.home_url || '',
+        mode: settings.browser_policy?.mode === 'blacklist' ? 'blacklist' : 'whitelist',
         allowed_domains_enabled: Object.hasOwn(settings.browser_policy || {}, 'allowed_domains'),
         allowed_domains: Array.isArray(settings.browser_policy?.allowed_domains)
           ? settings.browser_policy.allowed_domains.join('\n')
@@ -757,6 +835,60 @@ function studentSpecificExtensionFor(assignment, studentName) {
   return assignment?.student_temporary_access_until?.[key] || null
 }
 
+function studentAccessRevokedFor(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return false
+  }
+  return Boolean(assignment?.student_access_revoked?.[key])
+}
+
+function accessRequestsForAssignment(assignment) {
+  const requests = assignment?.student_access_requests && typeof assignment.student_access_requests === 'object'
+    ? assignment.student_access_requests
+    : {}
+  return Object.entries(requests)
+    .map(([key, value]) => ({
+      key,
+      student_name: String(value?.student_name || key || '').trim(),
+      requested_at: String(value?.requested_at || ''),
+      note: String(value?.note || '').trim(),
+    }))
+    .filter((request) => request.key && request.student_name)
+    .sort((a, b) => String(b.requested_at || '').localeCompare(String(a.requested_at || '')))
+}
+
+async function approveAssignmentAccessRequest(assignment, requestEntry, { hour = 15, minute = 0 } = {}) {
+  const isAlreadyOpen = assignmentIsOpenNow(assignment)
+  const nextRequests = { ...(assignment.student_access_requests || {}) }
+  delete nextRequests[requestEntry.key]
+
+  const nextStudentTemporaryAccessUntil = { ...(assignment.student_temporary_access_until || {}) }
+  const nextStudentAccessRevoked = { ...(assignment.student_access_revoked || {}) }
+  delete nextStudentAccessRevoked[requestEntry.key]
+  if (isAlreadyOpen) {
+    delete nextStudentTemporaryAccessUntil[requestEntry.key]
+  } else {
+    nextStudentTemporaryAccessUntil[requestEntry.key] = nextLocalTimeAtOrAfter(hour, minute).toISOString()
+  }
+
+  const updatedAssignment = await request(`/api/edu/assignments/${assignment.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      student_access_requests: nextRequests,
+      student_temporary_access_until: nextStudentTemporaryAccessUntil,
+      student_access_revoked: nextStudentAccessRevoked,
+    }),
+  })
+
+  dashboardState = {
+    ...dashboardState,
+    assignments: getAssignments().map((item) => (item.id === updatedAssignment.id ? updatedAssignment : item)),
+  }
+  selectedAssignmentId = updatedAssignment.id
+  renderView()
+}
+
 async function extendSelectedAssignmentForStudentToToday(studentName, hour, minute = 0) {
   const assignment = getSelectedAssignment()
   if (!assignment) {
@@ -772,17 +904,89 @@ async function extendSelectedAssignmentForStudentToToday(studentName, hour, minu
 
   const target = todayAtLocalTime(hour, minute)
   if (target.getTime() < Date.now()) {
-    window.alert('The selected time today has already passed.')
+    const reopenForMinutes = window.prompt(
+      'That time has already passed. Reopen this student for how many minutes from now?',
+      '15',
+    )
+    if (reopenForMinutes == null) {
+      return
+    }
+    const durationMinutes = Number.parseInt(String(reopenForMinutes).trim(), 10)
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      window.alert('Enter a whole number of minutes greater than 0.')
+      return
+    }
+    const reopenUntil = new Date(Date.now() + durationMinutes * 60_000)
+    const updatedAssignment = await request(`/api/edu/assignments/${assignment.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        student_access_revoked: {
+          ...(assignment.student_access_revoked || {}),
+          [normalizedKey]: false,
+        },
+        student_temporary_access_until: {
+          ...(assignment.student_temporary_access_until || {}),
+          [normalizedKey]: reopenUntil.toISOString(),
+        },
+      }),
+    })
+
+    dashboardState = {
+      ...dashboardState,
+      assignments: getAssignments().map((item) => (item.id === updatedAssignment.id ? updatedAssignment : item)),
+    }
+    selectedAssignmentId = updatedAssignment.id
+    renderView()
     return
   }
 
   const updatedAssignment = await request(`/api/edu/assignments/${assignment.id}`, {
     method: 'PUT',
     body: JSON.stringify({
+      student_access_revoked: {
+        ...(assignment.student_access_revoked || {}),
+        [normalizedKey]: false,
+      },
       student_temporary_access_until: {
         ...(assignment.student_temporary_access_until || {}),
         [normalizedKey]: target.toISOString(),
       },
+    }),
+  })
+
+  dashboardState = {
+    ...dashboardState,
+    assignments: getAssignments().map((item) => (item.id === updatedAssignment.id ? updatedAssignment : item)),
+  }
+  selectedAssignmentId = updatedAssignment.id
+  renderView()
+}
+
+async function toggleSelectedAssignmentStudentAccess(studentName) {
+  const assignment = getSelectedAssignment()
+  if (!assignment) {
+    window.alert('Select an assignment first.')
+    return
+  }
+
+  const normalizedKey = normalizeStudentOverrideKey(studentName)
+  if (!normalizedKey) {
+    window.alert('That student name is missing.')
+    return
+  }
+
+  const currentlyRevoked = studentAccessRevokedFor(assignment, studentName)
+  const nextStudentAccessRevoked = { ...(assignment.student_access_revoked || {}) }
+  if (currentlyRevoked) {
+    delete nextStudentAccessRevoked[normalizedKey]
+  } else {
+    nextStudentAccessRevoked[normalizedKey] = true
+  }
+
+  const updatedAssignment = await request(`/api/edu/assignments/${assignment.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      student_access_revoked: nextStudentAccessRevoked,
     }),
   })
 
@@ -802,17 +1006,46 @@ function closeModal(modal) {
   modal.hidden = true
 }
 
-function populateAssignmentCourseSelect() {
-  const classrooms = getClassrooms()
-  const selectedId = selectedClassroomId || classrooms[0]?.id || ''
-  elements.assignmentCourseSelect.innerHTML = classrooms
-    .map(
-      (classroom) =>
-        `<option value="${escapeHtml(classroom.id)}"${
-          classroom.id === selectedId ? ' selected' : ''
-        }>${escapeHtml(classroom.name)}</option>`,
-    )
-    .join('')
+function feedbackContextSummary() {
+  const classroom = getSelectedClassroom()
+  const assignment = getSelectedAssignment()
+  const reviewSession = currentReviewSession()
+  return {
+    view: currentView,
+    classroom: classroom?.name || '',
+    assignment: assignment?.title || '',
+    student: reviewSession?.student_name || '',
+    teacher: teacherSession?.teacher_name || '',
+  }
+}
+
+function openFeedbackDraft(formData) {
+  const category = String(formData.get('category') || 'Teacher feedback').trim()
+  const subject = String(formData.get('subject') || '').trim()
+  const message = String(formData.get('message') || '').trim()
+  const replyTo = String(formData.get('reply_to') || '').trim()
+  if (!subject || !message) {
+    window.alert('Add both a subject and message before sending feedback.')
+    return false
+  }
+
+  const context = feedbackContextSummary()
+  const body = [
+    message,
+    '',
+    '---',
+    `Category: ${category}`,
+    `Teacher: ${context.teacher || 'Unknown'}`,
+    `View: ${context.view}`,
+    `Class: ${context.classroom || 'None selected'}`,
+    `Assignment: ${context.assignment || 'None selected'}`,
+    `Student: ${context.student || 'None selected'}`,
+    `Reply-to: ${replyTo || 'Not provided'}`,
+  ].join('\n')
+
+  const mailto = `mailto:support@handtyped.app?subject=${encodeURIComponent(`[Handtyped EDU] ${category}: ${subject}`)}&body=${encodeURIComponent(body)}`
+  window.location.href = mailto
+  return true
 }
 
 function selectedLinkedAssignmentIdsFromForm() {
@@ -820,7 +1053,7 @@ function selectedLinkedAssignmentIdsFromForm() {
   return [...new Set(new FormData(elements.assignmentForm).getAll('linked_assignment_ids').map((value) => String(value)))]
 }
 
-function knownStudentsForClassroom(classroomId = elements.assignmentCourseSelect?.value || selectedClassroomId || '') {
+function knownStudentsForClassroom(classroomId = selectedClassroomId || '') {
   const classroom = getClassrooms().find((item) => item.id === classroomId)
   const classroomStudents = Array.isArray(classroom?.students) ? classroom.students : []
   const liveStudents = getLiveSessions()
@@ -837,23 +1070,17 @@ function knownStudentsForClassroom(classroomId = elements.assignmentCourseSelect
 
 function selectedAssignedStudentsFromForm() {
   if (!elements.assignmentForm) return []
-  const checked = new FormData(elements.assignmentForm).getAll('assigned_students').map((value) => String(value))
-  const extra = String(elements.assignmentAssignedExtra?.value || '')
-    .split('\n')
-    .map((value) => value.trim())
-    .filter(Boolean)
-  return [...new Set([...checked, ...extra])]
+  return [...new Set(new FormData(elements.assignmentForm).getAll('assigned_students').map((value) => String(value)))]
 }
 
 function renderAssignedStudentOptions(selectedNames = null) {
   if (!elements.assignmentAssignedOptions) return
   const knownStudents = knownStudentsForClassroom()
-  renderStudentOverrideSuggestions()
   const selected = new Set((selectedNames || selectedAssignedStudentsFromForm()).map((value) => String(value).trim()))
 
   if (!knownStudents.length) {
     elements.assignmentAssignedOptions.innerHTML =
-      '<div class="linked-assignment-empty">No student names have reached this class yet. You can still type names below manually.</div>'
+      '<div class="linked-assignment-empty">No student names have reached this class yet.</div>'
     return
   }
 
@@ -874,7 +1101,7 @@ function renderAssignedStudentOptions(selectedNames = null) {
 
 function renderLinkedAssignmentOptions(selectedIds = null) {
   if (!elements.assignmentLinkedOptions) return
-  const classroomId = elements.assignmentCourseSelect?.value || selectedClassroomId || ''
+  const classroomId = selectedClassroomId || ''
   const currentAssignmentId = elements.assignmentIdInput?.value || ''
   const selected = new Set((selectedIds || selectedLinkedAssignmentIdsFromForm()).map((value) => String(value)))
   const options = getAssignmentsForClassroom(classroomId).filter((assignment) => assignment.id !== currentAssignmentId)
@@ -1093,7 +1320,6 @@ function buildReviewPayload() {
   return {
     rubric_scores: { ...reviewState.rubricScores },
     teacher_comment: reviewState.teacherComment,
-    suggested_revisions: reviewState.suggestedRevisions,
     returned_for_revision: reviewState.returnedForRevision,
     grade_label: reviewState.gradeLabel,
     grade_score: reviewState.gradeScore === '' ? null : Number(reviewState.gradeScore),
@@ -1435,8 +1661,9 @@ function renderReviewHighlightUi(session, assignment) {
     return
   }
 
+  const displayText = displaySessionText(session, reviewState.replayData)
   const ranges = reviewHighlightRangesForState(session, assignment)
-  const highlights = reviewHighlightIndexSet(session.current_text || '', ranges)
+  const highlights = reviewHighlightIndexSet(displayText, ranges)
   if (reviewState.highlightMode && !highlights.size) {
     elements.reviewHighlightMeta.textContent = 'No surviving characters matched that after-school filter.'
     return
@@ -1456,7 +1683,7 @@ async function loadReviewReplayData(session) {
   if (!reviewState || !session || reviewState.replayLoadState === 'loading' || reviewState.replayLoadState === 'ready') {
     return
   }
-  if (!session.replay_session_id) {
+  if (!session.id) {
     reviewState.replayLoadState = 'missing'
     reviewState.replayError = ''
     return
@@ -1467,18 +1694,11 @@ async function loadReviewReplayData(session) {
   renderReviewHighlightUi(session, getSelectedAssignment())
 
   try {
-    let cached = reviewReplayCache.get(session.replay_session_id)
+    let cached = reviewReplayCache.get(session.id)
     if (!cached) {
-      const replay = await request(`/api/edu/replays/${encodeURIComponent(session.replay_session_id)}`)
-      cached = {
-        replay,
-        attributedDocument: buildAttributedDocument({
-          ...replay,
-          doc_history: replay.document_history || [],
-          doc_text: replay.current_text || '',
-        }),
-      }
-      reviewReplayCache.set(session.replay_session_id, cached)
+      const replay = await request(`/api/edu/live-replays/${encodeURIComponent(session.id)}`)
+      cached = buildReviewReplayCacheEntry(replay)
+      reviewReplayCache.set(session.id, cached)
     }
 
     if (!reviewState || reviewState.sessionId !== session.id) {
@@ -1501,6 +1721,43 @@ async function loadReviewReplayData(session) {
     reviewState.replayError = error.message || 'Could not load replay data.'
     renderReviewHighlightUi(session, getSelectedAssignment())
   }
+}
+
+async function refreshSelectedReviewReplayData() {
+  if (!reviewWorkspaceOpen || !selectedReviewSessionId) {
+    return
+  }
+  const session = currentReviewSession()
+  if (!session) {
+    return
+  }
+
+  const cached = reviewReplayCache.get(session.id)
+  if (!cached) {
+    await loadReviewReplayData(session)
+    return
+  }
+
+  const updates = await request(
+    `/api/edu/live-replays/${encodeURIComponent(session.id)}/updates?since_seq=${encodeURIComponent(
+      String(cached.replay.last_seq || 0),
+    )}`,
+  )
+  if (!Array.isArray(updates?.events) || !updates.events.length) {
+    return
+  }
+
+  const mergedReplay = applyLiveReplayUpdates(cached.replay, updates)
+  const nextCache = buildReviewReplayCacheEntry(mergedReplay)
+  reviewReplayCache.set(session.id, nextCache)
+
+  if (!reviewState || reviewState.sessionId !== session.id) {
+    return
+  }
+
+  reviewState.replayData = nextCache
+  reviewState.replayLoadState = 'ready'
+  renderReviewWorkspace(getSelectedAssignment())
 }
 
 function renderDraftSurface(text, annotations) {
@@ -1634,46 +1891,10 @@ function renderReviewRubric(assignment) {
   })
 }
 
-function renderAssignmentAudits() {
-  if (!elements.assignmentAuditList) return
-  const audits = [...getSelectedAssignmentAudits()].sort((a, b) =>
-    String(b.created_at || b.updated_at || '').localeCompare(String(a.created_at || a.updated_at || '')),
-  )
-  if (!audits.length) {
-    elements.assignmentAuditList.innerHTML = '<div class="selection-empty">No teacher changes recorded for this assignment yet.</div>'
-    return
-  }
-  elements.assignmentAuditList.innerHTML = audits
-    .slice(0, 8)
-    .map((audit) => {
-      const changes = (audit.changes || [])
-        .slice(0, 4)
-        .map(
-          (change) => `<li><strong>${escapeHtml(change.label)}:</strong> ${escapeHtml(
-            change.after == null ? 'cleared' : typeof change.after === 'object' ? JSON.stringify(change.after) : String(change.after),
-          )}</li>`,
-        )
-        .join('')
-      return `
-        <article class="audit-entry">
-          <div class="audit-entry-header">
-            <div>
-              <div class="section-label">${escapeHtml(audit.action || 'updated')}</div>
-              <h4>${escapeHtml(audit.summary || 'Assignment updated')}</h4>
-            </div>
-            <div class="student-meta">${escapeHtml(timeAgoLabel(audit.created_at || audit.updated_at))}</div>
-          </div>
-          <div class="student-meta">${escapeHtml(audit.actor_name || audit.actor_email || 'Teacher')}</div>
-          ${changes ? `<ul class="audit-changes">${changes}</ul>` : ''}
-        </article>
-      `
-    })
-    .join('')
-}
-
 function renderReviewWorkspace(selectedAssignment) {
   if (!elements.reviewWorkspace) return
   elements.reviewLayout?.classList.toggle('is-review-open', reviewWorkspaceOpen)
+  elements.assignmentView?.classList.toggle('is-review-open', reviewWorkspaceOpen)
   elements.reviewWorkspace.hidden = !reviewWorkspaceOpen
   if (!reviewWorkspaceOpen) {
     return
@@ -1702,21 +1923,24 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.reviewGradeLabel.value = reviewState.gradeLabel
   elements.reviewGradeScore.value = reviewState.gradeScore
   elements.reviewTeacherComment.value = reviewState.teacherComment
-  elements.reviewSuggestedRevisions.value = reviewState.suggestedRevisions
   elements.reviewReturned.checked = reviewState.returnedForRevision
-  elements.reviewDraftMeta.textContent = session.current_text
-    ? `Live draft is ${String(session.current_text).length} characters. Select text to anchor comments or suggestions.`
+  const reviewText = displaySessionText(session, reviewState.replayData)
+  elements.reviewDraftMeta.textContent = reviewText
+    ? `Live draft is ${reviewText.length} characters. Select text to anchor comments or suggestions.`
     : 'The student draft is still empty.'
   renderReviewHighlightUi(session, selectedAssignment)
   renderReviewRubric(selectedAssignment)
-  renderDraftSurface(session.current_text, reviewState.inlineAnnotations)
+  renderDraftSurface(reviewText, reviewState.inlineAnnotations)
   elements.reviewDraftSurface.querySelectorAll('[data-annotation-id]').forEach((node) => {
     node.addEventListener('click', () => {
       selectedAnnotationId = node.dataset.annotationId || null
       renderReviewWorkspace(selectedAssignment)
     })
   })
-  renderReviewAnnotationList(session)
+  renderReviewAnnotationList({
+    ...session,
+    current_text: reviewText,
+  })
   renderReviewSelectionUi()
   renderReviewSyncStatus()
   void loadReviewReplayData(session)
@@ -1748,19 +1972,56 @@ function handleReviewDraftSelection() {
   renderReviewSelectionUi()
 }
 
+function dashboardRefreshMs() {
+  if (currentView === 'assignment' && selectedAssignmentId) {
+    return reviewWorkspaceOpen && selectedReviewSessionId
+      ? DASHBOARD_REVIEW_REFRESH_MS
+      : ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS
+  }
+  return reviewWorkspaceOpen && selectedReviewSessionId
+    ? DASHBOARD_REVIEW_REFRESH_MS
+    : DASHBOARD_IDLE_REFRESH_MS
+}
+
+function scheduleDashboardRefresh() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer)
+  }
+  refreshTimer = window.setTimeout(async () => {
+    if (!document.hidden) {
+      await refreshDashboard().catch(() => {})
+    }
+    scheduleDashboardRefresh()
+  }, dashboardRefreshMs())
+}
+
+function activeReviewEditorElement() {
+  const element = document.activeElement
+  if (!element?.closest?.('.review-workspace')) {
+    return null
+  }
+  if (element.matches?.('textarea, input, select')) {
+    return element
+  }
+  return element.isContentEditable ? element : null
+}
+
 async function selectReviewSession(sessionId) {
   if (!sessionId) return
   await flushReviewSave()
   reviewWorkspaceOpen = true
   elements.reviewWorkspace?.removeAttribute('hidden')
+  scheduleDashboardRefresh()
   if (selectedReviewSessionId === sessionId) {
     renderStudentCards()
+    await refreshDashboard()
     return
   }
   selectedReviewSessionId = sessionId
   reviewState = null
   selectedAnnotationId = null
   renderStudentCards()
+  await refreshDashboard()
 }
 
 async function closeReviewWorkspace() {
@@ -1770,6 +2031,7 @@ async function closeReviewWorkspace() {
   selectedReviewSessionId = null
   reviewState = null
   selectedAnnotationId = null
+  scheduleDashboardRefresh()
   renderStudentCards()
 }
 
@@ -1837,7 +2099,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   }
 
   renderMonitoringOverview(matchingSessions)
-  renderAssignmentAudits()
+  renderAccessRequests(selectedAssignment, matchingSessions)
   if (!selectedClassroom || !selectedAssignment) {
     elements.sessionGrid.innerHTML = `<div class="student-empty">Choose an assignment to see student work.</div>`
     if (!skipReviewWorkspace) {
@@ -1872,6 +2134,10 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
         : ''
       const statusLabel = risk.active ? 'Active' : 'Offline'
       const statusTone = risk.active ? (session.focused ? 'good' : 'warn') : 'danger'
+      const requestKey = normalizeStudentOverrideKey(session.student_name)
+      const pendingRequest = selectedAssignment?.student_access_requests?.[requestKey]
+      const requestBadge = pendingRequest ? badge('Access requested', 'warn') : ''
+      const accessRevoked = studentAccessRevokedFor(selectedAssignment, session.student_name)
 
       return `
         <article
@@ -1883,7 +2149,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
               <h2>${escapeHtml(session.student_name)}</h2>
               <div class="student-meta">Last activity ${escapeHtml(timeAgoLabel(session.last_activity_at, now))}</div>
             </div>
-            <div class="student-badges">${badge(statusLabel, statusTone)}</div>
+            <div class="student-badges">${badge(statusLabel, statusTone)}${requestBadge}</div>
           </div>
           <div class="student-card-body">
             <div class="student-section">
@@ -1892,7 +2158,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
             </div>
             <div class="student-section">
               <div class="section-label">Current writing</div>
-              <div class="student-text">${escapeHtml(session.current_text || '(empty)')}</div>
+              <div class="student-meta">${escapeHtml(session.current_text || '(empty)')}</div>
             </div>
             <div class="student-section">
               <div class="section-label">Recent browser URLs</div>
@@ -1900,6 +2166,13 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
             </div>
           </div>
           <div class="student-card-footer">
+            <button
+              class="button ${accessRevoked ? 'button-secondary' : 'button-danger'} small-button"
+              type="button"
+              data-toggle-student-access="${escapeHtml(session.student_name)}"
+            >
+              ${accessRevoked ? 'Reopen access' : 'Close access'}
+            </button>
             <button
               class="button button-secondary small-button"
               type="button"
@@ -1920,6 +2193,12 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
       `
     })
     .join('')
+
+  elements.sessionGrid.querySelectorAll('[data-toggle-student-access]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      await toggleSelectedAssignmentStudentAccess(button.dataset.toggleStudentAccess)
+    })
+  })
 
   elements.sessionGrid.querySelectorAll('[data-extend-student]').forEach((button) => {
     button.addEventListener('click', async () => {
@@ -1963,12 +2242,160 @@ function renderDashboard(data) {
   renderView()
 }
 
+function renderAccessRequests(assignment, matchingSessions = []) {
+  if (!elements.accessRequestList) {
+    return
+  }
+  const requests = accessRequestsForAssignment(assignment)
+  if (!assignment || !requests.length) {
+    elements.accessRequestList.innerHTML = ''
+    elements.accessRequestList.closest('.access-request-panel')?.setAttribute('hidden', '')
+    return
+  }
+
+  const sessionKeys = new Set((matchingSessions || []).map((session) => normalizeStudentOverrideKey(session.student_name)))
+  const assignmentOpen = assignmentIsOpenNow(assignment)
+  elements.accessRequestList.closest('.access-request-panel')?.removeAttribute('hidden')
+  elements.accessRequestList.innerHTML = requests
+    .map((entry) => {
+      const requestTime = entry.requested_at ? timeAgoLabel(entry.requested_at) : 'just now'
+      const linkedToLiveSession = sessionKeys.has(entry.key)
+      return `
+        <article class="access-request-card">
+          <div class="access-request-copy">
+            <div class="access-request-title-row">
+              <h3>${escapeHtml(entry.student_name)}</h3>
+              <span class="student-badge student-badge-warn">Access requested</span>
+            </div>
+            <div class="student-meta">Requested ${escapeHtml(requestTime)}${linkedToLiveSession ? ' • visible in student list' : ''}</div>
+            ${entry.note ? `<p class="access-request-note">${escapeHtml(entry.note)}</p>` : ''}
+          </div>
+          <div class="access-request-actions">
+            ${
+              assignmentOpen
+                ? '<div class="student-meta">Approve now and use the normal class window.</div>'
+                : `
+                  <label class="access-request-time">
+                    <span>End time</span>
+                    <input type="time" value="${escapeHtml(elements.quickExtendTime?.value || '15:00')}" data-access-request-time="${escapeHtml(entry.key)}" />
+                  </label>
+                `
+            }
+            <button class="button small-button" type="button" data-approve-access-request="${escapeHtml(entry.key)}">
+              ${assignmentOpen ? 'Approve now' : 'Approve access'}
+            </button>
+          </div>
+        </article>
+      `
+    })
+    .join('')
+
+  elements.accessRequestList.querySelectorAll('[data-approve-access-request]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const requestKey = button.dataset.approveAccessRequest || ''
+      const entry = requests.find((item) => item.key === requestKey)
+      if (!assignment || !entry) {
+        return
+      }
+      button.disabled = true
+      try {
+        if (assignmentIsOpenNow(assignment)) {
+          await approveAssignmentAccessRequest(assignment, entry)
+          return
+        }
+        const timeInput = elements.accessRequestList.querySelector(`[data-access-request-time="${CSS.escape(requestKey)}"]`)
+        const { hour, minute } = selectedTimeParts(timeInput, 15, 0)
+        await approveAssignmentAccessRequest(assignment, entry, { hour, minute })
+      } catch (error) {
+        window.alert(`Could not approve access: ${error.message}`)
+        button.disabled = false
+      }
+    })
+  })
+}
+
 function mergeById(previous, incoming) {
   const map = new Map((previous || []).map((item) => [item.id, item]))
   for (const item of incoming || []) {
     map.set(item.id, item)
   }
   return [...map.values()]
+}
+
+function replaceAssignmentInState(assignment) {
+  if (!dashboardState || !assignment) {
+    return
+  }
+  dashboardState = {
+    ...dashboardState,
+    assignments: getAssignments().map((item) => (item.id === assignment.id ? assignment : item)),
+  }
+}
+
+async function refreshAssignmentViewData() {
+  if (!dashboardState || currentView !== 'assignment' || !selectedAssignmentId) {
+    return
+  }
+
+  const now = Date.now()
+  const fetchSummaryBundle =
+    now - lastAssignmentViewSummaryRefreshAt >= ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS ||
+    !getSelectedAssignment()
+  const fetchAudits = now - lastAssignmentViewAuditRefreshAt >= ASSIGNMENT_VIEW_AUDIT_REFRESH_MS
+  const fetchSelectedSession = reviewWorkspaceOpen && selectedReviewSessionId
+
+  const requests = []
+  if (fetchSummaryBundle) {
+    requests.push(request(`/api/edu/assignments/${encodeURIComponent(selectedAssignmentId)}`))
+    requests.push(request(`/api/edu/assignments/${encodeURIComponent(selectedAssignmentId)}/live-summaries`))
+  } else {
+    requests.push(Promise.resolve(null))
+    requests.push(Promise.resolve(null))
+  }
+  requests.push(
+    fetchAudits
+      ? request(`/api/edu/assignments/${encodeURIComponent(selectedAssignmentId)}/audit`)
+      : Promise.resolve(null),
+  )
+  requests.push(
+    fetchSelectedSession
+      ? request(`/api/edu/live-sessions/${encodeURIComponent(selectedReviewSessionId)}`)
+      : Promise.resolve(null),
+  )
+
+  const [assignment, summariesPayload, audits, selectedSession] = await Promise.all(requests)
+
+  if (assignment) {
+    replaceAssignmentInState(assignment)
+    lastAssignmentViewSummaryRefreshAt = now
+  }
+  if (summariesPayload?.live_sessions) {
+    dashboardState = {
+      ...dashboardState,
+      live_sessions: mergeById(
+        getLiveSessions().filter((session) => session.assignment_id !== selectedAssignmentId),
+        summariesPayload.live_sessions,
+      ),
+    }
+    lastAssignmentViewSummaryRefreshAt = now
+  }
+  if (Array.isArray(audits)) {
+    const filtered = getAssignmentAudits().filter((item) => item.assignment_id !== selectedAssignmentId)
+    dashboardState = {
+      ...dashboardState,
+      assignment_audits: [...filtered, ...audits],
+    }
+    lastAssignmentViewAuditRefreshAt = now
+  }
+  if (selectedSession) {
+    dashboardState = {
+      ...dashboardState,
+      live_sessions: mergeById(getLiveSessions(), [selectedSession]),
+    }
+  }
+
+  renderStudentCards()
+  await refreshSelectedReviewReplayData()
 }
 
 function applyDashboardDelta(delta) {
@@ -1993,7 +2420,7 @@ function applyDashboardDelta(delta) {
   }
   dashboardCursor = String(delta.updated_at || dashboardCursor || '')
   syncSelectionState()
-  if (document.activeElement?.closest?.('.review-workspace')) {
+  if (activeReviewEditorElement()) {
     return
   }
   renderView()
@@ -2036,49 +2463,66 @@ function renderView() {
 
 function showAssignmentView() {
   currentView = 'assignment'
+  resetAssignmentViewRefreshState()
   renderView()
 }
 
 function showClassesView() {
   currentView = 'classes'
   selectedAssignmentId = null
+  resetAssignmentViewRefreshState()
   renderView()
 }
 
 function showAssignmentsView() {
   currentView = getSelectedClassroom() ? 'assignments' : 'classes'
+  resetAssignmentViewRefreshState()
   renderView()
 }
 
 async function refreshDashboard() {
-  if (refreshInFlight) return
+  if (refreshInFlight) {
+    refreshQueued = true
+    return
+  }
   refreshInFlight = true
   try {
     if (!dashboardState) {
       renderDashboard(await request('/api/edu/dashboard'))
       return
     }
+    if (currentView === 'assignment' && selectedAssignmentId) {
+      await refreshAssignmentViewData()
+      return
+    }
     const delta = await request(`/api/edu/dashboard/updates?since=${encodeURIComponent(dashboardCursor || '')}`)
+    if (dashboardDeltaNeedsFullRefresh(dashboardState, delta)) {
+      renderDashboard(await request('/api/edu/dashboard'))
+      await refreshSelectedReviewReplayData()
+      return
+    }
     applyDashboardDelta(delta)
+    await refreshSelectedReviewReplayData()
   } finally {
     refreshInFlight = false
+    if (refreshQueued) {
+      refreshQueued = false
+      refreshDashboard().catch(() => {})
+    }
   }
 }
 
 function startDashboardRefresh() {
-  if (refreshTimer) {
-    clearInterval(refreshTimer)
+  scheduleDashboardRefresh()
+  if (!dashboardVisibilityRefreshBound) {
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshDashboard().catch(() => {})
+      }
+      scheduleDashboardRefresh()
+    })
+    dashboardVisibilityRefreshBound = true
   }
-  refreshTimer = window.setInterval(() => {
-    if (!document.hidden) {
-      refreshDashboard().catch(() => {})
-    }
-  }, DASHBOARD_REFRESH_MS)
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      refreshDashboard().catch(() => {})
-    }
-  })
 }
 
 function dayLabel(days) {
@@ -2120,28 +2564,21 @@ function validateAssignmentDraft() {
     errors.push('Study browser is enabled, so a home URL is required.')
   }
   if (browserEnabled && !domains.length) {
-    warnings.push('Study browser is enabled without any allowlisted domains.')
+    warnings.push('Study browser is enabled without any URL rules.')
   }
   if (form.get('require_lockdown') === 'on' && form.get('browser_enabled') !== 'on') {
     warnings.push('Lockdown is on and the study browser is disabled. Students will only have the writing workspace.')
   }
-  if (form.get('citations_required') === 'on' && form.get('browser_enabled') !== 'on' && !selectedLinkedAssignmentIdsFromForm().length) {
-    warnings.push('Citations are required, but there is no study browser or linked reference assignment.')
-  }
-  if (form.get('temporary_access_until')) {
-    const temporaryAccess = new Date(String(form.get('temporary_access_until')))
-    if (!Number.isNaN(temporaryAccess.getTime()) && temporaryAccess.getTime() < Date.now()) {
-      warnings.push('Temporary access time is already in the past.')
-    }
+  const fontSize = Number(form.get('editor_font_size') || 12)
+  if (!Number.isFinite(fontSize) || fontSize < 10 || fontSize > 100) {
+    errors.push('Font size must be between 10 and 100.')
   }
 
   return { errors, warnings }
 }
 
 function updateAssignmentFormGuidance() {
-  const { errors, warnings } = validateAssignmentDraft()
-  renderValidationList(elements.assignmentValidationErrors, errors)
-  renderValidationList(elements.assignmentValidationWarnings, warnings)
+  const { errors } = validateAssignmentDraft()
   elements.assignmentFormSubmit.disabled = errors.length > 0
 }
 
@@ -2174,7 +2611,6 @@ function wireModalButtons() {
       window.alert('Create or select a class first.')
       return
     }
-    populateAssignmentCourseSelect()
     resetAssignmentModal()
     openModal(elements.assignmentModal)
   })
@@ -2185,7 +2621,6 @@ function wireModalButtons() {
       window.alert('Select an assignment first.')
       return
     }
-    populateAssignmentCourseSelect()
     populateAssignmentModalForEdit(assignment)
     openModal(elements.assignmentModal)
   })
@@ -2196,7 +2631,7 @@ function wireModalButtons() {
       window.alert('Select an assignment first.')
       return
     }
-    if (!window.confirm(`Delete ${assignment.title}? Students will no longer see it in Handtyped.`)) {
+    if (!window.confirm(`Are you sure you want to delete ${assignment.title}? This will remove the assignment and all student submissions.`)) {
       return
     }
     try {
@@ -2216,6 +2651,10 @@ function wireModalButtons() {
     try {
       const time = selectedTimeParts(elements.quickExtendTime)
       await extendSelectedAssignmentToToday(time.hour, time.minute)
+      if (elements.quickExtendStatus) {
+        elements.quickExtendStatus.hidden = false
+        elements.quickExtendStatus.textContent = `Extended until ${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')} today.`
+      }
     } catch (error) {
       window.alert(`Could not extend access: ${error.message}`)
     } finally {
@@ -2228,10 +2667,11 @@ function wireModalButtons() {
       const modalId = button.dataset.closeModal
       if (modalId === 'classroom-modal') closeModal(elements.classroomModal)
       if (modalId === 'assignment-modal') closeModal(elements.assignmentModal)
+      if (modalId === 'feedback-modal') closeModal(elements.feedbackModal)
     })
   })
 
-  ;[elements.classroomModal, elements.assignmentModal].forEach((modal) => {
+  ;[elements.classroomModal, elements.assignmentModal, elements.feedbackModal].forEach((modal) => {
     modal.addEventListener('click', (event) => {
       if (event.target === modal) closeModal(modal)
     })
@@ -2239,12 +2679,13 @@ function wireModalButtons() {
 
   document.getElementById('back-to-classes-button')?.addEventListener('click', () => showClassesView())
   document.getElementById('back-to-assignments-button')?.addEventListener('click', () => showAssignmentsView())
-  elements.tempAccessTimeButton?.addEventListener('click', () => {
-    const time = selectedTimeParts(elements.tempAccessTime)
-    setTemporaryAccessToday(time.hour, time.minute)
-  })
+  elements.feedbackButton?.addEventListener('click', () => openModal(elements.feedbackModal))
   elements.assignmentAddStudentOverride?.addEventListener('click', () => {
-    assignmentStudentOverrideDrafts = [...currentStudentOverrideDrafts(), createStudentOverrideDraft()]
+    const drafts = currentStudentOverrideDrafts()
+    assignmentStudentOverrideDrafts = [
+      ...drafts,
+      createStudentOverrideDraft({ student_name: nextStudentOverrideName(drafts) }),
+    ]
     renderStudentOverrideCards(assignmentStudentOverrideDrafts)
   })
   elements.assignmentAddRubric?.addEventListener('click', () => {
@@ -2253,6 +2694,18 @@ function wireModalButtons() {
   elements.assignmentFormCancel?.addEventListener('click', () => {
     closeModal(elements.assignmentModal)
     resetAssignmentModal()
+  })
+  elements.feedbackFormCancel?.addEventListener('click', () => {
+    closeModal(elements.feedbackModal)
+    elements.feedbackForm?.reset()
+  })
+  elements.feedbackForm?.addEventListener('submit', (event) => {
+    event.preventDefault()
+    if (!openFeedbackDraft(new FormData(event.currentTarget))) {
+      return
+    }
+    closeModal(elements.feedbackModal)
+    elements.feedbackForm.reset()
   })
 }
 
@@ -2264,13 +2717,13 @@ function resetAssignmentModal() {
   elements.assignmentFormCancel.hidden = true
   elements.assignmentForm.reset()
   elements.assignmentForm.elements.namedItem('require_lockdown').checked = true
+  elements.assignmentForm.elements.namedItem('editor_font_locked').checked = false
   elements.assignmentForm.elements.namedItem('editor_font_family').value = 'arial'
-  elements.assignmentForm.elements.namedItem('editor_font_size').value = '22'
+  elements.assignmentForm.elements.namedItem('editor_font_size').value = '12'
   elements.assignmentForm.elements.namedItem('editor_line_height').value = 'relaxed'
-  elements.assignmentCourseSelect.disabled = false
-  populateAssignmentCourseSelect()
-  if (elements.assignmentAssignedExtra) {
-    elements.assignmentAssignedExtra.value = ''
+  if (elements.quickExtendStatus) {
+    elements.quickExtendStatus.hidden = true
+    elements.quickExtendStatus.textContent = ''
   }
   assignmentStudentOverrideDrafts = []
   renderAssignedStudentOptions([])
@@ -2290,10 +2743,6 @@ function populateAssignmentModalForEdit(assignment) {
   const form = elements.assignmentForm
   form.title.value = assignment.title || ''
   form.prompt.value = assignment.prompt || ''
-  populateAssignmentCourseSelect()
-  form.course.value = assignment.classroom_id || selectedClassroomId || ''
-  elements.assignmentCourseSelect.disabled = true
-  form.temporary_access_until.value = assignment.temporary_access_until || ''
 
   if (assignment.windows?.[0]) {
     const win = assignment.windows[0]
@@ -2313,27 +2762,27 @@ function populateAssignmentModalForEdit(assignment) {
     form.allow_dictation.checked = assignment.policy.allow_dictation ?? false
     form.allow_offline_editing.checked = assignment.policy.allow_offline_editing ?? true
     form.copy_paste_allowed.checked = assignment.policy.copy_paste_allowed ?? false
-    form.printing_allowed.checked = assignment.policy.printing_allowed ?? false
     form.export_allowed.checked = assignment.policy.export_allowed ?? false
     form.images_allowed.checked = assignment.policy.images_allowed ?? false
-    form.citations_required.checked = assignment.policy.citations_required ?? false
     form.require_lockdown.checked = assignment.policy.require_lockdown ?? false
+    form.require_permission_to_rejoin.checked = assignment.policy.require_permission_to_rejoin ?? false
+    form.show_rubric_to_student.checked = assignment.policy.show_rubric_to_student ?? false
   }
 
   if (assignment.editor_policy) {
     form.editor_font_family.value = assignment.editor_policy.font_family || 'arial'
-    form.editor_font_size.value = String(assignment.editor_policy.font_size ?? 22)
+    form.editor_font_size.value = String(assignment.editor_policy.font_size ?? 12)
     form.editor_line_height.value = assignment.editor_policy.line_height || 'relaxed'
+    form.editor_font_locked.checked = assignment.editor_policy.font_locked ?? false
   }
 
   if (assignment.browser_policy) {
     form.browser_enabled.checked = assignment.browser_policy.browser_enabled ?? false
+    form.browser_mode.value = assignment.browser_policy.mode === 'blacklist' ? 'blacklist' : 'whitelist'
     form.browser_home_url.value = assignment.browser_policy.home_url || ''
     form.browser_allowed_domains.value = (assignment.browser_policy.allowed_domains || []).join('\n')
   }
-  const knownStudents = new Set(knownStudentsForClassroom(assignment.classroom_id || selectedClassroomId || ''))
   const assignedStudents = Array.isArray(assignment.assigned_students) ? assignment.assigned_students : []
-  form.assigned_students_extra.value = assignedStudents.filter((name) => !knownStudents.has(name)).join('\n')
   renderAssignedStudentOptions(assignedStudents)
   renderStudentOverrideCards(draftsFromAssignmentStudentOverrides(assignment))
   renderLinkedAssignmentOptions(assignment.linked_assignment_ids || [])
@@ -2366,12 +2815,6 @@ function wireForms() {
 
   elements.assignmentForm.addEventListener('input', updateAssignmentFormGuidance)
   elements.assignmentForm.addEventListener('change', updateAssignmentFormGuidance)
-  elements.assignmentCourseSelect?.addEventListener('change', () => {
-    renderAssignedStudentOptions()
-    renderStudentOverrideCards(currentStudentOverrideDrafts())
-    renderLinkedAssignmentOptions()
-  })
-
   elements.assignmentForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     const formEl = event.currentTarget
@@ -2385,8 +2828,7 @@ function wireForms() {
       const form = new FormData(formEl)
       const assignmentId = form.get('assignment_id')
       const isEditing = !!assignmentId
-      const classroomId = form.get('course')
-      const activeClassroom = getClassrooms().find((classroom) => classroom.id === classroomId)
+      const activeClassroom = getSelectedClassroom()
       const startTime = parseTimeParts(form.get('window_start_time'), 10, 0)
       const endTime = parseTimeParts(form.get('window_end_time'), 11, 0)
       const studentOverrides = selectedStudentOverridesFromForm()
@@ -2414,26 +2856,27 @@ function wireForms() {
             end_minute: endTime.minute,
           },
         ],
-        temporary_access_until: toIsoFromDateTimeLocal(form.get('temporary_access_until')),
         student_temporary_access_until: studentOverrides.studentTemporaryAccessUntil,
         policy: {
           allow_dictation: form.get('allow_dictation') === 'on',
           allow_offline_editing: form.get('allow_offline_editing') === 'on',
           copy_paste_allowed: form.get('copy_paste_allowed') === 'on',
-          printing_allowed: form.get('printing_allowed') === 'on',
           export_allowed: form.get('export_allowed') === 'on',
           images_allowed: form.get('images_allowed') === 'on',
-          citations_required: form.get('citations_required') === 'on',
           require_lockdown: form.get('require_lockdown') === 'on',
+          require_permission_to_rejoin: form.get('require_permission_to_rejoin') === 'on',
           require_fullscreen: form.get('require_lockdown') === 'on',
+          show_rubric_to_student: form.get('show_rubric_to_student') === 'on',
         },
         editor_policy: {
-          font_family: String(form.get('editor_font_family') || 'serif'),
-          font_size: Number(form.get('editor_font_size') || 22),
+          font_family: String(form.get('editor_font_family') || 'arial'),
+          font_size: Number(form.get('editor_font_size') || 12),
           line_height: String(form.get('editor_line_height') || 'relaxed'),
+          font_locked: form.get('editor_font_locked') === 'on',
         },
         browser_policy: {
           browser_enabled: form.get('browser_enabled') === 'on',
+          mode: form.get('browser_mode') === 'blacklist' ? 'blacklist' : 'whitelist',
           home_url: form.get('browser_home_url') || '',
           allowed_domains: String(form.get('browser_allowed_domains') || '')
             .split('\n')
@@ -2507,12 +2950,6 @@ function wireReviewWorkspace() {
     markReviewDirty()
   })
 
-  elements.reviewSuggestedRevisions?.addEventListener('input', () => {
-    if (!reviewState) return
-    reviewState.suggestedRevisions = elements.reviewSuggestedRevisions.value
-    markReviewDirty()
-  })
-
   elements.reviewReturned?.addEventListener('change', () => {
     if (!reviewState) return
     reviewState.returnedForRevision = elements.reviewReturned.checked
@@ -2552,6 +2989,13 @@ function wireReviewWorkspace() {
   elements.reviewCancelAnnotation?.addEventListener('click', clearReviewComposer)
   elements.reviewAddAnnotation?.addEventListener('click', addReviewAnnotation)
   elements.reviewCloseButton?.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    closeReviewWorkspace().catch((error) => {
+      window.alert(`Could not close review: ${error.message}`)
+    })
+  })
+  elements.reviewBackButton?.addEventListener('click', (event) => {
     event.preventDefault()
     event.stopPropagation()
     closeReviewWorkspace().catch((error) => {

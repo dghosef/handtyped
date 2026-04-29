@@ -32,6 +32,7 @@ function shortId(length = 16) {
 let baseUrl
 let server
 let sessionsDir
+let eduStoreDir
 let trustedSignerKeyPair
 let untrustedSignerKeyPair
 let lateBootstrapServer
@@ -198,6 +199,7 @@ function smokeBlogDraftEnvelope() {
 
 beforeAll(async () => {
   sessionsDir = join(__dirname, `sessions-test-${randomUUID()}`)
+  eduStoreDir = join(sessionsDir, 'edu-store')
   mkdirSync(sessionsDir, { recursive: true })
   trustedSignerKeyPair = generateKeyPairSync('ed25519')
   untrustedSignerKeyPair = generateKeyPairSync('ed25519')
@@ -207,6 +209,7 @@ beforeAll(async () => {
 
   const { createApp } = await import('./server-lib.js')
   const app = createApp(sessionsDir, {
+    eduStoreDir,
     trustedSignerKeys: [publicKeyHex(trustedSignerKeyPair)],
     googleClientId: 'test-google-client-id',
     googleTokenVerifier: async (credential) => {
@@ -720,7 +723,6 @@ describe('edu teacher and student flow', () => {
       {
         rubric_scores: { claim: 3, evidence: 4 },
         teacher_comment: 'Push the thesis one step further.',
-        suggested_revisions: 'Tighten the causal language in the opening sentence.',
         returned_for_revision: true,
         grade_label: 'A-',
         grade_score: 91,
@@ -798,6 +800,779 @@ describe('edu teacher and student flow', () => {
         ],
       },
     })
+  })
+
+  it('shows student draft edits on the teacher dashboard after each live-session update', async () => {
+    const joinCode = `LIV${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Live Monitor',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Live dashboard check',
+        course: 'Live Monitor',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Make sure student edits appear for the teacher.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = 'teacher-dashboard:student'
+    const firstDraft = 'The first draft appears in teacher monitoring.'
+    const secondDraft = 'The revised draft appears in teacher monitoring after the student edits again.'
+
+    const firstPublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: firstDraft,
+      document_history: [{ op: 'insert', text: firstDraft }],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T12:10:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(firstPublish.status).toBe(201)
+
+    const firstDashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(firstDashboard.status).toBe(200)
+    expect(firstDashboard.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          student_name: 'Ada',
+          current_text: firstDraft,
+        }),
+      ]),
+    )
+
+    const sinceCursor = firstDashboard.body.updated_at
+
+    const secondPublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: secondDraft,
+      document_history: [{ op: 'insert', text: secondDraft }],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T12:11:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(secondPublish.status).toBe(201)
+
+    const secondDashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(secondDashboard.status).toBe(200)
+    expect(secondDashboard.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          student_name: 'Ada',
+          current_text: secondDraft,
+        }),
+      ]),
+    )
+
+    const teacherLiveView = await request(
+      'GET',
+      `/api/edu/live-sessions/${liveSessionId}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(teacherLiveView.status).toBe(200)
+    expect(teacherLiveView.body).toMatchObject({
+      id: liveSessionId,
+      student_name: 'Ada',
+      current_text: secondDraft,
+      document_history: [{ op: 'insert', text: secondDraft }],
+    })
+
+    const delta = await request(
+      'GET',
+      `/api/edu/dashboard/updates?since=${encodeURIComponent(sinceCursor)}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(delta.status).toBe(200)
+    expect(delta.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          current_text: secondDraft,
+        }),
+      ]),
+    )
+  })
+
+  it('shows teacher feedback, suggestions, and inline annotations in teacher-facing session reads and dashboard updates', async () => {
+    const joinCode = `FDB${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Feedback Workshop',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Teacher feedback check',
+        course: 'Feedback Workshop',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Verify teacher feedback survives round-trips.',
+        rubric: [
+          { id: 'idea', title: 'Idea', description: 'Clear controlling idea', points: 4 },
+        ],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = 'teacher-feedback:student'
+    const livePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: 'This sentence needs a clearer claim.',
+      document_history: [{ op: 'insert', text: 'This sentence needs a clearer claim.' }],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T12:20:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(livePublish.status).toBe(201)
+
+    const beforeGradingDashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(beforeGradingDashboard.status).toBe(200)
+
+    const grading = await request(
+      'PUT',
+      `/api/edu/live-sessions/${liveSessionId}/grading`,
+      {
+        rubric_scores: { idea: 3 },
+        teacher_comment: 'Strong start, but make the thesis more specific.',
+        returned_for_revision: true,
+        grade_label: 'Revise',
+        grade_score: 78,
+        inline_annotations: [
+          {
+            type: 'comment',
+            start: 0,
+            end: 13,
+            quote: 'This sentence',
+            note: 'Name the idea more directly.',
+          },
+          {
+            type: 'suggestion',
+            start: 20,
+            end: 35,
+            quote: 'clearer claim',
+            replacement: 'more specific thesis',
+            note: 'This will sharpen the paragraph.',
+          },
+        ],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(grading.status).toBe(200)
+
+    const teacherRead = await request('GET', `/api/edu/live-sessions/${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(teacherRead.status).toBe(200)
+    expect(teacherRead.body).toMatchObject({
+      id: liveSessionId,
+      current_text: 'This sentence needs a clearer claim.',
+        grading: {
+          rubric_scores: { idea: 3 },
+          teacher_comment: 'Strong start, but make the thesis more specific.',
+          returned_for_revision: true,
+        grade_label: 'Revise',
+        grade_score: 78,
+        inline_annotations: [
+          expect.objectContaining({
+            type: 'comment',
+            quote: 'This sentence',
+            note: 'Name the idea more directly.',
+          }),
+          expect.objectContaining({
+            type: 'suggestion',
+            quote: 'clearer claim',
+            replacement: 'more specific thesis',
+            note: 'This will sharpen the paragraph.',
+          }),
+        ],
+      },
+    })
+
+    const afterGradingDashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(afterGradingDashboard.status).toBe(200)
+    expect(afterGradingDashboard.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          grading: expect.objectContaining({
+            teacher_comment: 'Strong start, but make the thesis more specific.',
+            returned_for_revision: true,
+            grade_label: 'Revise',
+            grade_score: 78,
+            inline_annotations: expect.arrayContaining([
+              expect.objectContaining({ type: 'comment', quote: 'This sentence' }),
+              expect.objectContaining({ type: 'suggestion', replacement: 'more specific thesis' }),
+            ]),
+          }),
+        }),
+      ]),
+    )
+
+    const delta = await request(
+      'GET',
+      `/api/edu/dashboard/updates?since=${encodeURIComponent(beforeGradingDashboard.body.updated_at)}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(delta.status).toBe(200)
+    expect(delta.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          grading: expect.objectContaining({
+            teacher_comment: 'Strong start, but make the thesis more specific.',
+            inline_annotations: expect.arrayContaining([
+              expect.objectContaining({ type: 'comment', note: 'Name the idea more directly.' }),
+              expect.objectContaining({ type: 'suggestion', replacement: 'more specific thesis' }),
+            ]),
+          }),
+        }),
+      ]),
+    )
+  })
+
+  it('includes teacher feedback in the student config for the matching student', async () => {
+    const joinCode = `SFB${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Revision Workshop',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Argument Revision',
+        course: 'English 10',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Revise your claim and connect each piece of evidence back to it.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = 'student-feedback:ada'
+    const livePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'The draft still needs a stronger claim.',
+      document_history: [{ op: 'insert', text: 'The draft still needs a stronger claim.' }],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T13:05:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(livePublish.status).toBe(201)
+
+    const grading = await request(
+      'PUT',
+      `/api/edu/live-sessions/${liveSessionId}/grading`,
+      {
+        rubric_scores: { claim: 2, evidence: 3 },
+        teacher_comment: 'You are close. Make the thesis more direct.',
+        returned_for_revision: true,
+        grade_label: 'Revise',
+        grade_score: 79,
+        inline_annotations: [
+          {
+            type: 'comment',
+            start: 0,
+            end: 9,
+            quote: 'The draft',
+            note: 'Open with the actual argument instead.',
+          },
+          {
+            type: 'suggestion',
+            start: 27,
+            end: 41,
+            quote: 'stronger claim',
+            replacement: 'clear thesis',
+            note: 'Say exactly what you want to prove.',
+          },
+        ],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(grading.status).toBe(200)
+
+    const adaConfig = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(adaConfig.status).toBe(200)
+    expect(adaConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback: expect.objectContaining({
+            rubric_scores: { claim: 2, evidence: 3 },
+            teacher_comment: 'You are close. Make the thesis more direct.',
+            returned_for_revision: true,
+            grade_label: 'Revise',
+            grade_score: '79',
+            inline_annotations: expect.arrayContaining([
+              expect.objectContaining({
+                type: 'comment',
+                quote: 'The draft',
+                note: 'Open with the actual argument instead.',
+              }),
+              expect.objectContaining({
+                type: 'suggestion',
+                quote: 'stronger claim',
+                replacement: 'clear thesis',
+                note: 'Say exactly what you want to prove.',
+              }),
+            ]),
+          }),
+        }),
+      ]),
+    )
+
+    const graceConfig = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Grace Hopper')}`,
+    )
+    expect(graceConfig.status).toBe(200)
+    expect(graceConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback: null,
+        }),
+      ]),
+    )
+  })
+
+  it('preserves the last known student draft when a later live-session sync sends blank text', async () => {
+    const joinCode = `BLK${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Live Presence',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Presence draft',
+        course: 'Live Presence',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Keep the live preview stable while the app reports presence.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = 'presence:student'
+    const initialPublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: 'A live draft should stay visible to teachers.',
+      document_history: [{ op: 'insert', text: 'A live draft should stay visible to teachers.' }],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T12:00:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(initialPublish.status).toBe(201)
+
+    const blankPresencePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: '',
+      document_history: [],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T12:01:00Z',
+      schedule_open: false,
+      focused: false,
+      hid_active: false,
+    })
+    expect(blankPresencePublish.status).toBe(201)
+    expect(blankPresencePublish.body).toMatchObject({
+      id: liveSessionId,
+      current_text: 'A live draft should stay visible to teachers.',
+      document_history: [{ op: 'insert', text: 'A live draft should stay visible to teachers.' }],
+      schedule_open: false,
+      focused: false,
+      hid_active: false,
+    })
+
+    const persisted = await request('GET', `/api/edu/live-sessions/${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(persisted.status).toBe(200)
+    expect(persisted.body).toMatchObject({
+      id: liveSessionId,
+      current_text: 'A live draft should stay visible to teachers.',
+      document_history: [{ op: 'insert', text: 'A live draft should stay visible to teachers.' }],
+    })
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          current_text: 'A live draft should stay visible to teachers.',
+        }),
+      ]),
+    )
+  })
+
+  it('keeps the latest revised live draft visible after a close-style blank presence update', async () => {
+    const joinCode = `CLS${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Close Persistence',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Close and reopen draft',
+        course: 'Live Presence',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Keep the newest text visible after close.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = 'close-latest:student'
+    const openingDraft = 'Opening paragraph'
+    const revisedDraft = 'Opening paragraph with a stronger revised claim.'
+
+    expect(
+      await request('POST', '/api/edu/live-sessions', {
+        id: liveSessionId,
+        assignment_id: assignment.body.id,
+        assignment_title: assignment.body.title,
+        course: assignment.body.course,
+        classroom: classroom.body.name,
+        student_name: 'Ada',
+        current_text: openingDraft,
+        document_history: [{ op: 'insert', text: openingDraft }],
+        current_url: null,
+        current_url_title: null,
+        url_history: [],
+        violation_count: 0,
+        violations: [],
+        last_activity_at: '2026-04-28T12:00:00Z',
+        schedule_open: true,
+        focused: true,
+        hid_active: true,
+      }),
+    ).toMatchObject({ status: 201 })
+
+    expect(
+      await request('POST', '/api/edu/live-sessions', {
+        id: liveSessionId,
+        assignment_id: assignment.body.id,
+        assignment_title: assignment.body.title,
+        course: assignment.body.course,
+        classroom: classroom.body.name,
+        student_name: 'Ada',
+        current_text: revisedDraft,
+        document_history: [
+          { op: 'insert', text: openingDraft },
+          { op: 'insert', text: ' with a stronger revised claim.' },
+        ],
+        current_url: null,
+        current_url_title: null,
+        url_history: [],
+        violation_count: 0,
+        violations: [],
+        last_activity_at: '2026-04-28T12:02:00Z',
+        schedule_open: true,
+        focused: true,
+        hid_active: true,
+      }),
+    ).toMatchObject({ status: 201 })
+
+    const closePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: '',
+      document_history: [],
+      current_url: null,
+      current_url_title: null,
+      url_history: [],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: '2026-04-28T12:03:00Z',
+      schedule_open: false,
+      focused: false,
+      hid_active: false,
+    })
+    expect(closePublish.status).toBe(201)
+    expect(closePublish.body).toMatchObject({
+      id: liveSessionId,
+      current_text: revisedDraft,
+      document_history: [
+        { op: 'insert', text: openingDraft },
+        { op: 'insert', text: ' with a stronger revised claim.' },
+      ],
+      schedule_open: false,
+      focused: false,
+      hid_active: false,
+    })
+
+    const persisted = await request('GET', `/api/edu/live-sessions/${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(persisted.status).toBe(200)
+    expect(persisted.body.current_text).toBe(revisedDraft)
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          current_text: revisedDraft,
+        }),
+      ]),
+    )
+  })
+
+  it('preserves replay timing metadata for teacher replay analysis', async () => {
+    const joinCode = `RPL${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Replay Analysis',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'After-school audit',
+        course: 'Replay Analysis',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        windows: [
+          {
+            label: 'Class block',
+            days: {
+              monday: true,
+              tuesday: true,
+              wednesday: true,
+              thursday: true,
+              friday: true,
+              saturday: false,
+              sunday: false,
+            },
+            start_hour: 10,
+            start_minute: 0,
+            end_hour: 15,
+            end_minute: 15,
+          },
+        ],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const replayId = 'edu-replay-metadata'
+    const replayPublish = await request('POST', '/api/edu/replays', {
+      id: replayId,
+      live_session_id: 'replay:metadata:student',
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: 'Hello world',
+      document_history: [
+        { op: 'insert', text: 'Hello' },
+        { op: 'insert', text: ' world' },
+      ],
+      focus_events: [{ t: 2_000, state: 'inactive' }],
+      url_history: [],
+      violations: [],
+      last_activity_at: '2026-04-28T12:02:00Z',
+      focused: true,
+      hid_active: true,
+      start_wall_ns: 1_700_000_000_000_000_000,
+      replay_origin_wall_ms: 1_700_000_000_000,
+      recorded_timezone: 'AST',
+      recorded_timezone_offset_minutes: -240,
+    })
+    expect(replayPublish.status).toBe(201)
+
+    const replayRead = await request('GET', `/api/edu/replays/${replayId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(replayRead.status).toBe(200)
+    expect(replayRead.body).toMatchObject({
+      id: replayId,
+      student_name: 'Ada',
+      replay_origin_wall_ms: 1_700_000_000_000,
+      recorded_timezone: 'AST',
+      recorded_timezone_offset_minutes: -240,
+      start_wall_ns: 1_700_000_000_000_000_000,
+      assignment: expect.objectContaining({
+        id: assignment.body.id,
+        title: 'After-school audit',
+      }),
+    })
+    expect(replayRead.body.document_history).toEqual([
+      { op: 'insert', text: 'Hello' },
+      { op: 'insert', text: ' world' },
+    ])
   })
 
   it('deletes assignments for authenticated teachers', async () => {
@@ -1317,6 +2092,334 @@ describe('per-student assignment extensions', () => {
       id: assignment.body.id,
       temporary_access_until: '2026-04-27T18:00:00.000Z',
       student_temporary_access_until: {},
+    })
+  })
+
+  it('lets a blocked student request access and gives them a teacher-picked end time when class is closed', async () => {
+    const joinCode = `REQ${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'After Hours',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Exit Ticket',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        windows: [
+          {
+            label: 'Teacher writing window',
+            days: {
+              monday: true,
+              tuesday: true,
+              wednesday: true,
+              thursday: true,
+              friday: true,
+              saturday: false,
+              sunday: false,
+            },
+            start_hour: 8,
+            start_minute: 0,
+            end_hour: 9,
+            end_minute: 0,
+          },
+        ],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const accessRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/access-requests`,
+      {
+        student_name: 'Ada Lovelace',
+      },
+    )
+    expect(accessRequest.status).toBe(201)
+    expect(accessRequest.body.student_access_request).toMatchObject({
+      student_name: 'Ada Lovelace',
+    })
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_access_requests: expect.objectContaining({
+            'ada lovelace': expect.objectContaining({ student_name: 'Ada Lovelace' }),
+          }),
+        }),
+      ]),
+    )
+
+    const approvedUntil = '2026-04-28T18:30:00.000Z'
+    const approvedAssignment = await request(
+      'PUT',
+      `/api/edu/assignments/${assignment.body.id}`,
+      {
+        student_access_requests: {},
+        student_temporary_access_until: {
+          'ada lovelace': approvedUntil,
+        },
+      },
+      { Cookie: login.cookie },
+    )
+    expect(approvedAssignment.status).toBe(200)
+
+    const studentConfig = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(studentConfig.status).toBe(200)
+    expect(studentConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          temporary_access_until: approvedUntil,
+          student_access_request: null,
+        }),
+      ]),
+    )
+  })
+
+  it('approves a student request into the normal class window when the assignment is already open', async () => {
+    const joinCode = `OPN${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Open Block',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const openUntil = '2099-01-01T23:59:59.000Z'
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Warmup',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        temporary_access_until: openUntil,
+        student_temporary_access_until: {
+          'ada lovelace': '2099-01-02T00:30:00.000Z',
+        },
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const accessRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/access-requests`,
+      {
+        student_name: 'Ada Lovelace',
+      },
+    )
+    expect(accessRequest.status).toBe(201)
+
+    const approvedAssignment = await request(
+      'PUT',
+      `/api/edu/assignments/${assignment.body.id}`,
+      {
+        student_access_requests: {},
+        student_temporary_access_until: {},
+      },
+      { Cookie: login.cookie },
+    )
+    expect(approvedAssignment.status).toBe(200)
+
+    const studentConfig = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(studentConfig.status).toBe(200)
+    expect(studentConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          temporary_access_until: openUntil,
+          access_revoked: false,
+          student_access_request: null,
+          student_temporary_access_until: {},
+        }),
+      ]),
+    )
+  })
+
+  it('surfaces per-student instant access revocation in student config', async () => {
+    const joinCode = `REV${shortId(5)}`
+    const cookie = (await teacherLogin()).cookie
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'English 12',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'In-class close read',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        temporary_access_until: '2099-01-01T23:59:59.000Z',
+        student_access_revoked: {
+          'ada lovelace': true,
+        },
+      },
+      { Cookie: cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const revokedConfig = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(revokedConfig.status).toBe(200)
+    expect(revokedConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          access_revoked: true,
+          student_access_revoked: {},
+        }),
+      ]),
+    )
+
+    const openConfig = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Grace Hopper')}`,
+    )
+    expect(openConfig.status).toBe(200)
+    expect(openConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          access_revoked: false,
+        }),
+      ]),
+    )
+  })
+
+  it('returns lightweight live summaries and direct single-assignment student config', async () => {
+    const joinCode = `LIV${shortId(5)}`
+    const cookie = (await teacherLogin()).cookie
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'English 10',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Live Draft',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+      },
+      { Cookie: cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSession = await request('POST', '/api/edu/live-sessions', {
+      id: `Ada Lovelace:${assignment.body.id}`,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft opening paragraph',
+      document_history: [{ t: 1, ins: 'Draft', del: '', pos: 0 }],
+      focus_events: [{ t: 1, state: 'focused' }],
+      url_history: [
+        { url: 'https://example.com/1' },
+        { url: 'https://example.com/2' },
+        { url: 'https://example.com/3' },
+        { url: 'https://example.com/4' },
+        { url: 'https://example.com/5' },
+      ],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: new Date().toISOString(),
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+      updated_at: new Date().toISOString(),
+    })
+    expect(liveSession.status).toBe(201)
+
+    const summaries = await request(
+      'GET',
+      `/api/edu/assignments/${assignment.body.id}/live-summaries`,
+      undefined,
+      { Cookie: cookie },
+    )
+    expect(summaries.status).toBe(200)
+    expect(summaries.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `Ada Lovelace:${assignment.body.id}`,
+          assignment_id: assignment.body.id,
+          current_text: 'Draft opening paragraph',
+          recent_edit_count: expect.any(Number),
+        }),
+      ]),
+    )
+    expect(summaries.body.live_sessions[0].document_history).toBeUndefined()
+    expect(summaries.body.live_sessions[0].url_history).toHaveLength(4)
+
+    const studentAssignment = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(studentAssignment.status).toBe(200)
+    expect(studentAssignment.body.assignment).toMatchObject({
+      id: assignment.body.id,
+      access_revoked: false,
     })
   })
 

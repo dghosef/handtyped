@@ -23,18 +23,48 @@ function normalizeStudentOverrideKey(value) {
   return String(value || '').trim().toLowerCase()
 }
 
+function normalizeStudentAccessRequest(input = {}, fallbackKey = '') {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return null
+  }
+  const student_name = String(input.student_name || fallbackKey || '').trim()
+  const key = normalizeStudentOverrideKey(student_name || fallbackKey)
+  if (!key) {
+    return null
+  }
+  return {
+    student_name: student_name || fallbackKey,
+    requested_at: String(input.requested_at || nowIso()),
+    note: String(input.note || ''),
+  }
+}
+
+function normalizeStudentAccessRequests(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+  const normalized = {}
+  for (const [rawKey, rawValue] of Object.entries(input)) {
+    const request = normalizeStudentAccessRequest(rawValue, rawKey)
+    if (request) {
+      normalized[normalizeStudentOverrideKey(request.student_name)] = request
+    }
+  }
+  return normalized
+}
+
 function normalizeStudentPolicyOverride(input = {}) {
   const output = {}
   for (const key of [
     'allow_dictation',
     'allow_offline_editing',
     'copy_paste_allowed',
-    'printing_allowed',
     'export_allowed',
     'images_allowed',
-    'citations_required',
     'require_lockdown',
+    'require_permission_to_rejoin',
     'require_fullscreen',
+    'show_rubric_to_student',
   ]) {
     if (typeof input?.[key] === 'boolean') {
       output[key] = input[key]
@@ -48,11 +78,14 @@ function normalizeStudentEditorOverride(input = {}) {
   if (['arial', 'serif', 'sans', 'mono'].includes(input?.font_family)) {
     output.font_family = input.font_family
   }
-  if ([16, 18, 20, 22, 24, 28, 32].includes(Number(input?.font_size))) {
+  if (Number(input?.font_size) >= 10 && Number(input?.font_size) <= 100) {
     output.font_size = Number(input.font_size)
   }
   if (['compact', 'single', 'relaxed', 'one-half', 'double'].includes(input?.line_height)) {
     output.line_height = input.line_height
+  }
+  if (typeof input?.font_locked === 'boolean') {
+    output.font_locked = input.font_locked
   }
   return output
 }
@@ -69,6 +102,9 @@ function normalizeStudentBrowserOverride(input = {}) {
     output.allowed_domains = Array.isArray(input?.allowed_domains)
       ? input.allowed_domains.map((value) => String(value || '').trim()).filter(Boolean)
       : []
+  }
+  if (input?.mode === 'blacklist' || input?.mode === 'whitelist') {
+    output.mode = input.mode
   }
   if (typeof input?.log_all_navigation === 'boolean') {
     output.log_all_navigation = input.log_all_navigation
@@ -124,6 +160,51 @@ function normalizeStudentOverrides(input = {}) {
   }
 
   return normalized
+}
+
+function normalizeStudentFeedback(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return null
+  }
+
+  const rubric_scores =
+    input.rubric_scores && typeof input.rubric_scores === 'object' ? { ...input.rubric_scores } : {}
+  const inline_annotations = Array.isArray(input.inline_annotations)
+    ? input.inline_annotations
+        .map(normalizeInlineAnnotation)
+        .sort((a, b) => a.start - b.start || a.end - b.end)
+    : []
+  const teacher_comment = String(input.teacher_comment || '')
+  const returned_for_revision = Boolean(input.returned_for_revision)
+  const grade_label = String(input.grade_label || '')
+  const grade_score = input.grade_score == null ? '' : String(input.grade_score)
+  const updated_at = input.updated_at || null
+  const actor_name = input.actor_name || null
+  const actor_email = input.actor_email || null
+
+  const hasVisibleContent =
+    Object.keys(rubric_scores).length > 0 ||
+    inline_annotations.length > 0 ||
+    teacher_comment ||
+    returned_for_revision ||
+    grade_label ||
+    grade_score
+
+  if (!hasVisibleContent) {
+    return null
+  }
+
+  return {
+    rubric_scores,
+    teacher_comment,
+    returned_for_revision,
+    grade_label,
+    grade_score,
+    inline_annotations,
+    updated_at,
+    actor_name,
+    actor_email,
+  }
 }
 
 export function buildClassroom(input = {}) {
@@ -208,27 +289,30 @@ export function buildAssignment(input = {}) {
       allow_dictation: Boolean(input.policy?.allow_dictation),
       allow_offline_editing: input.policy?.allow_offline_editing ?? true,
       copy_paste_allowed: Boolean(input.policy?.copy_paste_allowed),
-      printing_allowed: Boolean(input.policy?.printing_allowed),
       export_allowed: Boolean(input.policy?.export_allowed),
       images_allowed: Boolean(input.policy?.images_allowed),
-      citations_required: Boolean(input.policy?.citations_required),
       require_lockdown: input.policy?.require_lockdown ?? true,
+      require_permission_to_rejoin: Boolean(input.policy?.require_permission_to_rejoin),
       require_fullscreen: input.policy?.require_fullscreen ?? false,
+      show_rubric_to_student: Boolean(input.policy?.show_rubric_to_student),
     },
     editor_policy: {
       font_family: ['arial', 'serif', 'sans', 'mono'].includes(input.editor_policy?.font_family)
         ? input.editor_policy.font_family
         : 'arial',
-      font_size: [16, 18, 20, 22, 24, 28, 32].includes(Number(input.editor_policy?.font_size))
+      font_size:
+        Number(input.editor_policy?.font_size) >= 10 && Number(input.editor_policy?.font_size) <= 100
         ? Number(input.editor_policy.font_size)
-        : 22,
+        : 12,
       line_height: ['compact', 'single', 'relaxed', 'one-half', 'double'].includes(input.editor_policy?.line_height)
         ? input.editor_policy.line_height
         : 'relaxed',
+      font_locked: Boolean(input.editor_policy?.font_locked),
     },
     browser_policy: {
       browser_enabled: input.browser_policy?.browser_enabled ?? true,
       home_url: String(input.browser_policy?.home_url || 'https://www.gutenberg.org'),
+      mode: input.browser_policy?.mode === 'blacklist' ? 'blacklist' : 'whitelist',
       allowed_domains: Array.isArray(input.browser_policy?.allowed_domains)
         ? input.browser_policy.allowed_domains
         : ['gutenberg.org'],
@@ -239,10 +323,20 @@ export function buildAssignment(input = {}) {
     rubric: Array.isArray(input.rubric)
       ? input.rubric.map(buildRubricCriterion).filter((criterion) => criterion.title.trim())
       : [],
+    student_feedback: normalizeStudentFeedback(input.student_feedback),
+    student_access_requests: normalizeStudentAccessRequests(input.student_access_requests),
     temporary_access_until: input.temporary_access_until ?? null,
     student_temporary_access_until:
       input.student_temporary_access_until && typeof input.student_temporary_access_until === 'object'
         ? { ...input.student_temporary_access_until }
+        : {},
+    student_access_revoked:
+      input.student_access_revoked && typeof input.student_access_revoked === 'object'
+        ? Object.fromEntries(
+            Object.entries(input.student_access_revoked)
+              .map(([key, value]) => [normalizeStudentOverrideKey(key), Boolean(value)])
+              .filter(([, value]) => value),
+          )
         : {},
     student_overrides: normalizeStudentOverrides(input.student_overrides),
     created_at: input.created_at || now,
@@ -306,7 +400,6 @@ export function buildLiveSession(input = {}) {
                 ? { ...input.grading.rubric_scores }
                 : {},
             teacher_comment: String(input.grading.teacher_comment || ''),
-            suggested_revisions: String(input.grading.suggested_revisions || ''),
             returned_for_revision: Boolean(input.grading.returned_for_revision),
             grade_label: String(input.grading.grade_label || ''),
             grade_score: normalizeGradeScore(input.grading.grade_score),
@@ -323,7 +416,6 @@ export function buildLiveSession(input = {}) {
         : {
             rubric_scores: {},
             teacher_comment: '',
-            suggested_revisions: '',
             returned_for_revision: false,
             grade_label: '',
             grade_score: null,
@@ -334,6 +426,109 @@ export function buildLiveSession(input = {}) {
             actor_email: null,
           },
     updated_at: String(input.updated_at || nowIso()),
+  }
+}
+
+export function buildLiveSessionSummary(input = {}) {
+  const session = buildLiveSession(input)
+  const recentEditCount = Number.isFinite(Number(input?.recent_edit_count))
+    ? Math.max(0, Number(input.recent_edit_count))
+    : Array.isArray(session.document_history)
+      ? Math.min(25, session.document_history.length)
+      : 0
+  return {
+    id: session.id,
+    assignment_id: session.assignment_id,
+    assignment_title: session.assignment_title,
+    course: session.course,
+    classroom: session.classroom,
+    student_name: session.student_name,
+    current_text: session.current_text,
+    current_url: session.current_url,
+    current_url_title: session.current_url_title,
+    url_history: Array.isArray(session.url_history) ? session.url_history.slice(-4) : [],
+    violation_count: session.violation_count,
+    violations: Array.isArray(session.violations) ? session.violations.slice(-4) : [],
+    focus_events: Array.isArray(session.focus_events) ? session.focus_events.slice(-8) : [],
+    recent_edit_count: recentEditCount,
+    last_activity_at: session.last_activity_at,
+    schedule_open: session.schedule_open,
+    focused: session.focused,
+    hid_active: session.hid_active,
+    replay_session_id: session.replay_session_id,
+    grading: session.grading,
+    updated_at: session.updated_at,
+  }
+}
+
+export function buildLiveReplayHead(input = {}) {
+  const now = nowIso()
+  return {
+    id: input.id || randomId('live_replay'),
+    live_session_id: String(input.live_session_id || input.id || ''),
+    replay_session_id: input.replay_session_id ?? null,
+    assignment_id: String(input.assignment_id || ''),
+    assignment_title: String(input.assignment_title || ''),
+    course: String(input.course || ''),
+    classroom: input.classroom ?? null,
+    student_name: String(input.student_name || 'Student'),
+    current_text: String(input.current_text || ''),
+    document_history: Array.isArray(input.document_history) ? input.document_history : [],
+    focus_events: Array.isArray(input.focus_events) ? input.focus_events : [],
+    keystroke_log: String(input.keystroke_log || ''),
+    current_url: input.current_url ?? null,
+    current_url_title: input.current_url_title ?? null,
+    url_history: Array.isArray(input.url_history) ? input.url_history : [],
+    violation_count: Number(input.violation_count ?? 0),
+    violations: Array.isArray(input.violations) ? input.violations : [],
+    last_activity_at: String(input.last_activity_at || now),
+    focused: input.focused ?? true,
+    hid_active: input.hid_active ?? true,
+    start_wall_ns: Number(input.start_wall_ns || 0),
+    replay_origin_wall_ms:
+      input.replay_origin_wall_ms == null ? null : Number(input.replay_origin_wall_ms || 0),
+    recorded_timezone_offset_minutes:
+      input.recorded_timezone_offset_minutes == null ? null : Number(input.recorded_timezone_offset_minutes || 0),
+    recorded_timezone: input.recorded_timezone ? String(input.recorded_timezone) : null,
+    snapshot_history_count: Math.max(
+      0,
+      Number(
+        input.snapshot_history_count ??
+          (Array.isArray(input.document_history) ? input.document_history.length : 0),
+      ) || 0,
+    ),
+    snapshot_url_history_count: Math.max(
+      0,
+      Number(
+        input.snapshot_url_history_count ??
+          (Array.isArray(input.url_history) ? input.url_history.length : 0),
+      ) || 0,
+    ),
+    last_event_seq: Math.max(0, Number(input.last_event_seq ?? 0) || 0),
+    created_at: String(input.created_at || now),
+    updated_at: String(input.updated_at || now),
+  }
+}
+
+export function buildLiveReplayEvent(input = {}) {
+  const now = nowIso()
+  return {
+    id: input.id || randomId('live_replay_event'),
+    live_session_id: String(input.live_session_id || ''),
+    replay_session_id: input.replay_session_id ?? null,
+    assignment_id: String(input.assignment_id || ''),
+    student_name: String(input.student_name || 'Student'),
+    seq: Math.max(1, Number(input.seq ?? 1) || 1),
+    current_text: String(input.current_text || ''),
+    current_url: input.current_url ?? null,
+    current_url_title: input.current_url_title ?? null,
+    document_history_tail: Array.isArray(input.document_history_tail) ? input.document_history_tail : [],
+    url_history_tail: Array.isArray(input.url_history_tail) ? input.url_history_tail : [],
+    last_activity_at: String(input.last_activity_at || now),
+    focused: input.focused ?? true,
+    hid_active: input.hid_active ?? true,
+    created_at: String(input.created_at || now),
+    updated_at: String(input.updated_at || now),
   }
 }
 
@@ -378,6 +573,12 @@ export function buildEduReplay(input = {}) {
     focused: input.focused ?? true,
     hid_active: input.hid_active ?? true,
     start_wall_ns: Number(input.start_wall_ns || 0),
+    replay_origin_wall_ms:
+      input.replay_origin_wall_ms == null ? null : Number(input.replay_origin_wall_ms || 0),
+    recorded_timezone_offset_minutes:
+      input.recorded_timezone_offset_minutes == null ? null : Number(input.recorded_timezone_offset_minutes || 0),
+    recorded_timezone: input.recorded_timezone ? String(input.recorded_timezone) : null,
+    created_at: String(input.created_at || nowIso()),
     updated_at: String(input.updated_at || nowIso()),
   }
 }

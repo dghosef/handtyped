@@ -797,11 +797,17 @@ textarea {
 }
 
 .review-layout.is-review-open {
-  grid-template-columns: minmax(320px, 1.1fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .review-layout .student-grid {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+#assignment-view.is-review-open #monitoring-overview,
+#assignment-view.is-review-open .monitoring-toolbar,
+#assignment-view.is-review-open #session-grid {
+  display: none;
 }
 
 .review-workspace {
@@ -810,6 +816,11 @@ textarea {
   padding: 18px;
   position: sticky;
   top: 20px;
+}
+
+#assignment-view.is-review-open .review-workspace {
+  position: static;
+  top: auto;
 }
 
 .review-workspace[hidden] {
@@ -837,6 +848,10 @@ textarea {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+#review-back-button {
+  margin-bottom: 10px;
 }
 
 .review-sync-pill,
@@ -1089,6 +1104,59 @@ textarea {
   flex-wrap: wrap;
 }
 
+.access-request-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.access-request-list {
+  display: grid;
+  gap: 12px;
+}
+
+.access-request-card {
+  border: 1px solid var(--line);
+  background: var(--page);
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.access-request-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.access-request-title-row h3 {
+  font-size: 1rem;
+}
+
+.access-request-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.access-request-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.access-request-actions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.access-request-time {
+  display: grid;
+  gap: 6px;
+  min-width: 140px;
+}
+
 #assignment-form > label,
 #assignment-form .selector-row > label {
   gap: 7px;
@@ -1206,40 +1274,6 @@ textarea {
   border-color: #efd39d;
 }
 
-.audit-list {
-  display: grid;
-  gap: 12px;
-}
-
-.audit-entry {
-  border: 1px solid var(--line);
-  background: var(--page);
-  padding: 16px;
-  display: grid;
-  gap: 8px;
-}
-
-.audit-entry-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: start;
-}
-
-.audit-entry h4 {
-  font-size: 1rem;
-  line-height: 1.3;
-}
-
-.audit-changes {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
 .form-callout {
   border: 1px solid var(--line);
   background: var(--page);
@@ -1280,6 +1314,14 @@ textarea {
 
 .modal-header .button {
   align-self: start;
+}
+
+.feedback-form-note {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 14px;
 }
 
 @media (max-width: 800px) {

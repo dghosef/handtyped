@@ -2,15 +2,25 @@ import { parseReplayAttestation, buildReplayUrl } from './session-store.js'
 import { parseTrustedSignerAllowlist } from './trusted-signers.js'
 import { createReplayGuardrails, resolveReplayUploadRateLimit } from './guardrails.js'
 import {
+  buildAssignmentLiveSummaries,
   buildAssignmentAuditRecord,
   buildEduDashboard,
   buildEduDashboardDelta,
+  buildStudentAssignmentConfig,
   buildStudentConfig,
   createD1EduStore,
   createKvEduStore,
   ensureEduSeedData,
 } from './edu-store.js'
-import { buildAssignment, buildClassroom, buildEduReplay, buildLiveSession, nowIso } from './edu-schema.js'
+import {
+  buildAssignment,
+  buildClassroom,
+  buildEduReplay,
+  buildLiveReplayEvent,
+  buildLiveReplayHead,
+  buildLiveSession,
+  nowIso,
+} from './edu-schema.js'
 import {
   authenticateTeacher,
   authenticateTeacherWithGoogle,
@@ -118,6 +128,132 @@ function getEduStore(env) {
     return createD1EduStore(env.EDU_DB)
   }
   return createKvEduStore(env.SESSIONS)
+}
+
+function liveReplayHeadFromSession(session, existingHead = null, replay = null) {
+  return buildLiveReplayHead({
+    ...existingHead,
+    id: session.id,
+    live_session_id: session.id,
+    replay_session_id: session.replay_session_id || existingHead?.replay_session_id || replay?.id || null,
+    assignment_id: session.assignment_id,
+    assignment_title: session.assignment_title,
+    course: session.course,
+    classroom: session.classroom,
+    student_name: session.student_name,
+    current_text: session.current_text,
+    document_history: session.document_history,
+    focus_events: session.focus_events,
+    keystroke_log: session.keystroke_log,
+    current_url: session.current_url,
+    current_url_title: session.current_url_title,
+    url_history: session.url_history,
+    violation_count: session.violation_count,
+    violations: session.violations,
+    last_activity_at: session.last_activity_at,
+    focused: session.focused,
+    hid_active: session.hid_active,
+    start_wall_ns: replay?.start_wall_ns || existingHead?.start_wall_ns || 0,
+    replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? existingHead?.replay_origin_wall_ms ?? null,
+    recorded_timezone_offset_minutes:
+      replay?.recorded_timezone_offset_minutes ?? existingHead?.recorded_timezone_offset_minutes ?? null,
+    recorded_timezone: replay?.recorded_timezone ?? existingHead?.recorded_timezone ?? null,
+    snapshot_history_count: Array.isArray(session.document_history) ? session.document_history.length : 0,
+    snapshot_url_history_count: Array.isArray(session.url_history) ? session.url_history.length : 0,
+    created_at: existingHead?.created_at || nowIso(),
+    updated_at: nowIso(),
+  })
+}
+
+function buildLiveReplayResponse(head, events = [], replay = null) {
+  return {
+    id: head.id,
+    live_session_id: head.live_session_id || head.id,
+    replay_session_id: head.replay_session_id || replay?.id || null,
+    assignment_id: head.assignment_id,
+    assignment_title: head.assignment_title,
+    course: head.course,
+    classroom: head.classroom,
+    student_name: head.student_name,
+    current_text: head.current_text,
+    document_history: Array.isArray(head.document_history) ? head.document_history : [],
+    focus_events: Array.isArray(head.focus_events) ? head.focus_events : [],
+    keystroke_log: String(head.keystroke_log || ''),
+    current_url: head.current_url ?? null,
+    current_url_title: head.current_url_title ?? null,
+    url_history: Array.isArray(head.url_history) ? head.url_history : [],
+    violation_count: Number(head.violation_count ?? 0),
+    violations: Array.isArray(head.violations) ? head.violations : [],
+    last_activity_at: head.last_activity_at,
+    focused: head.focused,
+    hid_active: head.hid_active,
+    start_wall_ns: replay?.start_wall_ns || head.start_wall_ns || 0,
+    replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? head.replay_origin_wall_ms ?? null,
+    recorded_timezone_offset_minutes:
+      replay?.recorded_timezone_offset_minutes ?? head.recorded_timezone_offset_minutes ?? null,
+    recorded_timezone: replay?.recorded_timezone ?? head.recorded_timezone ?? null,
+    last_seq: Number(head.last_event_seq ?? 0),
+    events,
+    created_at: head.created_at,
+    updated_at: head.updated_at,
+  }
+}
+
+async function appendLiveReplayUpdate(store, session, replay = null) {
+  const existingHead = await store.getLiveReplayHead(session.id)
+  const previousHistoryCount = Number(existingHead?.snapshot_history_count ?? 0)
+  const previousUrlHistoryCount = Number(existingHead?.snapshot_url_history_count ?? 0)
+  const history = Array.isArray(session.document_history) ? session.document_history : []
+  const urlHistory = Array.isArray(session.url_history) ? session.url_history : []
+  const documentHistoryTail = history.slice(Math.max(0, previousHistoryCount))
+  const urlHistoryTail = urlHistory.slice(Math.max(0, previousUrlHistoryCount))
+  const hasMeaningfulChange =
+    !existingHead ||
+    documentHistoryTail.length > 0 ||
+    urlHistoryTail.length > 0 ||
+    String(existingHead.current_text || '') !== String(session.current_text || '') ||
+    String(existingHead.current_url || '') !== String(session.current_url || '') ||
+    String(existingHead.current_url_title || '') !== String(session.current_url_title || '') ||
+    String(existingHead.last_activity_at || '') !== String(session.last_activity_at || '')
+
+  const nextSeq = Math.max(0, Number(existingHead?.last_event_seq ?? 0)) + (hasMeaningfulChange ? 1 : 0)
+  const head = liveReplayHeadFromSession(
+    {
+      ...session,
+      document_history: history,
+      url_history: urlHistory,
+    },
+    {
+      ...existingHead,
+      last_event_seq: nextSeq,
+    },
+    replay,
+  )
+  await store.putLiveReplayHead(head)
+  if (!hasMeaningfulChange) {
+    return head
+  }
+  await store.appendLiveReplayEvent(
+    buildLiveReplayEvent({
+      id: `${session.id}:${String(nextSeq).padStart(8, '0')}`,
+      live_session_id: session.id,
+      replay_session_id: head.replay_session_id,
+      assignment_id: session.assignment_id,
+      student_name: session.student_name,
+      seq: nextSeq,
+      current_text: session.current_text,
+      current_url: session.current_url,
+      current_url_title: session.current_url_title,
+      document_history_tail: documentHistoryTail,
+      url_history_tail: urlHistoryTail,
+      last_activity_at: session.last_activity_at,
+      focused: session.focused,
+      hid_active: session.hid_active,
+      created_at: session.updated_at || nowIso(),
+      updated_at: session.updated_at || nowIso(),
+    }),
+  )
+  return head
 }
 
 function getEduAuthStore(env) {
@@ -474,8 +610,33 @@ export default {
     if (
       eduHost &&
       request.method === 'GET' &&
+      /\/api\/edu\/assignments\/[^/]+\/live-summaries$/.test(url.pathname)
+    ) {
+      const store = getEduStore(env)
+      await ensureEduSeedData(store)
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const parts = url.pathname.split('/')
+      const assignmentId = parts[parts.length - 2]
+      const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
+      if (!assignment) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      return json({
+        assignment_id: assignmentId,
+        live_sessions: await buildAssignmentLiveSummaries(store, assignmentId),
+        updated_at: nowIso(),
+      })
+    }
+
+    if (
+      eduHost &&
+      request.method === 'GET' &&
       url.pathname.startsWith('/api/edu/assignments/') &&
-      !url.pathname.endsWith('/audit')
+      !url.pathname.endsWith('/audit') &&
+      !url.pathname.endsWith('/live-summaries')
     ) {
       const store = getEduStore(env)
       await ensureEduSeedData(store)
@@ -486,6 +647,55 @@ export default {
       const id = url.pathname.split('/').pop()
       const assignment = id ? await store.getAssignment(id) : null
       return assignment ? json(assignment) : json({ error: 'Not found' }, { status: 404 })
+    }
+
+    if (
+      eduHost &&
+      request.method === 'POST' &&
+      /\/api\/edu\/assignments\/[^/]+\/access-requests$/.test(url.pathname)
+    ) {
+      const store = getEduStore(env)
+      await ensureEduSeedData(store)
+      const parts = url.pathname.split('/')
+      const assignmentId = parts[parts.length - 2]
+      const existing = assignmentId ? await store.getAssignment(assignmentId) : null
+      if (!existing) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const body = await parseJsonRequest(request)
+      const studentName = String(body?.student_name || '').trim()
+      if (!studentName) {
+        return json({ error: 'Student name is required' }, { status: 400 })
+      }
+      const normalizedKey = studentName.toLowerCase()
+      const updatedAssignment = buildAssignment({
+        ...existing,
+        student_access_requests: {
+          ...(existing.student_access_requests || {}),
+          [normalizedKey]: {
+            student_name: studentName,
+            requested_at: nowIso(),
+            note: String(body?.note || ''),
+          },
+        },
+        updated_at: nowIso(),
+      })
+      await store.putAssignment(updatedAssignment)
+      await store.putAssignmentAudit(
+        buildAssignmentAuditRecord({
+          action: 'updated',
+          assignment: updatedAssignment,
+          previousAssignment: existing,
+          actor: null,
+        }),
+      )
+      return json(
+        {
+          assignment_id: updatedAssignment.id,
+          student_access_request: updatedAssignment.student_access_requests?.[normalizedKey] || null,
+        },
+        { status: 201 },
+      )
     }
 
     if (eduHost && request.method === 'PUT' && url.pathname.startsWith('/api/edu/assignments/')) {
@@ -585,6 +795,7 @@ export default {
         updated_at: nowIso(),
       })
       await store.putLiveSession(session)
+      await appendLiveReplayUpdate(store, session)
       return json(session, { status: 201 })
     }
 
@@ -611,7 +822,6 @@ export default {
             ? { ...body.rubric_scores }
             : {},
         teacher_comment: String(body?.teacher_comment || ''),
-        suggested_revisions: String(body?.suggested_revisions || ''),
         returned_for_revision: Boolean(body?.returned_for_revision),
         grade_label: String(body?.grade_label || ''),
         grade_score:
@@ -640,6 +850,59 @@ export default {
       const id = url.pathname.split('/').pop()
       const liveSession = id ? await store.getLiveSession(id) : null
       return liveSession ? json(buildLiveSession(liveSession)) : json({ error: 'Not found' }, { status: 404 })
+    }
+
+    if (eduHost && request.method === 'GET' && /^\/api\/edu\/live-replays\/[^/]+\/updates$/.test(url.pathname)) {
+      const store = getEduStore(env)
+      const teacherSession = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!teacherSession.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const headId = url.pathname.split('/')[4]
+      const head = headId ? await store.getLiveReplayHead(headId) : null
+      if (!head) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const sinceSeq = Math.max(0, Number(url.searchParams.get('since_seq') || 0) || 0)
+      const events = (await store.listLiveReplayEvents(head.id)).filter((event) => event.seq > sinceSeq)
+      const replay = head.replay_session_id ? await store.getReplay(head.replay_session_id) : null
+      return json({
+        id: head.id,
+        live_session_id: head.live_session_id || head.id,
+        replay_session_id: head.replay_session_id || replay?.id || null,
+        current_text: head.current_text,
+        current_url: head.current_url ?? null,
+        current_url_title: head.current_url_title ?? null,
+        last_activity_at: head.last_activity_at,
+        last_seq: Number(head.last_event_seq ?? 0),
+        replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? head.replay_origin_wall_ms ?? null,
+        recorded_timezone_offset_minutes:
+          replay?.recorded_timezone_offset_minutes ?? head.recorded_timezone_offset_minutes ?? null,
+        recorded_timezone: replay?.recorded_timezone ?? head.recorded_timezone ?? null,
+        events,
+        updated_at: head.updated_at,
+      })
+    }
+
+    if (eduHost && request.method === 'GET' && /^\/api\/edu\/live-replays\/[^/]+$/.test(url.pathname)) {
+      const store = getEduStore(env)
+      const teacherSession = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!teacherSession.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const headId = url.pathname.split('/').pop()
+      const head = headId ? await store.getLiveReplayHead(headId) : null
+      if (head) {
+        const replay = head.replay_session_id ? await store.getReplay(head.replay_session_id) : null
+        return json(buildLiveReplayResponse(head, await store.listLiveReplayEvents(head.id), replay))
+      }
+      const liveSession = headId ? await store.getLiveSession(headId) : null
+      if (!liveSession) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const replay = liveSession.replay_session_id ? await store.getReplay(liveSession.replay_session_id) : null
+      const fallbackHead = liveReplayHeadFromSession(liveSession, null, replay)
+      return json(buildLiveReplayResponse(fallbackHead, [], replay))
     }
 
     if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/replays/')) {
@@ -679,6 +942,22 @@ export default {
       const store = getEduStore(env)
       const replay = buildEduReplay({ ...(await parseJsonRequest(request)), updated_at: nowIso() })
       await store.putReplay(replay)
+      if (replay.live_session_id) {
+        const existingHead = await store.getLiveReplayHead(replay.live_session_id)
+        if (existingHead) {
+          await store.putLiveReplayHead(
+            buildLiveReplayHead({
+              ...existingHead,
+              replay_session_id: replay.id,
+              start_wall_ns: replay.start_wall_ns,
+              replay_origin_wall_ms: replay.replay_origin_wall_ms,
+              recorded_timezone_offset_minutes: replay.recorded_timezone_offset_minutes,
+              recorded_timezone: replay.recorded_timezone,
+              updated_at: nowIso(),
+            }),
+          )
+        }
+      }
       return json(replay, { status: 201 })
     }
 
@@ -691,6 +970,21 @@ export default {
           studentName: url.searchParams.get('student_name') || '',
         }),
       )
+    }
+
+    if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/student/assignments/')) {
+      const store = getEduStore(env)
+      await ensureEduSeedData(store)
+      const assignmentId = url.pathname.split('/').pop()
+      const result = await buildStudentAssignmentConfig(store, {
+        assignmentId,
+        joinCode: url.searchParams.get('join_code') || '',
+        studentName: url.searchParams.get('student_name') || '',
+      })
+      if (!result.classroom || !result.assignment) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      return json(result)
     }
 
     if (request.method === 'GET' && url.pathname === '/api/health') {

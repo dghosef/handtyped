@@ -1,11 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
   buildAssignment,
   buildAssignmentAudit,
   buildClassroom,
   buildEduReplay,
+  buildLiveReplayEvent,
+  buildLiveReplayHead,
   buildLiveSession,
+  buildLiveSessionSummary,
   buildTeacher,
   nowIso,
 } from './edu-schema.js'
@@ -13,6 +16,9 @@ import {
 const CLASSROOM_PREFIX = 'edu:classrooms:'
 const ASSIGNMENT_PREFIX = 'edu:assignments:'
 const LIVE_PREFIX = 'edu:live_sessions:'
+const LIVE_SUMMARY_PREFIX = 'edu:live_session_summaries:'
+const LIVE_REPLAY_HEAD_PREFIX = 'edu:live_replay_heads:'
+const LIVE_REPLAY_EVENT_PREFIX = 'edu:live_replay_events:'
 const REPLAY_PREFIX = 'edu:replays:'
 const ASSIGNMENT_AUDIT_PREFIX = 'edu:assignment_audits:'
 const TEACHER_PREFIX = 'edu:teachers:'
@@ -95,6 +101,14 @@ function effectiveStudentTemporaryAccessUntil(assignment, studentName) {
   return assignment?.student_temporary_access_until?.[key] ?? assignment?.temporary_access_until ?? null
 }
 
+function studentAccessRevokedForAssignment(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return false
+  }
+  return Boolean(assignment?.student_access_revoked?.[key])
+}
+
 function effectiveStudentSettingsOverride(assignment, studentName) {
   const key = normalizeStudentOverrideKey(studentName)
   if (!key) {
@@ -108,6 +122,19 @@ function effectiveStudentSettingsOverride(assignment, studentName) {
   return override && typeof override === 'object' ? override : null
 }
 
+function studentAccessRequestForAssignment(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return null
+  }
+  const requests = assignment?.student_access_requests
+  if (!requests || typeof requests !== 'object') {
+    return null
+  }
+  const request = requests[key]
+  return request && typeof request === 'object' ? request : null
+}
+
 function assignmentForStudentConfig(assignment, studentName) {
   const normalized = buildAssignment(assignment)
   const override = effectiveStudentSettingsOverride(normalized, studentName)
@@ -117,6 +144,7 @@ function assignmentForStudentConfig(assignment, studentName) {
   return {
     ...normalized,
     temporary_access_until: effectiveTemporaryAccessUntil,
+    access_revoked: studentAccessRevokedForAssignment(normalized, studentName),
     policy: {
       ...normalized.policy,
       ...(override?.policy || {}),
@@ -129,9 +157,34 @@ function assignmentForStudentConfig(assignment, studentName) {
       ...normalized.browser_policy,
       ...(override?.browser_policy || {}),
     },
+    student_feedback: normalized.student_feedback || null,
+    student_access_request: studentAccessRequestForAssignment(normalized, studentName),
+    student_access_requests: {},
+    student_access_revoked: {},
     student_temporary_access_until: {},
     student_overrides: {},
   }
+}
+
+function normalizedStudentKey(studentName) {
+  return normalizeStudentOverrideKey(studentName)
+}
+
+function studentFeedbackForAssignment(liveSessions, assignmentId, studentName) {
+  const studentKey = normalizedStudentKey(studentName)
+  if (!assignmentId || !studentKey) {
+    return null
+  }
+
+  const matching = (liveSessions || [])
+    .map((item) => buildLiveSession(item))
+    .filter((session) => session.assignment_id === assignmentId)
+    .filter((session) => normalizedStudentKey(session.student_name) === studentKey)
+    .sort((a, b) =>
+      String(b.updated_at || b.last_activity_at || '').localeCompare(String(a.updated_at || a.last_activity_at || '')),
+    )
+
+  return matching[0]?.grading || null
 }
 
 function sortByUpdatedDesc(items) {
@@ -156,7 +209,10 @@ export function createNodeEduStore(baseDir) {
   }
 
   function writeCollection(name, value) {
-    writeFileSync(filePath(name), JSON.stringify(value, null, 2))
+    const path = filePath(name)
+    const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`
+    writeFileSync(tempPath, JSON.stringify(value, null, 2))
+    renameSync(tempPath, path)
   }
 
   return {
@@ -230,13 +286,48 @@ export function createNodeEduStore(baseDir) {
       return sortByUpdatedDesc(readCollection('live_sessions'))
     },
     async putLiveSession(session) {
+      const summary = buildLiveSessionSummary(session)
       const sessions = readCollection('live_sessions')
       const next = sessions.filter((item) => item.id !== session.id)
       next.push(session)
       writeCollection('live_sessions', next)
+
+      const summaries = readCollection('live_session_summaries')
+      const nextSummaries = summaries.filter((item) => item.id !== summary.id)
+      nextSummaries.push(summary)
+      writeCollection('live_session_summaries', nextSummaries)
     },
     async getLiveSession(id) {
       return readCollection('live_sessions').find((item) => item.id === id) || null
+    },
+    async listLiveSessionSummariesForAssignment(assignmentId) {
+      return sortByUpdatedDesc(readCollection('live_session_summaries')).filter(
+        (item) => item.assignment_id === assignmentId,
+      )
+    },
+    async listLiveReplayHeads() {
+      return sortByUpdatedDesc(readCollection('live_replay_heads'))
+    },
+    async putLiveReplayHead(head) {
+      const heads = readCollection('live_replay_heads')
+      const next = heads.filter((item) => item.id !== head.id)
+      next.push(buildLiveReplayHead(head))
+      writeCollection('live_replay_heads', next)
+    },
+    async getLiveReplayHead(id) {
+      const item = readCollection('live_replay_heads').find((entry) => entry.id === id)
+      return item ? buildLiveReplayHead(item) : null
+    },
+    async listLiveReplayEvents(liveSessionId) {
+      return readCollection('live_replay_events')
+        .filter((item) => item.live_session_id === liveSessionId)
+        .map((item) => buildLiveReplayEvent(item))
+        .sort((a, b) => a.seq - b.seq || String(a.updated_at).localeCompare(String(b.updated_at)))
+    },
+    async appendLiveReplayEvent(event) {
+      const events = readCollection('live_replay_events')
+      events.push(buildLiveReplayEvent(event))
+      writeCollection('live_replay_events', events)
     },
     async listReplays() {
       return sortByUpdatedDesc(readCollection('replays'))
@@ -326,11 +417,37 @@ export function createKvEduStore(kv) {
       return sortByUpdatedDesc(await listByPrefix(LIVE_PREFIX))
     },
     async putLiveSession(session) {
+      const summary = buildLiveSessionSummary(session)
       await kv.put(`${LIVE_PREFIX}${session.id}`, JSON.stringify(session))
+      await kv.put(`${LIVE_SUMMARY_PREFIX}${session.assignment_id}:${session.id}`, JSON.stringify(summary))
     },
     async getLiveSession(id) {
       const raw = await kv.get(`${LIVE_PREFIX}${id}`)
       return raw ? JSON.parse(raw) : null
+    },
+    async listLiveSessionSummariesForAssignment(assignmentId) {
+      return sortByUpdatedDesc(await listByPrefix(`${LIVE_SUMMARY_PREFIX}${assignmentId}:`))
+    },
+    async listLiveReplayHeads() {
+      return sortByUpdatedDesc(await listByPrefix(LIVE_REPLAY_HEAD_PREFIX))
+    },
+    async putLiveReplayHead(head) {
+      await kv.put(`${LIVE_REPLAY_HEAD_PREFIX}${head.id}`, JSON.stringify(buildLiveReplayHead(head)))
+    },
+    async getLiveReplayHead(id) {
+      const raw = await kv.get(`${LIVE_REPLAY_HEAD_PREFIX}${id}`)
+      return raw ? buildLiveReplayHead(JSON.parse(raw)) : null
+    },
+    async listLiveReplayEvents(liveSessionId) {
+      const items = await listByPrefix(`${LIVE_REPLAY_EVENT_PREFIX}${liveSessionId}:`)
+      return items.map((item) => buildLiveReplayEvent(item)).sort((a, b) => a.seq - b.seq)
+    },
+    async appendLiveReplayEvent(event) {
+      const normalized = buildLiveReplayEvent(event)
+      await kv.put(
+        `${LIVE_REPLAY_EVENT_PREFIX}${normalized.live_session_id}:${String(normalized.seq).padStart(8, '0')}`,
+        JSON.stringify(normalized),
+      )
     },
     async listReplays() {
       return sortByUpdatedDesc(await listByPrefix(REPLAY_PREFIX))
@@ -469,12 +586,56 @@ export function createD1EduStore(db) {
       return listKind('live_session')
     },
     async putLiveSession(session) {
+      const summary = buildLiveSessionSummary(session)
       await putRecord('live_session', session.id, session, {
         classroom_id: session.assignment_id || null,
+      })
+      await putRecord('live_session_summary', summary.id, summary, {
+        classroom_id: summary.assignment_id || null,
       })
     },
     async getLiveSession(id) {
       return getByKindAndId('live_session', id)
+    },
+    async listLiveSessionSummariesForAssignment(assignmentId) {
+      await ensureSchema()
+      const response = await db
+        .prepare(
+          'SELECT json FROM edu_records WHERE kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
+        )
+        .bind('live_session_summary', assignmentId)
+        .all()
+      return (response.results || []).map((row) => JSON.parse(row.json))
+    },
+    async listLiveReplayHeads() {
+      return listKind('live_replay_head')
+    },
+    async putLiveReplayHead(head) {
+      const normalized = buildLiveReplayHead(head)
+      await putRecord('live_replay_head', normalized.id, normalized, {
+        classroom_id: normalized.assignment_id || null,
+      })
+    },
+    async getLiveReplayHead(id) {
+      return getByKindAndId('live_replay_head', id)
+    },
+    async listLiveReplayEvents(liveSessionId) {
+      await ensureSchema()
+      const response = await db
+        .prepare(
+          'SELECT json FROM edu_records WHERE kind = ? AND classroom_id = ? ORDER BY updated_at ASC, id ASC',
+        )
+        .bind('live_replay_event', liveSessionId)
+        .all()
+      return (response.results || [])
+        .map((row) => buildLiveReplayEvent(JSON.parse(row.json)))
+        .sort((a, b) => a.seq - b.seq || String(a.updated_at).localeCompare(String(b.updated_at)))
+    },
+    async appendLiveReplayEvent(event) {
+      const normalized = buildLiveReplayEvent(event)
+      await putRecord('live_replay_event', normalized.id, normalized, {
+        classroom_id: normalized.live_session_id || null,
+      })
     },
     async listReplays() {
       return listKind('replay')
@@ -659,6 +820,12 @@ export async function buildEduDashboard(store) {
   }
 }
 
+export async function buildAssignmentLiveSummaries(store, assignmentId) {
+  return (await store.listLiveSessionSummariesForAssignment(assignmentId)).map((item) =>
+    buildLiveSessionSummary(item),
+  )
+}
+
 export async function buildEduDashboardDelta(store, { since } = {}) {
   const normalizedSince = String(since || '')
   const classrooms = await store.listClassrooms()
@@ -720,6 +887,8 @@ export function buildAssignmentAuditRecord({
       previousSnapshot.student_temporary_access_until,
       nextSnapshot.student_temporary_access_until,
     )
+    pushChange('Blocked students', previousSnapshot.student_access_revoked, nextSnapshot.student_access_revoked)
+    pushChange('Access requests', previousSnapshot.student_access_requests, nextSnapshot.student_access_requests)
     pushChange('Student setting overrides', previousSnapshot.student_overrides, nextSnapshot.student_overrides)
     pushChange('Assigned students', previousSnapshot.assigned_students, nextSnapshot.assigned_students)
     pushChange('Rules', previousSnapshot.policy, nextSnapshot.policy)
@@ -759,9 +928,58 @@ export async function buildStudentConfig(store, { joinCode, studentName } = {}) 
     return { classroom: null, assignments: [] }
   }
   classroom = await rememberStudentInClassroom(store, classroom, studentName)
+  const liveSessions = await store.listLiveSessions()
   const assignments = (await store.listAssignments())
     .filter((item) => item.classroom_id === classroom.id)
     .filter((item) => assignmentTargetsStudent(item, studentName))
-    .map((item) => assignmentForStudentConfig(item, studentName))
+    .map((item) =>
+      assignmentForStudentConfig(
+        {
+          ...item,
+          student_feedback: studentFeedbackForAssignment(liveSessions, item.id, studentName),
+        },
+        studentName,
+      ),
+    )
   return { classroom, assignments }
+}
+
+export async function buildStudentAssignmentConfig(
+  store,
+  {
+    assignmentId,
+    joinCode,
+    studentName,
+  } = {},
+) {
+  const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
+  if (!assignment) {
+    return { classroom: null, assignment: null }
+  }
+
+  const classroom = assignment.classroom_id ? await store.getClassroom(assignment.classroom_id) : null
+  if (!classroom) {
+    return { classroom: null, assignment: null }
+  }
+
+  if (String(classroom.join_code || '').toUpperCase() !== String(joinCode || '').toUpperCase()) {
+    return { classroom: null, assignment: null }
+  }
+
+  if (!assignmentTargetsStudent(assignment, studentName)) {
+    return { classroom, assignment: null }
+  }
+
+  const liveSessionId = `${String(studentName || 'Student')}:${assignment.id}`
+  const liveSession = await store.getLiveSession(liveSessionId)
+  return {
+    classroom,
+    assignment: assignmentForStudentConfig(
+      {
+        ...assignment,
+        student_feedback: liveSession?.grading || null,
+      },
+      studentName,
+    ),
+  }
 }

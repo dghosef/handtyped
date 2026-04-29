@@ -389,6 +389,71 @@ function toAttributedChars(text, insertedAtMs) {
   return Array.from(String(text || '')).map((char) => ({ char, insertedAtMs }))
 }
 
+function applyDeltaEntry(currentText, entry) {
+  if (!Number.isInteger(entry?.pos) || typeof entry?.ins !== 'string') {
+    return null
+  }
+  const chars = Array.from(String(currentText || ''))
+  const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
+  const delCount = typeof entry.del === 'string'
+    ? Array.from(entry.del).length
+    : Math.max(0, Number(entry.del) || 0)
+  chars.splice(pos, delCount, ...Array.from(entry.ins))
+  return chars.join('')
+}
+
+function applyLegacyHistoryEntry(currentText, entry) {
+  if (typeof entry?.text !== 'string') {
+    return null
+  }
+  const op = String(entry?.op || '').toLowerCase()
+  if (!op || op === 'replace' || op === 'snapshot' || op === 'set') {
+    return entry.text
+  }
+  if (op === 'insert') {
+    return `${String(currentText || '')}${entry.text}`
+  }
+  return entry.text
+}
+
+function nextHistoryText(currentText, entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null
+  }
+  if (typeof entry.text === 'string' && !entry.op) {
+    return entry.text
+  }
+  return applyDeltaEntry(currentText, entry) ?? applyLegacyHistoryEntry(currentText, entry)
+}
+
+function historyEntryTime(entry, fallbackT) {
+  const rawT = Number(entry?.t)
+  if (Number.isFinite(rawT) && rawT >= 0) {
+    return rawT
+  }
+  return fallbackT
+}
+
+export function latestTextFromHistory(session = {}) {
+  const raw = Array.isArray(session?.doc_history) ? session.doc_history : []
+  let currentText = ''
+  let sawHistory = false
+
+  raw.forEach((entry) => {
+    const nextText = nextHistoryText(currentText, entry)
+    if (typeof nextText !== 'string') {
+      return
+    }
+    currentText = nextText
+    sawHistory = true
+  })
+
+  if (sawHistory) {
+    return currentText
+  }
+  return String(session?.doc_text || '')
+}
+
 function renderPlainTextHtml(markdown) {
   const text = String(markdown || '')
   if (!text) return ''
@@ -485,7 +550,7 @@ export function buildAttributedDocument(session = {}) {
   const originWallMs = getReplayOriginWallMs(session)
   const sortedHistory = history
     .slice()
-    .sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
+    .sort((a, b) => historyEntryTime(a, 0) - historyEntryTime(b, 0))
 
   let chars = []
   let latestRawT = 0
@@ -528,27 +593,23 @@ export function buildAttributedDocument(session = {}) {
   }
 
   for (const entry of sortedHistory) {
-    if (!entry || typeof entry !== 'object') {
-      continue
-    }
+    const rawT = Math.max(0, historyEntryTime(entry, latestRawT + 1))
+    const nextText = nextHistoryText(chars.map((item) => item.char).join(''), entry)
 
-    const rawT = Math.max(0, Number(entry.t) || 0)
-
-    if (typeof entry.text === 'string') {
-      applySnapshot(entry.text, rawT)
-      continue
-    }
-
-    if (Number.isInteger(entry.pos) && typeof entry.ins === 'string') {
-      const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
-      const delCount = typeof entry.del === 'string'
-        ? Array.from(entry.del).length
-        : Math.max(0, Number(entry.del) || 0)
-      chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT)))
+    if (typeof nextText === 'string') {
+      if (applyDeltaEntry(chars.map((item) => item.char).join(''), entry) != null && !entry.op) {
+        const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
+        const delCount = typeof entry.del === 'string'
+          ? Array.from(entry.del).length
+          : Math.max(0, Number(entry.del) || 0)
+        chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT)))
+      } else {
+        applySnapshot(nextText, rawT)
+      }
     }
   }
 
-  const finalText = String(session?.doc_text || '')
+  const finalText = String(session?.doc_text || latestTextFromHistory(session) || '')
   if (chars.map((entry) => entry.char).join('') !== finalText) {
     applySnapshot(finalText, latestRawT)
   }
@@ -646,34 +707,21 @@ export function parseHistory(session, keydowns = []) {
   const raw = Array.isArray(session?.doc_history) ? session.doc_history : []
   const parsed = []
   let currentText = ''
+  let fallbackT = 0
 
   raw
     .slice()
-    .sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0))
+    .sort((a, b) => historyEntryTime(a, 0) - historyEntryTime(b, 0))
     .forEach((entry) => {
-      if (!entry || typeof entry !== 'object') return
-
-      if (typeof entry.text === 'string') {
-        currentText = entry.text
+      const nextText = nextHistoryText(currentText, entry)
+      if (typeof nextText === 'string') {
+        const nextT = historyEntryTime(entry, fallbackT)
+        currentText = nextText
         parsed.push({
-          t: Number(entry.t) || 0,
+          t: nextT,
           text: currentText,
         })
-        return
-      }
-
-      if (Number.isInteger(entry.pos) && typeof entry.ins === 'string') {
-        const chars = Array.from(currentText)
-        const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
-        const del = typeof entry.del === 'string'
-          ? Array.from(entry.del).length
-          : Math.max(0, Number(entry.del) || 0)
-        chars.splice(pos, del, ...Array.from(entry.ins))
-        currentText = chars.join('')
-        parsed.push({
-          t: Number(entry.t) || 0,
-          text: currentText,
-        })
+        fallbackT = nextT + 1
       }
     })
 
@@ -681,7 +729,7 @@ export function parseHistory(session, keydowns = []) {
     return buildSyntheticHistory(session?.doc_text || '', keydowns)
   }
 
-  const finalText = session?.doc_text || parsed[parsed.length - 1]?.text || ''
+  const finalText = session?.doc_text || latestTextFromHistory(session) || parsed[parsed.length - 1]?.text || ''
   if (parsed[parsed.length - 1]?.text !== finalText) {
     parsed.push({
       t: parsed[parsed.length - 1]?.t || 0,

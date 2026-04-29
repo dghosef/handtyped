@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=1",
     "cf:dev": "npx wrangler dev",
     "cf:deploy": "npx wrangler deploy"
   },

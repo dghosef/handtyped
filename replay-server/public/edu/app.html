@@ -14,6 +14,7 @@
     <header class="teacher-topbar">
       <a class="teacher-brand" href="/edu">Handtyped EDU</a>
       <div class="teacher-topbar-actions">
+        <button class="button button-secondary" id="feedback-button" type="button">Send feedback</button>
         <a class="button button-secondary" href="/">Main site</a>
         <button class="button button-secondary" id="logout-button" type="button" hidden>Sign out</button>
       </div>
@@ -73,6 +74,7 @@
               </label>
               <button class="button button-secondary" id="quick-extend-button" type="button">Extend all today</button>
             </div>
+            <div class="muted selection-meta" id="quick-extend-status" hidden></div>
             <button class="button button-secondary" id="delete-assignment-button" type="button">Delete assignment</button>
             <button class="button" id="edit-assignment-button" type="button">Edit assignment</button>
           </div>
@@ -118,6 +120,13 @@
             <input id="session-search-input" type="search" placeholder="Filter by student name" />
           </label>
         </section>
+        <section class="teacher-panel access-request-panel" hidden>
+          <div class="review-card-header">
+            <div class="section-label">Access requests</div>
+            <div class="student-meta">Students can ask to re-enter Handtyped when they are outside the writing window.</div>
+          </div>
+          <div id="access-request-list" class="access-request-list"></div>
+        </section>
         <section class="review-layout" id="review-layout">
           <section class="student-grid" id="session-grid"></section>
           <aside class="teacher-panel review-workspace" id="review-workspace" hidden>
@@ -125,13 +134,14 @@
             <div id="review-workspace-content" hidden>
               <div class="review-workspace-header">
                 <div>
+                  <button class="button button-secondary small-button back-button" id="review-back-button" type="button">Back to students</button>
                   <div class="section-label">Teacher review</div>
                   <h3 id="review-workspace-title">Live draft review</h3>
                   <p class="muted" id="review-workspace-meta"></p>
                 </div>
                 <div class="review-workspace-actions">
                   <div class="review-sync-pill" id="review-sync-status">Saved</div>
-                  <button class="button button-secondary small-button" id="review-close-button" type="button">Close review</button>
+                  <button class="button button-secondary small-button" id="review-close-button" type="button">Back to students</button>
                 </div>
               </div>
 
@@ -204,10 +214,6 @@
                   <span>Teacher comment</span>
                   <textarea id="review-teacher-comment" rows="3" placeholder="Overall feedback for this draft"></textarea>
                 </label>
-                <label>
-                  <span>Suggested revisions</span>
-                  <textarea id="review-suggested-revisions" rows="3" placeholder="Big-picture revision guidance"></textarea>
-                </label>
                 <label class="checkbox-label grading-return-row">
                   <input id="review-returned" type="checkbox" />
                   <span>Return for revision</span>
@@ -223,9 +229,6 @@
               </section>
             </div>
           </aside>
-        </section>
-        <section class="teacher-panel audit-panel" id="assignment-audit-panel">
-          <div id="assignment-audit-list" class="audit-list"></div>
         </section>
       </section>
     </main>
@@ -270,10 +273,6 @@
           <input name="title" type="text" placeholder="Timed essay" required />
         </label>
         <label>
-          <span>Course</span>
-          <select name="course" id="assignment-course-select" required></select>
-        </label>
-        <label>
           <span>Prompt (optional)</span>
           <textarea name="prompt" rows="4" placeholder="Write an in-class response..."></textarea>
         </label>
@@ -305,20 +304,6 @@
           </label>
         </fieldset>
         <fieldset class="form-fieldset">
-          <legend>Temporary access override</legend>
-          <div class="selector-row">
-            <label>
-              <span>Custom access until</span>
-              <input name="temporary_access_until" type="datetime-local" />
-            </label>
-            <div class="temporary-access-actions">
-              <span>Quick actions</span>
-              <input id="temp-access-time" type="time" value="15:00" />
-              <button class="button button-secondary small-button" id="temp-access-time-button" type="button">Set to selected time today</button>
-            </div>
-          </div>
-        </fieldset>
-        <fieldset class="form-fieldset">
           <legend>Rules</legend>
           <label class="checkbox-label">
             <input type="checkbox" name="allow_dictation" />
@@ -333,31 +318,38 @@
             <span>Allow copy and paste inside the student app</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" name="printing_allowed" />
-            <span>Allow printing from the student app</span>
-          </label>
-          <label class="checkbox-label">
             <input type="checkbox" name="export_allowed" />
-            <span>Allow export/download as DOCX, PDF, Markdown, or plain text</span>
+            <span>Allow export or print from the student app</span>
           </label>
           <label class="checkbox-label">
             <input type="checkbox" name="images_allowed" />
             <span>Allow images in the document, including images copied from the study browser</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" name="citations_required" />
-            <span>Require citations before final submission</span>
+            <input type="checkbox" name="show_rubric_to_student" />
+            <span>Let students see the rubric while writing</span>
           </label>
           <label class="checkbox-label">
             <input type="checkbox" name="require_lockdown" checked />
-            <span>Lock the student Mac to Handtyped only while editing</span>
+            <span>Keep students in Handtyped until the writing window ends</span>
           </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="require_permission_to_rejoin" />
+            <span>If a student leaves, they need teacher approval before they can come back</span>
+          </label>
+          <p class="muted linked-assignment-copy">
+            Turn this off if students should be able to leave Handtyped and come back on their own later.
+          </p>
         </fieldset>
         <fieldset class="form-fieldset">
-          <legend>Writing defaults</legend>
+          <legend>Writing setup</legend>
+          <label class="checkbox-label">
+            <input type="checkbox" name="editor_font_locked" />
+            <span>Lock the writing font for this assignment</span>
+          </label>
           <div class="selector-row">
             <label>
-              <span>Font</span>
+              <span>Locked font</span>
               <select name="editor_font_family">
                 <option value="arial" selected>Arial</option>
                 <option value="serif">Serif</option>
@@ -366,16 +358,8 @@
               </select>
             </label>
             <label>
-              <span>Font size</span>
-              <select name="editor_font_size">
-                <option value="16">16 px</option>
-                <option value="18">18 px</option>
-                <option value="20">20 px</option>
-                <option value="22" selected>22 px</option>
-                <option value="24">24 px</option>
-                <option value="28">28 px</option>
-                <option value="32">32 px</option>
-              </select>
+              <span>Locked font size</span>
+              <input name="editor_font_size" type="number" min="10" max="100" step="1" value="12" />
             </label>
           </div>
           <label>
@@ -404,11 +388,18 @@
             <span>Enable the built-in study browser</span>
           </label>
           <label>
+            <span>URL policy</span>
+            <select name="browser_mode">
+              <option value="whitelist">Allow only these URLs</option>
+              <option value="blacklist">Allow all except these URLs</option>
+            </select>
+          </label>
+          <label>
             <span>Home URL</span>
             <input name="browser_home_url" type="url" placeholder="https://example.com" />
           </label>
           <label>
-            <span>Allowed domains (one per line)</span>
+            <span>URLs or domains (one per line)</span>
             <textarea name="browser_allowed_domains" rows="3" placeholder="example.com&#10;wikipedia.org"></textarea>
           </label>
         </fieldset>
@@ -419,15 +410,6 @@
             Leave this empty to assign the work to the whole class, or pick specific students for differentiated assignments.
           </p>
           <div id="assignment-assigned-options" class="linked-assignment-list"></div>
-          <label>
-            <span>Additional student names (one per line)</span>
-            <textarea
-              id="assignment-assigned-extra"
-              name="assigned_students_extra"
-              rows="3"
-              placeholder="Ada Lovelace&#10;Grace Hopper"
-            ></textarea>
-          </label>
         </fieldset>
         <fieldset class="form-fieldset">
           <legend>Student Overrides</legend>
@@ -435,7 +417,6 @@
           <p class="muted linked-assignment-copy">
             The defaults above apply to everyone. Add an override card only for students who should get different settings.
           </p>
-          <datalist id="assignment-student-override-suggestions"></datalist>
           <div id="assignment-student-override-list" class="student-override-list"></div>
           <button class="button button-secondary small-button" id="assignment-add-student-override" type="button">
             Add student override
@@ -449,14 +430,52 @@
           </p>
           <div id="assignment-linked-options" class="linked-assignment-list"></div>
         </fieldset>
-        <div class="form-callout" id="assignment-validation-panel">
-          <div class="section-label">Checks</div>
-          <ul id="assignment-validation-errors" class="validation-list"></ul>
-          <ul id="assignment-validation-warnings" class="validation-list validation-warnings"></ul>
-        </div>
         <div class="form-actions">
           <button class="button" id="assignment-form-submit" type="submit">Create assignment</button>
           <button class="button button-secondary" id="assignment-form-cancel" type="button" hidden>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="feedback-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="section-label">Support</div>
+          <h2>Send feedback</h2>
+        </div>
+        <button class="button button-secondary modal-close" type="button" data-close-modal="feedback-modal">Close</button>
+      </div>
+      <form class="inline-form" id="feedback-form">
+        <label>
+          <span>What is this about?</span>
+          <select name="category">
+            <option value="Bug report">Bug report</option>
+            <option value="Teacher feedback">Teacher feedback</option>
+            <option value="Student workflow">Student workflow</option>
+            <option value="Feature request">Feature request</option>
+            <option value="Account or access">Account or access</option>
+          </select>
+        </label>
+        <label>
+          <span>Subject</span>
+          <input name="subject" type="text" placeholder="What happened?" required />
+        </label>
+        <label>
+          <span>Message</span>
+          <textarea name="message" rows="6" placeholder="Tell us what you were doing, what you expected, and what got in the way." required></textarea>
+        </label>
+        <label>
+          <span>Your email (optional)</span>
+          <input name="reply_to" type="email" placeholder="you@school.edu" />
+        </label>
+        <div class="feedback-form-note">
+          This opens your email app and sends the draft to <strong>support@handtyped.app</strong>.
+        </div>
+        <div class="form-actions">
+          <button class="button" type="submit">Open email draft</button>
+          <button class="button button-secondary" id="feedback-form-cancel" type="button">Cancel</button>
         </div>
       </form>
     </div>

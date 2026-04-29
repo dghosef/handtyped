@@ -732,7 +732,6 @@ describe('worker host routing', () => {
         body: JSON.stringify({
           rubric_scores: { claim: 3, evidence: 4 },
           teacher_comment: 'Push the thesis one step further.',
-          suggested_revisions: 'Tighten the causal language in the opening sentence.',
           returned_for_revision: true,
           grade_label: 'A-',
           grade_score: 91,
@@ -1339,6 +1338,288 @@ describe('worker per-student assignment extensions', () => {
           student_temporary_access_until: {},
         },
       ],
+    })
+  })
+
+  it('stores student access requests and clears them when a teacher approves closed access', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `REQ${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'After Hours',
+          teacher_name: 'Joseph Tan',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+    expect(classroomRes.status).toBe(201)
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Exit Ticket',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+        }),
+      }),
+      env,
+    )
+    const assignment = await assignmentRes.json()
+    expect(assignmentRes.status).toBe(201)
+
+    const accessRequestRes = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}/access-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_name: 'Ada Lovelace' }),
+      }),
+      env,
+    )
+    expect(accessRequestRes.status).toBe(201)
+
+    const teacherReadRes = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(teacherReadRes.status).toBe(200)
+    expect(await teacherReadRes.json()).toMatchObject({
+      student_access_requests: {
+        'ada lovelace': {
+          student_name: 'Ada Lovelace',
+        },
+      },
+    })
+
+    const approvedUntil = '2026-04-28T18:30:00.000Z'
+    const approveRes = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          student_access_requests: {},
+          student_temporary_access_until: {
+            'ada lovelace': approvedUntil,
+          },
+        }),
+      }),
+      env,
+    )
+    expect(approveRes.status).toBe(200)
+
+    const studentConfigRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    expect(studentConfigRes.status).toBe(200)
+    expect(await studentConfigRes.json()).toMatchObject({
+      assignments: [
+        {
+          id: assignment.id,
+          temporary_access_until: approvedUntil,
+          access_revoked: false,
+          student_access_request: null,
+        },
+      ],
+    })
+  })
+
+  it('surfaces per-student instant access revocation in student config', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `REV${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'English 12',
+          teacher_name: 'Ms. Keating',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+    expect(classroomRes.status).toBe(201)
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'In-class close read',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          temporary_access_until: '2099-01-01T23:59:59.000Z',
+          student_access_revoked: {
+            'ada lovelace': true,
+          },
+        }),
+      }),
+      env,
+    )
+    const assignment = await assignmentRes.json()
+    expect(assignmentRes.status).toBe(201)
+
+    const revokedConfigRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    expect(revokedConfigRes.status).toBe(200)
+    expect(await revokedConfigRes.json()).toMatchObject({
+      assignments: [
+        {
+          id: assignment.id,
+          access_revoked: true,
+          student_access_revoked: {},
+        },
+      ],
+    })
+
+    const openConfigRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Grace Hopper')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    expect(openConfigRes.status).toBe(200)
+    expect(await openConfigRes.json()).toMatchObject({
+      assignments: [
+        {
+          id: assignment.id,
+          access_revoked: false,
+        },
+      ],
+    })
+  })
+
+  it('returns lightweight live summaries and direct single-assignment student config', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+    const joinCode = `LIV${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'English 10',
+          teacher_name: 'Ms. Keating',
+          join_code: joinCode,
+        }),
+      }),
+      env,
+    )
+    const classroom = await classroomRes.json()
+    expect(classroomRes.status).toBe(201)
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Live Draft',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+        }),
+      }),
+      env,
+    )
+    const assignment = await assignmentRes.json()
+    expect(assignmentRes.status).toBe(201)
+
+    const liveSessionRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `Ada Lovelace:${assignment.id}`,
+          assignment_id: assignment.id,
+          assignment_title: assignment.title,
+          course: assignment.course,
+          classroom: classroom.name,
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft opening paragraph',
+          document_history: [{ t: 1, ins: 'Draft', del: '', pos: 0 }],
+          focus_events: [{ t: 1, state: 'focused' }],
+          url_history: [
+            { url: 'https://example.com/1' },
+            { url: 'https://example.com/2' },
+            { url: 'https://example.com/3' },
+            { url: 'https://example.com/4' },
+            { url: 'https://example.com/5' },
+          ],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: new Date().toISOString(),
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+          updated_at: new Date().toISOString(),
+        }),
+      }),
+      env,
+    )
+    expect(liveSessionRes.status).toBe(201)
+
+    const summariesRes = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}/live-summaries`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(summariesRes.status).toBe(200)
+    const summaries = await summariesRes.json()
+    expect(summaries.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `Ada Lovelace:${assignment.id}`,
+          assignment_id: assignment.id,
+          current_text: 'Draft opening paragraph',
+          recent_edit_count: expect.any(Number),
+        }),
+      ]),
+    )
+    expect(summaries.live_sessions[0].document_history).toBeUndefined()
+    expect(summaries.live_sessions[0].url_history).toHaveLength(4)
+
+    const studentAssignmentRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+        { method: 'GET' },
+      ),
+      env,
+    )
+    expect(studentAssignmentRes.status).toBe(200)
+    expect(await studentAssignmentRes.json()).toMatchObject({
+      assignment: {
+        id: assignment.id,
+        access_revoked: false,
+      },
     })
   })
 

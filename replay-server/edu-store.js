@@ -813,12 +813,62 @@ export function createD1EduStore(db) {
   let schemaReady = null
   let maintenanceRanAt = 0
 
+  async function schemaColumns() {
+    const response = await db.prepare('PRAGMA table_info(edu_records)').all()
+    return new Set((response.results || []).map((row) => String(row.name || '')))
+  }
+
+  async function ensureColumn(name, sqlType) {
+    const columns = await schemaColumns()
+    if (!columns.has(name)) {
+      await db.prepare(`ALTER TABLE edu_records ADD COLUMN ${name} ${sqlType}`).run()
+    }
+  }
+
+  async function backfillLegacyColumns() {
+    await db
+      .prepare(
+        `UPDATE edu_records
+         SET tenant_id = COALESCE(NULLIF(tenant_id, ''), NULLIF(json_extract(json, '$.tenant_id'), ''), ?),
+             classroom_id = COALESCE(
+               NULLIF(classroom_id, ''),
+               NULLIF(json_extract(json, '$.classroom_id'), ''),
+               NULLIF(json_extract(json, '$.assignment_id'), '')
+             ),
+             student_key = COALESCE(
+               NULLIF(student_key, ''),
+               lower(trim(COALESCE(json_extract(json, '$.student_name'), '')))
+             ),
+             parent_id = COALESCE(
+               NULLIF(parent_id, ''),
+               NULLIF(json_extract(json, '$.live_session_id'), ''),
+               NULLIF(json_extract(json, '$.replay_session_id'), '')
+             )
+         WHERE tenant_id IS NULL
+            OR tenant_id = ''
+            OR classroom_id IS NULL
+            OR classroom_id = ''
+            OR student_key IS NULL
+            OR student_key = ''
+            OR parent_id IS NULL
+            OR parent_id = ''`,
+      )
+      .bind(DEFAULT_TENANT_ID)
+      .run()
+  }
+
   async function ensureSchema() {
     if (!schemaReady) {
       schemaReady = (async () => {
-        for (const statement of D1_SCHEMA_STATEMENTS) {
+        await db.prepare(D1_SCHEMA_STATEMENTS[0]).run()
+        await ensureColumn('tenant_id', 'TEXT')
+        await ensureColumn('student_key', 'TEXT')
+        await ensureColumn('parent_id', 'TEXT')
+        await ensureColumn('expires_at', 'TEXT')
+        for (const statement of D1_SCHEMA_STATEMENTS.slice(1)) {
           await db.prepare(statement).run()
         }
+        await backfillLegacyColumns()
       })()
     }
     await schemaReady

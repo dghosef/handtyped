@@ -31,8 +31,11 @@ class FakeD1PreparedStatement {
 }
 
 class FakeD1Database {
-  constructor() {
+  constructor({ legacySchema = false } = {}) {
     this.records = new Map()
+    this.columns = legacySchema
+      ? ['kind', 'id', 'updated_at', 'json', 'email', 'join_code', 'classroom_id']
+      : ['kind', 'id', 'updated_at', 'json', 'tenant_id', 'email', 'join_code', 'classroom_id', 'student_key', 'parent_id', 'expires_at']
   }
 
   async exec(_sql) {}
@@ -54,6 +57,23 @@ class FakeD1Database {
       return
     }
 
+    if (sql.startsWith('ALTER TABLE edu_records ADD COLUMN ')) {
+      const match = sql.match(/^ALTER TABLE edu_records ADD COLUMN ([a-z_]+) /i)
+      if (!match) {
+        throw new Error(`Unsupported ALTER TABLE SQL in test: ${sql}`)
+      }
+      const [, column] = match
+      if (!this.columns.includes(column)) {
+        this.columns.push(column)
+      }
+      for (const row of this.records.values()) {
+        if (!(column in row)) {
+          row[column] = null
+        }
+      }
+      return
+    }
+
     if (sql.includes('INSERT INTO edu_records')) {
       const [kind, id, updated_at, json, tenant_id, email, join_code, classroom_id, student_key, parent_id, expires_at] = args
       this.records.set(this.key(kind, id), {
@@ -69,6 +89,18 @@ class FakeD1Database {
         parent_id,
         expires_at,
       })
+      return
+    }
+
+    if (sql.startsWith('UPDATE edu_records')) {
+      const [defaultTenantId] = args
+      for (const row of this.records.values()) {
+        const parsed = JSON.parse(row.json)
+        row.tenant_id = row.tenant_id || parsed.tenant_id || defaultTenantId
+        row.classroom_id = row.classroom_id || parsed.classroom_id || parsed.assignment_id || null
+        row.student_key = row.student_key || String(parsed.student_name || '').trim().toLowerCase() || null
+        row.parent_id = row.parent_id || parsed.live_session_id || parsed.replay_session_id || null
+      }
       return
     }
 
@@ -92,6 +124,10 @@ class FakeD1Database {
 
   query(sql, args) {
     const records = [...this.records.values()]
+
+    if (sql.startsWith('PRAGMA table_info(edu_records)')) {
+      return this.columns.map((name, index) => ({ cid: index, name }))
+    }
 
     if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind] = args
@@ -210,6 +246,53 @@ describe('createD1EduStore', () => {
 
     await store.deleteTeacherSession('session-1')
     await expect(store.getTeacherSession('session-1')).resolves.toBeNull()
+  })
+
+  it('upgrades a legacy D1 schema and backfills tenant-aware columns', async () => {
+    const db = new FakeD1Database({ legacySchema: true })
+    db.records.set(db.key('classroom', 'legacy-class'), {
+      kind: 'classroom',
+      id: 'legacy-class',
+      updated_at: '2026-04-28T21:00:00.000Z',
+      json: JSON.stringify(
+        buildClassroom({
+          id: 'legacy-class',
+          name: 'Legacy English',
+          join_code: 'LEGACY1',
+        }),
+      ),
+      email: null,
+      join_code: 'LEGACY1',
+      classroom_id: null,
+    })
+    db.records.set(db.key('assignment', 'legacy-assignment'), {
+      kind: 'assignment',
+      id: 'legacy-assignment',
+      updated_at: '2026-04-28T21:05:00.000Z',
+      json: JSON.stringify(
+        buildAssignment({
+          id: 'legacy-assignment',
+          title: 'Legacy essay',
+          classroom_id: 'legacy-class',
+          classroom_name: 'Legacy English',
+        }),
+      ),
+      email: null,
+      join_code: null,
+      classroom_id: 'legacy-class',
+    })
+
+    const store = createD1EduStore(db)
+    const classrooms = await store.listClassrooms()
+    const assignments = await store.listAssignments()
+
+    expect(classrooms).toHaveLength(1)
+    expect(assignments).toHaveLength(1)
+    expect(db.columns).toEqual(
+      expect.arrayContaining(['tenant_id', 'student_key', 'parent_id', 'expires_at']),
+    )
+    expect(db.records.get(db.key('classroom', 'legacy-class')).tenant_id).toBe('tenant_demo')
+    expect(db.records.get(db.key('assignment', 'legacy-assignment')).tenant_id).toBe('tenant_demo')
   })
 
   it('deletes classrooms and assignments by id', async () => {

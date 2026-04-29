@@ -6,12 +6,15 @@ This replay server can run for free on Cloudflare using:
 - a Worker in `worker.js`
 - a KV namespace bound as `SESSIONS` for replay session storage
 - a D1 database bound as `EDU_DB` for classroom, assignment, teacher, live-session, and EDU replay metadata
+- a Durable Object bound as `EDU_REALTIME` for teacher/student SSE fanout
+- a scheduled Worker trigger for EDU retention cleanup
 
 Production hostnames:
 
 - `https://handtyped.app`
 - `https://www.handtyped.app`
 - `https://replay.handtyped.app`
+- `https://edu.handtyped.app`
 
 ## One-time setup
 
@@ -20,9 +23,13 @@ Production hostnames:
 3. `npx wrangler login`
 4. `npx wrangler kv namespace create SESSIONS`
 5. `npx wrangler d1 create handtyped-edu`
-6. Copy the returned IDs into [wrangler.toml](/Users/dghosef/handtyped/handtyped/replay-server/wrangler.toml):
+6. Copy the returned IDs into [wrangler.toml](/Users/dghosef/handtyped/handtyped/replay-server/wrangler.toml) and keep the Durable Object plus cron sections:
 
 ```toml
+[[durable_objects.bindings]]
+name = "EDU_REALTIME"
+class_name = "EduRealtimeHub"
+
 [[kv_namespaces]]
 binding = "SESSIONS"
 id = "your-production-namespace-id"
@@ -33,6 +40,9 @@ binding = "EDU_DB"
 database_name = "handtyped-edu"
 database_id = "your-production-d1-database-id"
 preview_database_id = "your-preview-d1-database-id"
+
+[triggers]
+crons = ["*/15 * * * *"]
 ```
 
 7. Apply the EDU schema:
@@ -40,6 +50,8 @@ preview_database_id = "your-preview-d1-database-id"
 ```bash
 npx wrangler d1 migrations apply handtyped-edu
 ```
+
+8. Deploy the Worker once so Cloudflare provisions the `EduRealtimeHub` Durable Object class from the migration block in [wrangler.toml](/Users/dghosef/handtyped/handtyped/replay-server/wrangler.toml).
 
 If you prefer, recent Wrangler versions can also provision resources automatically when IDs are omitted. See Cloudflare’s Wrangler configuration docs:
 - [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
@@ -65,10 +77,19 @@ The deployed Worker should serve production traffic from `https://handtyped.app`
 - `POST /api/sessions` stores a replay session in KV
 - `GET /api/sessions/:id` loads a session from KV
 - EDU classroom, assignment, teacher auth session, live-session, and EDU replay metadata live in D1 when `EDU_DB` is bound
+- `GET /api/edu/realtime` and `GET /api/edu/student/realtime` stream live updates over SSE through the Durable Object hub
+- the scheduled trigger runs retention cleanup for expired teacher sessions, live sessions, replay tails, and audit data
 - `GET /api/health` reports replay upload health, trust source, and recent failure counts
 - `GET /:id` serves `public/replay.html`
 - `GET /replay/:id` remains as a compatibility alias
 - all static assets in `public/` are served by Cloudflare assets
+
+## EDU architecture notes
+
+- D1 is the durable source of truth for classrooms, assignments, audits, and replay metadata.
+- Live teacher/student updates are pushed through `EDU_REALTIME` instead of relying on high-frequency polling.
+- Dashboard summaries are materialized in D1 so teacher home/dashboard loads do not need broad scans.
+- Record-level retention is driven by `expires_at`; opportunistic cleanup still runs on EDU traffic, and the cron trigger guarantees cleanup during quiet periods too.
 
 ## Trust model
 

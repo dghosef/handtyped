@@ -343,6 +343,36 @@
         </fieldset>
         <fieldset class="form-fieldset">
           <legend>Writing setup</legend>
+          <div class="teacher-editor-field">
+            <div class="teacher-editor-head">
+              <span>Default document</span>
+            </div>
+            <div class="teacher-editor-toolbar" id="starter-document-toolbar">
+              <button class="button button-secondary small-button" type="button" data-starter-command="bold">Bold</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="italic">Italic</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="underline">Underline</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="h1">H1</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="h2">H2</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="bullet">Bullets</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="number">Numbers</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="quote">Quote</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="clear">Clear</button>
+            </div>
+            <div
+              id="starter-document-editor"
+              class="teacher-editor-surface"
+              contenteditable="true"
+              spellcheck="true"
+              aria-label="Default document editor"
+              data-placeholder="Add the starter text students should see when they open the assignment."
+            ></div>
+            <textarea
+              name="starter_document"
+              id="starter-document-field"
+              rows="8"
+              hidden
+            ></textarea>
+          </div>
           <label class="checkbox-label">
             <input type="checkbox" name="editor_font_locked" />
             <span>Lock the writing font for this assignment</span>
@@ -359,7 +389,9 @@
             </label>
             <label>
               <span>Locked font size</span>
-              <input name="editor_font_size" type="number" min="10" max="100" step="1" value="12" />
+              <select name="editor_font_size">
+                <option value="12" selected>12 px</option>
+              </select>
             </label>
           </div>
           <label>
@@ -429,6 +461,15 @@
             Students can open saved work from these earlier assignments inside the reference pane while writing this one.
           </p>
           <div id="assignment-linked-options" class="linked-assignment-list"></div>
+          <div class="section-label">Reference PDFs</div>
+          <p class="muted linked-assignment-copy">
+            Upload PDFs students can open in the reference pane while they write.
+          </p>
+          <label>
+            <span>Add PDF reference</span>
+            <input id="assignment-reference-upload" type="file" accept="application/pdf,.pdf" multiple />
+          </label>
+          <div id="assignment-reference-document-list" class="linked-assignment-list"></div>
         </fieldset>
         <div class="form-actions">
           <button class="button" id="assignment-form-submit" type="submit">Create assignment</button>

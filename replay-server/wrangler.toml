@@ -3,6 +3,10 @@ main = "./worker.js"
 compatibility_date = "2026-03-31"
 compatibility_flags = ["nodejs_compat"]
 
+[[durable_objects.bindings]]
+name = "EDU_REALTIME"
+class_name = "EduRealtimeHub"
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
@@ -34,3 +38,10 @@ custom_domain = true
 [[routes]]
 pattern = "edu.handtyped.app"
 custom_domain = true
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EduRealtimeHub"]
+
+[triggers]
+crons = ["*/15 * * * *"]

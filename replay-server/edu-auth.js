@@ -1,4 +1,4 @@
-import { buildTeacherAuthSession, buildTeacherSessionRecord, normalizeTeacherEmail } from './edu-schema.js'
+import { buildTeacher, buildTeacherAuthSession, buildTeacherSessionRecord, normalizeTeacherEmail } from './edu-schema.js'
 import { verifyTeacherPassword } from './edu-password.js'
 
 export const EDU_SESSION_COOKIE = 'edu_teacher_session'
@@ -73,8 +73,33 @@ export async function authenticateTeacherWithGoogle(store, profile) {
   return teacher
 }
 
+export async function createTeacherAccount(store, { name, email, password }) {
+  const normalizedEmail = normalizeTeacherEmail(email)
+  const normalizedPassword = String(password || '')
+  const normalizedName = String(name || '').trim()
+  if (!normalizedEmail || !normalizedPassword || !normalizedName) {
+    throw new Error('Name, email, and password are required')
+  }
+  if (normalizedPassword.length < 8) {
+    throw new Error('Password must be at least 8 characters')
+  }
+  const existing = await store.getTeacherByEmail(normalizedEmail)
+  if (existing) {
+    throw new Error('A teacher account with that email already exists')
+  }
+  const teacher = buildTeacher({
+    name: normalizedName,
+    email: normalizedEmail,
+    password: normalizedPassword,
+    access_code: normalizedPassword,
+  })
+  await store.putTeacher(teacher)
+  return teacher
+}
+
 export async function createTeacherSession(store, teacher, provider = 'password') {
   const record = buildTeacherSessionRecord({
+    tenant_id: teacher.tenant_id,
     teacher_id: teacher.id,
     teacher_name: teacher.name,
     teacher_email: teacher.email,
@@ -102,6 +127,7 @@ export async function getTeacherSession(store, rawCookieHeader) {
 
   return buildTeacherAuthSession({
     authenticated: true,
+    tenant_id: record.tenant_id || null,
     teacher_id: record.teacher_id,
     teacher_name: record.teacher_name,
     teacher_email: record.teacher_email,

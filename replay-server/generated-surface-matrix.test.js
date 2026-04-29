@@ -28,6 +28,11 @@ import {
   getTeacherSession,
   teacherSessionCookie,
 } from "./edu-auth.js";
+import {
+  buildTeacherPasswordFields,
+  hashTeacherPasswordLegacy,
+  verifyTeacherPassword,
+} from "./edu-password.js";
 import { buildReplayUrl } from "./session-store.js";
 
 function makeStore({
@@ -137,7 +142,30 @@ describe("generated edu schema matrix", () => {
       expect(teacher.email).toBe(value.expected);
       expect(teacher.password_hash).toBeTruthy();
       expect(teacher.password_salt).toBeTruthy();
+      expect(teacher.password_hash).toHaveLength(128);
     });
+  });
+
+  it("teacher password verification supports current and legacy hashes", () => {
+    const current = buildTeacherPasswordFields({ password: "secret-123" });
+    expect(current.password_hash).toHaveLength(128);
+    expect(
+      verifyTeacherPassword(
+        {
+          password_hash: current.password_hash,
+          password_salt: current.password_salt,
+        },
+        "secret-123",
+      ),
+    ).toBe(true);
+
+    const legacySalt = "legacy-salt";
+    const legacy = {
+      password_hash: hashTeacherPasswordLegacy("secret-123", legacySalt),
+      password_salt: legacySalt,
+    };
+    expect(verifyTeacherPassword(legacy, "secret-123")).toBe(true);
+    expect(verifyTeacherPassword(legacy, "wrong-pass")).toBe(false);
   });
 
   const policyModes = [

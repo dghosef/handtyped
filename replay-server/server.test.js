@@ -290,6 +290,45 @@ describe('teacher auth', () => {
     })
   })
 
+  it('creates a teacher account with email and password', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Ms. Signup',
+        email: 'signup-teacher@edu.handtyped.app',
+        password: 'longenoughpassword',
+      }),
+    })
+    const body = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(res.headers.get('set-cookie') || '').toContain('edu_teacher_session=')
+    expect(body).toMatchObject({
+      authenticated: true,
+      teacher_email: 'signup-teacher@edu.handtyped.app',
+      provider: 'password',
+    })
+  })
+
+  it('rejects duplicate teacher signup emails', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Teacher',
+        email: 'teacher@edu.handtyped.app',
+        password: 'longenoughpassword',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({
+      authenticated: false,
+      error: 'A teacher account with that email already exists',
+    })
+  })
+
   it('signs in a teacher with Google', async () => {
     const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
       method: 'POST',
@@ -872,7 +911,7 @@ describe('edu teacher and student flow', () => {
       ]),
     )
 
-    const sinceCursor = firstDashboard.body.updated_at
+    const sinceCursor = new Date(Date.parse(firstDashboard.body.updated_at) - 1).toISOString()
 
     const secondPublish = await request('POST', '/api/edu/live-sessions', {
       id: liveSessionId,
@@ -1784,6 +1823,122 @@ describe('edu teacher and student flow', () => {
       join_code: joinCode.toUpperCase(),
     })
   })
+
+  it('rejects duplicate classroom names and assignment titles across create and rename flows', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const firstClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'English 11',
+        teacher_name: 'Ms. Keating',
+        join_code: `NAM${shortId(5)}`,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(firstClassroom.status).toBe(201)
+
+    const duplicateClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: '  english   11 ',
+        teacher_name: 'Ms. Keating',
+        join_code: `NMB${shortId(5)}`,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(duplicateClassroom.status).toBe(409)
+    expect(duplicateClassroom.body).toMatchObject({
+      error: 'Classroom name already in use',
+      name: '  english   11 ',
+    })
+
+    const secondClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'History 9',
+        teacher_name: 'Ms. Keating',
+        join_code: `NMC${shortId(5)}`,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(secondClassroom.status).toBe(201)
+
+    const duplicateClassroomRename = await request(
+      'PUT',
+      `/api/edu/classrooms/${secondClassroom.body.id}`,
+      {
+        name: '  ENGLISH 11  ',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(duplicateClassroomRename.status).toBe(409)
+    expect(duplicateClassroomRename.body).toMatchObject({
+      error: 'Classroom name already in use',
+      name: '  ENGLISH 11  ',
+    })
+
+    const firstAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Rhetorical Analysis',
+        course: firstClassroom.body.name,
+        classroom_id: firstClassroom.body.id,
+        classroom_name: firstClassroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(firstAssignment.status).toBe(201)
+
+    const duplicateAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: ' rhetorical   analysis ',
+        course: secondClassroom.body.name,
+        classroom_id: secondClassroom.body.id,
+        classroom_name: secondClassroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(duplicateAssignment.status).toBe(409)
+    expect(duplicateAssignment.body).toMatchObject({
+      error: 'Assignment title already in use',
+      title: ' rhetorical   analysis ',
+    })
+
+    const secondAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Poetry Response',
+        course: secondClassroom.body.name,
+        classroom_id: secondClassroom.body.id,
+        classroom_name: secondClassroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(secondAssignment.status).toBe(201)
+
+    const duplicateAssignmentRename = await request(
+      'PUT',
+      `/api/edu/assignments/${secondAssignment.body.id}`,
+      {
+        title: ' RHETORICAL ANALYSIS ',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(duplicateAssignmentRename.status).toBe(409)
+    expect(duplicateAssignmentRename.body).toMatchObject({
+      error: 'Assignment title already in use',
+      title: ' RHETORICAL ANALYSIS ',
+    })
+  })
 })
 
 describe('POST /api/sessions', () => {
@@ -2431,7 +2586,7 @@ describe('per-student assignment extensions', () => {
       'POST',
       '/api/edu/classrooms',
       {
-        name: 'English 11',
+        name: `English 11 ${joinCode}`,
         teacher_name: 'Joseph Tan',
         join_code: joinCode,
       },
@@ -2497,7 +2652,7 @@ describe('per-student assignment extensions', () => {
       'POST',
       '/api/edu/classrooms',
       {
-        name: 'English 11',
+        name: `English 11 ${joinCode}`,
         teacher_name: 'Joseph Tan',
         join_code: joinCode,
       },
@@ -2587,6 +2742,68 @@ describe('per-student assignment extensions', () => {
         browser_enabled: true,
       },
     })
+  })
+
+  it('persists assignment PDF references into student config responses', async () => {
+    const joinCode = `PDF${shortId(5)}`
+    const cookie = (await teacherLogin()).cookie
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: `English 11 ${joinCode}`,
+        teacher_name: 'Joseph Tan',
+        join_code: joinCode,
+      },
+      { Cookie: cookie },
+    )
+
+    expect(classroom.status).toBe(201)
+
+    const created = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Primary sources',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        reference_documents: [
+          {
+            title: 'Speech Packet',
+            mime_type: 'application/pdf',
+            data_url: 'data:application/pdf;base64,JVBERi0xLjQK',
+            size_bytes: 1234,
+          },
+        ],
+      },
+      { Cookie: cookie },
+    )
+
+    expect(created.status).toBe(201)
+    expect(created.body.reference_documents).toEqual([
+      expect.objectContaining({
+        title: 'Speech Packet',
+        mime_type: 'application/pdf',
+        data_url: expect.stringContaining('data:application/pdf;base64,'),
+        size_bytes: 1234,
+      }),
+    ])
+
+    const config = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+
+    expect(config.status).toBe(200)
+    expect(config.body.assignments[0].reference_documents).toEqual([
+      expect.objectContaining({
+        title: 'Speech Packet',
+        mime_type: 'application/pdf',
+        data_url: expect.stringContaining('data:application/pdf;base64,'),
+      }),
+    ])
   })
 })
 

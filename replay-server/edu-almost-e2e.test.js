@@ -1089,4 +1089,245 @@ describe('teacher almost end-to-end workflow', () => {
       },
     })
   })
+
+  it('lets the teacher see each student edit immediately after opening the live review', async () => {
+    const joinCode = `LIV${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Immediate Live Review',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Live review draft',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        assigned_students: ['Ada Lovelace'],
+        prompt: 'Revise live while the teacher watches.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = `live:${randomUUID()}`
+    const drafts = [
+      'The thesis starts here.',
+      'The thesis starts here.\n\nNow the student adds evidence.',
+      'The thesis starts here.\n\nNow the student adds evidence.\n\nFinally the conclusion lands.',
+    ]
+    const histories = [
+      [{ t: 100, pos: 0, del: '', ins: drafts[0] }],
+      [
+        { t: 100, pos: 0, del: '', ins: drafts[0] },
+        { t: 260, pos: drafts[0].length, del: '', ins: '\n\nNow the student adds evidence.' },
+      ],
+      [
+        { t: 100, pos: 0, del: '', ins: drafts[0] },
+        { t: 260, pos: drafts[0].length, del: '', ins: '\n\nNow the student adds evidence.' },
+        { t: 420, pos: drafts[1].length, del: '', ins: '\n\nFinally the conclusion lands.' },
+      ],
+    ]
+    const urls = [
+      [],
+      [
+        {
+          t: 300,
+          url: 'https://example.com/evidence',
+          allowed: true,
+          source: 'embedded_navigation',
+        },
+      ],
+      [
+        {
+          t: 300,
+          url: 'https://example.com/evidence',
+          allowed: true,
+          source: 'embedded_navigation',
+        },
+        {
+          t: 460,
+          url: 'https://example.com/conclusion',
+          allowed: true,
+          source: 'embedded_navigation',
+        },
+      ],
+    ]
+    const activityTimes = [
+      '2026-04-28T17:00:00.000Z',
+      '2026-04-28T17:00:01.000Z',
+      '2026-04-28T17:00:02.000Z',
+    ]
+
+    const firstPublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: drafts[0],
+      document_history: histories[0],
+      current_url: null,
+      current_url_title: null,
+      url_history: urls[0],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: activityTimes[0],
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(firstPublish.status).toBe(201)
+
+    const teacherOpenReview = await request(
+      'GET',
+      `/api/edu/live-replays/${encodeURIComponent(liveSessionId)}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(teacherOpenReview.status).toBe(200)
+    expect(teacherOpenReview.body).toMatchObject({
+      id: liveSessionId,
+      current_text: drafts[0],
+      last_seq: 1,
+      last_activity_at: activityTimes[0],
+    })
+    expect(teacherOpenReview.body.document_history).toEqual(histories[0])
+    expect(teacherOpenReview.body.events.map((event) => event.seq)).toEqual([1])
+
+    const secondPublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: drafts[1],
+      document_history: histories[1],
+      current_url: 'https://example.com/evidence',
+      current_url_title: 'Evidence',
+      url_history: urls[1],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: activityTimes[1],
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(secondPublish.status).toBe(201)
+
+    const firstImmediateUpdate = await request(
+      'GET',
+      `/api/edu/live-replays/${encodeURIComponent(liveSessionId)}/updates?since_seq=1`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(firstImmediateUpdate.status).toBe(200)
+    expect(firstImmediateUpdate.body).toMatchObject({
+      id: liveSessionId,
+      current_text: drafts[1],
+      last_seq: 2,
+      last_activity_at: activityTimes[1],
+      current_url: 'https://example.com/evidence',
+      current_url_title: 'Evidence',
+    })
+    expect(firstImmediateUpdate.body.events).toHaveLength(1)
+    expect(firstImmediateUpdate.body.events[0]).toMatchObject({
+      seq: 2,
+      current_text: drafts[1],
+      document_history_tail: [histories[1][1]],
+      url_history_tail: urls[1],
+    })
+
+    const thirdPublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: drafts[2],
+      document_history: histories[2],
+      current_url: 'https://example.com/conclusion',
+      current_url_title: 'Conclusion',
+      url_history: urls[2],
+      violation_count: 0,
+      violations: [],
+      last_activity_at: activityTimes[2],
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(thirdPublish.status).toBe(201)
+
+    const secondImmediateUpdate = await request(
+      'GET',
+      `/api/edu/live-replays/${encodeURIComponent(liveSessionId)}/updates?since_seq=2`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(secondImmediateUpdate.status).toBe(200)
+    expect(secondImmediateUpdate.body).toMatchObject({
+      id: liveSessionId,
+      current_text: drafts[2],
+      last_seq: 3,
+      last_activity_at: activityTimes[2],
+      current_url: 'https://example.com/conclusion',
+      current_url_title: 'Conclusion',
+    })
+    expect(secondImmediateUpdate.body.events).toHaveLength(1)
+    expect(secondImmediateUpdate.body.events[0]).toMatchObject({
+      seq: 3,
+      current_text: drafts[2],
+      document_history_tail: [histories[2][2]],
+      url_history_tail: [urls[2][1]],
+    })
+
+    const teacherSessionView = await request(
+      'GET',
+      `/api/edu/live-sessions/${encodeURIComponent(liveSessionId)}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(teacherSessionView.status).toBe(200)
+    expect(teacherSessionView.body).toMatchObject({
+      id: liveSessionId,
+      current_text: drafts[2],
+      last_activity_at: activityTimes[2],
+      current_url: 'https://example.com/conclusion',
+      current_url_title: 'Conclusion',
+    })
+
+    const teacherDashboardDelta = await request(
+      'GET',
+      `/api/edu/dashboard/updates?since=${encodeURIComponent(activityTimes[0])}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(teacherDashboardDelta.status).toBe(200)
+    expect(teacherDashboardDelta.body.live_sessions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: liveSessionId,
+          current_text: drafts[2],
+          last_activity_at: activityTimes[2],
+          current_url: 'https://example.com/conclusion',
+          current_url_title: 'Conclusion',
+        }),
+      ]),
+    )
+  })
 })

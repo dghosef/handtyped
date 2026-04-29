@@ -19,6 +19,8 @@ export function nowIso() {
   return new Date().toISOString()
 }
 
+export const DEFAULT_TENANT_ID = 'tenant_demo'
+
 function normalizeStudentOverrideKey(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -211,6 +213,7 @@ export function buildClassroom(input = {}) {
   const now = nowIso()
   return {
     id: input.id || randomId('classroom'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     name: String(input.name || 'Untitled classroom'),
     join_code: String(input.join_code || 'JOINME').toUpperCase(),
     teacher_name: String(input.teacher_name || 'Teacher'),
@@ -225,6 +228,7 @@ export function buildTeacher(input = {}) {
   const passwordFields = buildTeacherPasswordFields(input)
   return {
     id: input.id || randomId('teacher'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     name: String(input.name || 'Teacher'),
     email: normalizeTeacherEmail(input.email || 'teacher@edu.handtyped.app'),
     access_code: String(input.access_code || 'handtyped-edu'),
@@ -265,6 +269,27 @@ export function buildRubricCriterion(input = {}) {
   }
 }
 
+function normalizeReferenceDocuments(input) {
+  if (!Array.isArray(input)) {
+    return []
+  }
+  return input
+    .map((item = {}) => {
+      const dataUrl = String(item.data_url || '').trim()
+      if (!/^data:application\/pdf(;base64)?,/i.test(dataUrl)) {
+        return null
+      }
+      return {
+        id: item.id || randomId('refdoc'),
+        title: String(item.title || 'Reference PDF').trim() || 'Reference PDF',
+        mime_type: 'application/pdf',
+        data_url: dataUrl,
+        size_bytes: Math.max(0, Number(item.size_bytes || 0)),
+      }
+    })
+    .filter(Boolean)
+}
+
 export function buildAssignment(input = {}) {
   const now = nowIso()
   const linkedAssignmentIds = Array.isArray(input.linked_assignment_ids)
@@ -275,6 +300,7 @@ export function buildAssignment(input = {}) {
     : []
   return {
     id: input.id || randomId('assignment'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     title: String(input.title || 'Untitled assignment'),
     course: String(input.course || 'English'),
     classroom_id: input.classroom_id ?? null,
@@ -320,6 +346,7 @@ export function buildAssignment(input = {}) {
     },
     assigned_students: assignedStudents,
     linked_assignment_ids: linkedAssignmentIds,
+    reference_documents: normalizeReferenceDocuments(input.reference_documents),
     rubric: Array.isArray(input.rubric)
       ? input.rubric.map(buildRubricCriterion).filter((criterion) => criterion.title.trim())
       : [],
@@ -373,6 +400,7 @@ function normalizeInlineAnnotation(input = {}) {
 export function buildLiveSession(input = {}) {
   return {
     id: input.id || randomId('live'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     assignment_id: String(input.assignment_id || ''),
     assignment_title: String(input.assignment_title || ''),
     course: String(input.course || ''),
@@ -438,6 +466,7 @@ export function buildLiveSessionSummary(input = {}) {
       : 0
   return {
     id: session.id,
+    tenant_id: session.tenant_id,
     assignment_id: session.assignment_id,
     assignment_title: session.assignment_title,
     course: session.course,
@@ -465,6 +494,7 @@ export function buildLiveReplayHead(input = {}) {
   const now = nowIso()
   return {
     id: input.id || randomId('live_replay'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     live_session_id: String(input.live_session_id || input.id || ''),
     replay_session_id: input.replay_session_id ?? null,
     assignment_id: String(input.assignment_id || ''),
@@ -514,6 +544,7 @@ export function buildLiveReplayEvent(input = {}) {
   const now = nowIso()
   return {
     id: input.id || randomId('live_replay_event'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     live_session_id: String(input.live_session_id || ''),
     replay_session_id: input.replay_session_id ?? null,
     assignment_id: String(input.assignment_id || ''),
@@ -536,6 +567,7 @@ export function buildAssignmentAudit(input = {}) {
   const now = nowIso()
   return {
     id: input.id || randomId('assignment_audit'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     assignment_id: String(input.assignment_id || ''),
     classroom_id: input.classroom_id ?? null,
     assignment_title: String(input.assignment_title || ''),
@@ -554,6 +586,7 @@ export function buildAssignmentAudit(input = {}) {
 export function buildEduReplay(input = {}) {
   return {
     id: input.id || randomId('edu_replay'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     live_session_id: String(input.live_session_id || ''),
     assignment_id: String(input.assignment_id || ''),
     assignment_title: String(input.assignment_title || ''),
@@ -588,6 +621,7 @@ export function buildTeacherSessionRecord(input = {}) {
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
   return {
     id: input.id || randomId('teacher_session'),
+    tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
     teacher_id: String(input.teacher_id || ''),
     teacher_name: String(input.teacher_name || 'Teacher'),
     teacher_email: normalizeTeacherEmail(input.teacher_email || ''),
@@ -600,6 +634,7 @@ export function buildTeacherSessionRecord(input = {}) {
 export function buildTeacherAuthSession(input = {}) {
   return {
     authenticated: Boolean(input.authenticated),
+    tenant_id: input.tenant_id ?? null,
     teacher_id: input.teacher_id ?? null,
     teacher_name: input.teacher_name ?? null,
     teacher_email: input.teacher_email ?? null,

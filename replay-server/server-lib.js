@@ -11,6 +11,7 @@ import { parseReplayAttestation, buildReplayUrl } from './session-store.js'
 import { parseTrustedSignerAllowlist } from './trusted-signers.js'
 import { createReplayGuardrails, resolveReplayUploadRateLimit } from './guardrails.js'
 import {
+  DEFAULT_TENANT_ID,
   buildAssignment,
   buildClassroom,
   buildEduReplay,
@@ -32,6 +33,7 @@ import {
 import {
   authenticateTeacher,
   authenticateTeacherWithGoogle,
+  createTeacherAccount,
   clearTeacherSessionCookie,
   createTeacherSession,
   destroyTeacherSession,
@@ -42,7 +44,11 @@ import { verifyGoogleIdToken } from './edu-google-auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PUBLIC_ORIGIN = process.env.REPLAY_SERVER_PUBLIC_ORIGIN || 'https://replay.handtyped.app'
-const RESERVED_REPLAY_ROOTS = new Set(['api', 'replay'])
+  const RESERVED_REPLAY_ROOTS = new Set(['api', 'replay'])
+
+function teacherTenantId(session) {
+  return session?.tenant_id || DEFAULT_TENANT_ID
+}
 
 function loadTrustedSignerAllowlist(config = {}) {
   let getSource = () => 'missing'
@@ -265,6 +271,42 @@ async function findJoinCodeConflict(store, joinCode, excludeClassroomId = null) 
   )
 }
 
+function normalizeEntityName(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+async function findClassroomNameConflict(store, classroomName, excludeClassroomId = null) {
+  const normalizedName = normalizeEntityName(classroomName)
+  if (!normalizedName) {
+    return null
+  }
+
+  const classrooms = await store.listClassrooms()
+  return (
+    classrooms.find(
+      (classroom) =>
+        classroom.id !== excludeClassroomId &&
+        normalizeEntityName(classroom.name) === normalizedName,
+    ) || null
+  )
+}
+
+async function findAssignmentTitleConflict(store, assignmentTitle, excludeAssignmentId = null) {
+  const normalizedTitle = normalizeEntityName(assignmentTitle)
+  if (!normalizedTitle) {
+    return null
+  }
+
+  const assignments = await store.listAssignments()
+  return (
+    assignments.find(
+      (assignment) =>
+        assignment.id !== excludeAssignmentId &&
+        normalizeEntityName(assignment.title) === normalizedTitle,
+    ) || null
+  )
+}
+
 export function createApp(sessionsDir, config = {}) {
   if (!existsSync(sessionsDir)) mkdirSync(sessionsDir, { recursive: true })
   const eduStoreDir = config.eduStoreDir || join(sessionsDir, '..', 'edu-store')
@@ -311,7 +353,7 @@ export function createApp(sessionsDir, config = {}) {
       return res.status(401).json({ error: 'Unauthorized', authenticated: false })
     }
     await ensureEduSeedData(eduStore)
-    res.json(await buildEduDashboard(eduStore))
+    res.json(await buildEduDashboard(eduStore, teacherTenantId(session)))
   })
 
   app.get('/api/edu/dashboard/updates', async (req, res) => {
@@ -320,7 +362,7 @@ export function createApp(sessionsDir, config = {}) {
       return res.status(401).json({ error: 'Unauthorized', authenticated: false })
     }
     await ensureEduSeedData(eduStore)
-    res.json(await buildEduDashboardDelta(eduStore, { since: req.query.since }))
+    res.json(await buildEduDashboardDelta(eduStore, teacherTenantId(session), { since: req.query.since }))
   })
 
   app.get('/api/edu/config', (_req, res) => {
@@ -384,6 +426,30 @@ export function createApp(sessionsDir, config = {}) {
     )
   })
 
+  app.post('/api/edu/auth/signup', async (req, res) => {
+    await ensureEduSeedData(eduStore)
+    try {
+      const teacher = await createTeacherAccount(eduStore, {
+        name: req.body?.name,
+        email: req.body?.email,
+        password: req.body?.password,
+      })
+      const sessionRecord = await createTeacherSession(eduStore, teacher, 'password')
+      res.setHeader('Set-Cookie', teacherSessionCookie(sessionRecord.id))
+      res.status(201).json(
+        await getTeacherSession(
+          eduStore,
+          `${req.headers.cookie || ''}; edu_teacher_session=${sessionRecord.id}`,
+        ),
+      )
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : 'Could not create teacher account',
+        authenticated: false,
+      })
+    }
+  })
+
   app.post('/api/edu/auth/logout', async (req, res) => {
     await destroyTeacherSession(eduStore, req.headers.cookie)
     res.setHeader('Set-Cookie', clearTeacherSessionCookie())
@@ -409,6 +475,10 @@ export function createApp(sessionsDir, config = {}) {
     const conflict = await findJoinCodeConflict(eduStore, classroom.join_code)
     if (conflict) {
       return res.status(409).json({ error: 'Join code already in use', join_code: classroom.join_code })
+    }
+    const nameConflict = await findClassroomNameConflict(eduStore, classroom.name)
+    if (nameConflict) {
+      return res.status(409).json({ error: 'Classroom name already in use', name: classroom.name })
     }
     classroom.updated_at = nowIso()
     await eduStore.putClassroom(classroom)
@@ -438,6 +508,10 @@ export function createApp(sessionsDir, config = {}) {
     const conflict = await findJoinCodeConflict(eduStore, classroom.join_code, classroom.id)
     if (conflict) {
       return res.status(409).json({ error: 'Join code already in use', join_code: classroom.join_code })
+    }
+    const nameConflict = await findClassroomNameConflict(eduStore, classroom.name, classroom.id)
+    if (nameConflict) {
+      return res.status(409).json({ error: 'Classroom name already in use', name: classroom.name })
     }
     await eduStore.putClassroom(classroom)
     res.json(classroom)
@@ -475,6 +549,10 @@ export function createApp(sessionsDir, config = {}) {
     }
     await ensureEduSeedData(eduStore)
     const assignment = buildAssignment(req.body || {})
+    const titleConflict = await findAssignmentTitleConflict(eduStore, assignment.title)
+    if (titleConflict) {
+      return res.status(409).json({ error: 'Assignment title already in use', title: assignment.title })
+    }
     assignment.updated_at = nowIso()
     await eduStore.putAssignment(assignment)
     await eduStore.putAssignmentAudit(
@@ -570,6 +648,10 @@ export function createApp(sessionsDir, config = {}) {
     const existing = await eduStore.getAssignment(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
     const assignment = buildAssignment({ ...existing, ...(req.body || {}), id: req.params.id, updated_at: nowIso() })
+    const titleConflict = await findAssignmentTitleConflict(eduStore, assignment.title, assignment.id)
+    if (titleConflict) {
+      return res.status(409).json({ error: 'Assignment title already in use', title: assignment.title })
+    }
     await eduStore.putAssignment(assignment)
     await eduStore.putAssignmentAudit(
       buildAssignmentAuditRecord({

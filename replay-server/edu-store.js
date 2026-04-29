@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
+  DEFAULT_TENANT_ID,
   buildAssignment,
   buildAssignmentAudit,
   buildClassroom,
@@ -23,21 +24,36 @@ const REPLAY_PREFIX = 'edu:replays:'
 const ASSIGNMENT_AUDIT_PREFIX = 'edu:assignment_audits:'
 const TEACHER_PREFIX = 'edu:teachers:'
 const TEACHER_SESSION_PREFIX = 'edu:teacher_sessions:'
+const DASHBOARD_SUMMARY_PREFIX = 'edu:dashboard_summaries:'
+const LIVE_SESSION_TTL_DAYS = 30
+const LIVE_REPLAY_EVENT_TTL_DAYS = 30
+const REPLAY_TTL_DAYS = 180
+const AUDIT_TTL_DAYS = 365
 const D1_SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS edu_records (
     kind TEXT NOT NULL,
     id TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     json TEXT NOT NULL,
+    tenant_id TEXT,
     email TEXT,
     join_code TEXT,
     classroom_id TEXT,
+    student_key TEXT,
+    parent_id TEXT,
+    expires_at TEXT,
     PRIMARY KEY (kind, id)
   )`,
   'CREATE INDEX IF NOT EXISTS edu_records_kind_updated_at ON edu_records(kind, updated_at DESC)',
+  'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_updated_at ON edu_records(tenant_id, kind, updated_at DESC)',
   'CREATE INDEX IF NOT EXISTS edu_records_teacher_email ON edu_records(kind, email)',
   'CREATE INDEX IF NOT EXISTS edu_records_join_code ON edu_records(kind, join_code)',
   'CREATE INDEX IF NOT EXISTS edu_records_classroom_id ON edu_records(kind, classroom_id)',
+  'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_join_code ON edu_records(tenant_id, kind, join_code)',
+  'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_classroom_id ON edu_records(tenant_id, kind, classroom_id, updated_at DESC)',
+  'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_parent_id ON edu_records(tenant_id, kind, parent_id, updated_at DESC)',
+  'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_student_key ON edu_records(tenant_id, kind, student_key, updated_at DESC)',
+  'CREATE INDEX IF NOT EXISTS edu_records_kind_expires_at ON edu_records(kind, expires_at)',
 ]
 
 function recordUpdatedAt(record) {
@@ -50,6 +66,10 @@ function normalizeJoinCode(joinCode) {
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase()
+}
+
+function normalizeTenantId(tenantId) {
+  return String(tenantId || DEFAULT_TENANT_ID).trim() || DEFAULT_TENANT_ID
 }
 
 function normalizeStudentOverrideKey(studentName) {
@@ -99,6 +119,154 @@ function effectiveStudentTemporaryAccessUntil(assignment, studentName) {
     return assignment?.temporary_access_until ?? null
   }
   return assignment?.student_temporary_access_until?.[key] ?? assignment?.temporary_access_until ?? null
+}
+
+function parseDateOrNull(value) {
+  if (!value) {
+    return null
+  }
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function laterDate(left, right) {
+  if (!left) {
+    return right || null
+  }
+  if (!right) {
+    return left
+  }
+  return left >= right ? left : right
+}
+
+function assignmentWindowContainsNow(window, now = new Date()) {
+  if (!window) {
+    return false
+  }
+  const startMinutes = (Number(window.start_hour) || 0) * 60 + (Number(window.start_minute) || 0)
+  const endMinutes = (Number(window.end_hour) || 0) * 60 + (Number(window.end_minute) || 0)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const overnight = startMinutes > endMinutes
+  const anchor = new Date(now)
+  if (overnight && nowMinutes <= endMinutes) {
+    anchor.setDate(anchor.getDate() - 1)
+  }
+  const anchorDateKey = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(anchor.getDate()).padStart(2, '0')}`
+  if (window.end_date && anchorDateKey > String(window.end_date)) {
+    return false
+  }
+  const weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][anchor.getDay()]
+  if (!window.days?.[weekday]) {
+    return false
+  }
+  return overnight
+    ? nowMinutes >= startMinutes || nowMinutes <= endMinutes
+    : nowMinutes >= startMinutes && nowMinutes <= endMinutes
+}
+
+function assignmentWindowDeadline(window, now = new Date()) {
+  if (!assignmentWindowContainsNow(window, now)) {
+    return null
+  }
+  const startMinutes = (Number(window.start_hour) || 0) * 60 + (Number(window.start_minute) || 0)
+  const endMinutes = (Number(window.end_hour) || 0) * 60 + (Number(window.end_minute) || 0)
+  const overnight = startMinutes > endMinutes
+  const anchor = new Date(now)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  if (overnight && nowMinutes <= endMinutes) {
+    anchor.setDate(anchor.getDate() - 1)
+  }
+  const deadline = new Date(anchor)
+  if (overnight) {
+    deadline.setDate(deadline.getDate() + 1)
+  }
+  deadline.setHours(Number(window.end_hour) || 0, Number(window.end_minute) || 0, 0, 0)
+  return deadline
+}
+
+function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
+  const normalized = buildAssignment(assignment)
+  if (normalized.access_revoked) {
+    return { schedule_open: false, session_end_at: null }
+  }
+  const temporaryUntil = parseDateOrNull(effectiveStudentTemporaryAccessUntil(normalized, studentName))
+  const activeTemporaryUntil = temporaryUntil && temporaryUntil >= now ? temporaryUntil : null
+  const windowDeadline = (normalized.windows || []).reduce(
+    (latest, window) => laterDate(latest, assignmentWindowDeadline(window, now)),
+    null,
+  )
+  const sessionEndAt = laterDate(windowDeadline, activeTemporaryUntil)
+  return {
+    schedule_open: Boolean(sessionEndAt),
+    session_end_at: sessionEndAt ? sessionEndAt.toISOString() : null,
+  }
+}
+
+async function buildLinkedAssignmentReferences(store, assignment, studentName) {
+  const linkedIds = Array.isArray(assignment?.linked_assignment_ids) ? assignment.linked_assignment_ids : []
+  const references = []
+  for (const linkedId of linkedIds) {
+    if (!linkedId || linkedId === assignment.id) {
+      continue
+    }
+    const linkedAssignment = await store.getAssignment(linkedId)
+    if (!linkedAssignment) {
+      continue
+    }
+    const liveSession = await store.getLiveSessionForAssignmentStudent(
+      linkedAssignment.id,
+      studentName,
+      linkedAssignment.tenant_id,
+    )
+    const markdown = String(liveSession?.current_text || '').trim()
+    references.push({
+      assignment_id: linkedAssignment.id,
+      title: linkedAssignment.title,
+      course: linkedAssignment.course,
+      classroom_name: linkedAssignment.classroom_name ?? null,
+      available: Boolean(markdown),
+      markdown,
+      modified_at: liveSession?.updated_at || liveSession?.last_activity_at || null,
+      word_count: markdown ? markdown.split(/\s+/).filter(Boolean).length : 0,
+    })
+  }
+  return references
+}
+
+async function getClassroomByJoinCodeCompat(store, joinCode) {
+  if (typeof store.getClassroomByJoinCode === 'function') {
+    return store.getClassroomByJoinCode(joinCode)
+  }
+  const normalizedJoinCode = normalizeJoinCode(joinCode)
+  const classrooms = await store.listClassrooms?.()
+  return (classrooms || []).find((item) => normalizeJoinCode(item?.join_code) === normalizedJoinCode) || null
+}
+
+async function listAssignmentsByClassroomCompat(store, classroom) {
+  if (!classroom?.id) {
+    return []
+  }
+  if (typeof store.listAssignmentsByClassroomId === 'function') {
+    return store.listAssignmentsByClassroomId(classroom.id, classroom.tenant_id)
+  }
+  const assignments = await store.listAssignments?.()
+  return (assignments || []).filter((item) => item?.classroom_id === classroom.id)
+}
+
+async function getLiveSessionForAssignmentStudentCompat(store, assignmentId, studentName, tenantId) {
+  if (typeof store.getLiveSessionForAssignmentStudent === 'function') {
+    return store.getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId)
+  }
+  const sessions = await store.listLiveSessions?.(tenantId)
+  const studentKey = normalizedStudentKey(studentName)
+  const matching = (sessions || [])
+    .map((item) => buildLiveSession(item))
+    .filter((session) => session.assignment_id === assignmentId)
+    .filter((session) => normalizedStudentKey(session.student_name) === studentKey)
+    .sort((a, b) =>
+      String(b.updated_at || b.last_activity_at || '').localeCompare(String(a.updated_at || a.last_activity_at || '')),
+    )
+  return matching[0] || null
 }
 
 function studentAccessRevokedForAssignment(assignment, studentName) {
@@ -170,6 +338,32 @@ function normalizedStudentKey(studentName) {
   return normalizeStudentOverrideKey(studentName)
 }
 
+function isoDaysFromNow(days) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+}
+
+function expiryForKind(kind, record) {
+  if (record?.expires_at) {
+    return String(record.expires_at)
+  }
+  switch (kind) {
+    case 'teacher_session':
+      return String(record?.expires_at || isoDaysFromNow(1))
+    case 'live_session':
+    case 'live_session_summary':
+    case 'live_replay_head':
+      return isoDaysFromNow(LIVE_SESSION_TTL_DAYS)
+    case 'live_replay_event':
+      return isoDaysFromNow(LIVE_REPLAY_EVENT_TTL_DAYS)
+    case 'replay':
+      return isoDaysFromNow(REPLAY_TTL_DAYS)
+    case 'assignment_audit':
+      return isoDaysFromNow(AUDIT_TTL_DAYS)
+    default:
+      return null
+  }
+}
+
 function studentFeedbackForAssignment(liveSessions, assignmentId, studentName) {
   const studentKey = normalizedStudentKey(studentName)
   if (!assignmentId || !studentKey) {
@@ -189,6 +383,29 @@ function studentFeedbackForAssignment(liveSessions, assignmentId, studentName) {
 
 function sortByUpdatedDesc(items) {
   return [...items].sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+}
+
+function buildDashboardSummaryRecord({
+  tenantId = DEFAULT_TENANT_ID,
+  classrooms = 0,
+  assignments = 0,
+  live_sessions = 0,
+  replays_available = 0,
+  audits_recorded = 0,
+  active_students = 0,
+  updated_at = nowIso(),
+} = {}) {
+  return {
+    id: `dashboard:${normalizeTenantId(tenantId)}`,
+    tenant_id: normalizeTenantId(tenantId),
+    classrooms: Number(classrooms || 0),
+    assignments: Number(assignments || 0),
+    live_sessions: Number(live_sessions || 0),
+    replays_available: Number(replays_available || 0),
+    audits_recorded: Number(audits_recorded || 0),
+    active_students: Number(active_students || 0),
+    updated_at,
+  }
 }
 
 export function createNodeEduStore(baseDir) {
@@ -215,11 +432,17 @@ export function createNodeEduStore(baseDir) {
     renameSync(tempPath, path)
   }
 
+  function filterByTenant(items, tenantId = DEFAULT_TENANT_ID) {
+    const normalizedTenant = normalizeTenantId(tenantId)
+    return items.filter((item) => normalizeTenantId(item?.tenant_id) === normalizedTenant)
+  }
+
   return {
-    async listClassrooms() {
-      return sortByUpdatedDesc(readCollection('classrooms'))
+    async listClassrooms(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('classrooms'), tenantId))
     },
     async putClassroom(classroom) {
+      classroom = buildClassroom(classroom)
       const classrooms = readCollection('classrooms')
       const next = classrooms.filter((item) => item.id !== classroom.id)
       next.push(classroom)
@@ -235,10 +458,11 @@ export function createNodeEduStore(baseDir) {
         classrooms.filter((item) => item.id !== id),
       )
     },
-    async listAssignments() {
-      return sortByUpdatedDesc(readCollection('assignments'))
+    async listAssignments(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('assignments'), tenantId))
     },
     async putAssignment(assignment) {
+      assignment = buildAssignment(assignment)
       const assignments = readCollection('assignments')
       const next = assignments.filter((item) => item.id !== assignment.id)
       next.push(assignment)
@@ -254,17 +478,18 @@ export function createNodeEduStore(baseDir) {
         assignments.filter((item) => item.id !== id),
       )
     },
-    async listTeachers() {
-      return sortByUpdatedDesc(readCollection('teachers'))
+    async listTeachers(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('teachers'), tenantId))
     },
     async putTeacher(teacher) {
+      teacher = buildTeacher(teacher)
       const teachers = readCollection('teachers')
       const next = teachers.filter((item) => item.id !== teacher.id)
       next.push(teacher)
       writeCollection('teachers', next)
     },
-    async getTeacherByEmail(email) {
-      return readCollection('teachers').find((item) => item.email === email) || null
+    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
+      return filterByTenant(readCollection('teachers'), tenantId).find((item) => item.email === email) || null
     },
     async putTeacherSession(session) {
       const sessions = readCollection('teacher_sessions')
@@ -282,10 +507,11 @@ export function createNodeEduStore(baseDir) {
         sessions.filter((item) => item.id !== id),
       )
     },
-    async listLiveSessions() {
-      return sortByUpdatedDesc(readCollection('live_sessions'))
+    async listLiveSessions(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('live_sessions'), tenantId))
     },
     async putLiveSession(session) {
+      session = buildLiveSession(session)
       const summary = buildLiveSessionSummary(session)
       const sessions = readCollection('live_sessions')
       const next = sessions.filter((item) => item.id !== session.id)
@@ -300,13 +526,13 @@ export function createNodeEduStore(baseDir) {
     async getLiveSession(id) {
       return readCollection('live_sessions').find((item) => item.id === id) || null
     },
-    async listLiveSessionSummariesForAssignment(assignmentId) {
-      return sortByUpdatedDesc(readCollection('live_session_summaries')).filter(
+    async listLiveSessionSummariesForAssignment(assignmentId, tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('live_session_summaries'), tenantId)).filter(
         (item) => item.assignment_id === assignmentId,
       )
     },
-    async listLiveReplayHeads() {
-      return sortByUpdatedDesc(readCollection('live_replay_heads'))
+    async listLiveReplayHeads(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('live_replay_heads'), tenantId))
     },
     async putLiveReplayHead(head) {
       const heads = readCollection('live_replay_heads')
@@ -318,8 +544,8 @@ export function createNodeEduStore(baseDir) {
       const item = readCollection('live_replay_heads').find((entry) => entry.id === id)
       return item ? buildLiveReplayHead(item) : null
     },
-    async listLiveReplayEvents(liveSessionId) {
-      return readCollection('live_replay_events')
+    async listLiveReplayEvents(liveSessionId, tenantId = DEFAULT_TENANT_ID) {
+      return filterByTenant(readCollection('live_replay_events'), tenantId)
         .filter((item) => item.live_session_id === liveSessionId)
         .map((item) => buildLiveReplayEvent(item))
         .sort((a, b) => a.seq - b.seq || String(a.updated_at).localeCompare(String(b.updated_at)))
@@ -329,10 +555,11 @@ export function createNodeEduStore(baseDir) {
       events.push(buildLiveReplayEvent(event))
       writeCollection('live_replay_events', events)
     },
-    async listReplays() {
-      return sortByUpdatedDesc(readCollection('replays'))
+    async listReplays(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('replays'), tenantId))
     },
     async putReplay(replay) {
+      replay = buildEduReplay(replay)
       const replays = readCollection('replays')
       const next = replays.filter((item) => item.id !== replay.id)
       next.push(replay)
@@ -341,14 +568,67 @@ export function createNodeEduStore(baseDir) {
     async getReplay(id) {
       return readCollection('replays').find((item) => item.id === id) || null
     },
-    async listAssignmentAudits() {
-      return sortByUpdatedDesc(readCollection('assignment_audits'))
+    async listAssignmentAudits(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(readCollection('assignment_audits'), tenantId))
     },
     async putAssignmentAudit(audit) {
+      audit = buildAssignmentAudit(audit)
       const audits = readCollection('assignment_audits')
       const next = audits.filter((item) => item.id !== audit.id)
       next.push(audit)
       writeCollection('assignment_audits', next)
+    },
+    async getClassroomByJoinCode(joinCode) {
+      const normalizedJoinCode = normalizeJoinCode(joinCode)
+      return readCollection('classrooms').find((item) => normalizeJoinCode(item.join_code) === normalizedJoinCode) || null
+    },
+    async listAssignmentsByClassroomId(classroomId, tenantId = DEFAULT_TENANT_ID) {
+      return (await this.listAssignments(tenantId)).filter((item) => item.classroom_id === classroomId)
+    },
+    async listAssignmentAuditsByAssignmentId(assignmentId, tenantId = DEFAULT_TENANT_ID) {
+      return (await this.listAssignmentAudits(tenantId)).filter((item) => item.assignment_id === assignmentId)
+    },
+    async getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId = DEFAULT_TENANT_ID) {
+      const studentKey = normalizedStudentKey(studentName)
+      return (
+        (await this.listLiveSessions(tenantId)).find(
+          (item) => item.assignment_id === assignmentId && normalizedStudentKey(item.student_name) === studentKey,
+        ) || null
+      )
+    },
+    async putDashboardSummary(summary) {
+      const item = buildDashboardSummaryRecord(summary)
+      const summaries = readCollection('dashboard_summaries')
+      const next = summaries.filter((entry) => entry.id !== item.id)
+      next.push(item)
+      writeCollection('dashboard_summaries', next)
+    },
+    async getDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+      const id = `dashboard:${normalizeTenantId(tenantId)}`
+      return readCollection('dashboard_summaries').find((item) => item.id === id) || null
+    },
+    async refreshDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+      const [classrooms, assignments, liveSessions, replays, audits] = await Promise.all([
+        this.listClassrooms(tenantId),
+        this.listAssignments(tenantId),
+        this.listLiveSessions(tenantId),
+        this.listReplays(tenantId),
+        this.listAssignmentAudits(tenantId),
+      ])
+      const summary = buildDashboardSummaryRecord({
+        tenantId,
+        classrooms: classrooms.length,
+        assignments: assignments.length,
+        live_sessions: liveSessions.length,
+        replays_available: replays.length,
+        audits_recorded: audits.length,
+        active_students: liveSessions.length,
+      })
+      await this.putDashboardSummary(summary)
+      return summary
+    },
+    async runMaintenance() {
+      return false
     },
   }
 }
@@ -366,11 +646,17 @@ export function createKvEduStore(kv) {
     return items
   }
 
+  function filterByTenant(items, tenantId = DEFAULT_TENANT_ID) {
+    const normalizedTenant = normalizeTenantId(tenantId)
+    return items.filter((item) => normalizeTenantId(item?.tenant_id) === normalizedTenant)
+  }
+
   return {
-    async listClassrooms() {
-      return sortByUpdatedDesc(await listByPrefix(CLASSROOM_PREFIX))
+    async listClassrooms(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(CLASSROOM_PREFIX), tenantId))
     },
     async putClassroom(classroom) {
+      classroom = buildClassroom(classroom)
       await kv.put(`${CLASSROOM_PREFIX}${classroom.id}`, JSON.stringify(classroom))
     },
     async getClassroom(id) {
@@ -380,10 +666,11 @@ export function createKvEduStore(kv) {
     async deleteClassroom(id) {
       await kv.delete(`${CLASSROOM_PREFIX}${id}`)
     },
-    async listAssignments() {
-      return sortByUpdatedDesc(await listByPrefix(ASSIGNMENT_PREFIX))
+    async listAssignments(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(ASSIGNMENT_PREFIX), tenantId))
     },
     async putAssignment(assignment) {
+      assignment = buildAssignment(assignment)
       await kv.put(`${ASSIGNMENT_PREFIX}${assignment.id}`, JSON.stringify(assignment))
     },
     async getAssignment(id) {
@@ -393,14 +680,15 @@ export function createKvEduStore(kv) {
     async deleteAssignment(id) {
       await kv.delete(`${ASSIGNMENT_PREFIX}${id}`)
     },
-    async listTeachers() {
-      return sortByUpdatedDesc(await listByPrefix(TEACHER_PREFIX))
+    async listTeachers(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(TEACHER_PREFIX), tenantId))
     },
     async putTeacher(teacher) {
+      teacher = buildTeacher(teacher)
       await kv.put(`${TEACHER_PREFIX}${teacher.id}`, JSON.stringify(teacher))
     },
-    async getTeacherByEmail(email) {
-      const teachers = await listByPrefix(TEACHER_PREFIX)
+    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
+      const teachers = filterByTenant(await listByPrefix(TEACHER_PREFIX), tenantId)
       return teachers.find((item) => item.email === email) || null
     },
     async putTeacherSession(session) {
@@ -413,10 +701,11 @@ export function createKvEduStore(kv) {
     async deleteTeacherSession(id) {
       await kv.delete(`${TEACHER_SESSION_PREFIX}${id}`)
     },
-    async listLiveSessions() {
-      return sortByUpdatedDesc(await listByPrefix(LIVE_PREFIX))
+    async listLiveSessions(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(LIVE_PREFIX), tenantId))
     },
     async putLiveSession(session) {
+      session = buildLiveSession(session)
       const summary = buildLiveSessionSummary(session)
       await kv.put(`${LIVE_PREFIX}${session.id}`, JSON.stringify(session))
       await kv.put(`${LIVE_SUMMARY_PREFIX}${session.assignment_id}:${session.id}`, JSON.stringify(summary))
@@ -425,11 +714,11 @@ export function createKvEduStore(kv) {
       const raw = await kv.get(`${LIVE_PREFIX}${id}`)
       return raw ? JSON.parse(raw) : null
     },
-    async listLiveSessionSummariesForAssignment(assignmentId) {
-      return sortByUpdatedDesc(await listByPrefix(`${LIVE_SUMMARY_PREFIX}${assignmentId}:`))
+    async listLiveSessionSummariesForAssignment(assignmentId, tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(`${LIVE_SUMMARY_PREFIX}${assignmentId}:`), tenantId))
     },
-    async listLiveReplayHeads() {
-      return sortByUpdatedDesc(await listByPrefix(LIVE_REPLAY_HEAD_PREFIX))
+    async listLiveReplayHeads(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(LIVE_REPLAY_HEAD_PREFIX), tenantId))
     },
     async putLiveReplayHead(head) {
       await kv.put(`${LIVE_REPLAY_HEAD_PREFIX}${head.id}`, JSON.stringify(buildLiveReplayHead(head)))
@@ -438,8 +727,8 @@ export function createKvEduStore(kv) {
       const raw = await kv.get(`${LIVE_REPLAY_HEAD_PREFIX}${id}`)
       return raw ? buildLiveReplayHead(JSON.parse(raw)) : null
     },
-    async listLiveReplayEvents(liveSessionId) {
-      const items = await listByPrefix(`${LIVE_REPLAY_EVENT_PREFIX}${liveSessionId}:`)
+    async listLiveReplayEvents(liveSessionId, tenantId = DEFAULT_TENANT_ID) {
+      const items = filterByTenant(await listByPrefix(`${LIVE_REPLAY_EVENT_PREFIX}${liveSessionId}:`), tenantId)
       return items.map((item) => buildLiveReplayEvent(item)).sort((a, b) => a.seq - b.seq)
     },
     async appendLiveReplayEvent(event) {
@@ -449,27 +738,80 @@ export function createKvEduStore(kv) {
         JSON.stringify(normalized),
       )
     },
-    async listReplays() {
-      return sortByUpdatedDesc(await listByPrefix(REPLAY_PREFIX))
+    async listReplays(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(REPLAY_PREFIX), tenantId))
     },
     async putReplay(replay) {
+      replay = buildEduReplay(replay)
       await kv.put(`${REPLAY_PREFIX}${replay.id}`, JSON.stringify(replay))
     },
     async getReplay(id) {
       const raw = await kv.get(`${REPLAY_PREFIX}${id}`)
       return raw ? JSON.parse(raw) : null
     },
-    async listAssignmentAudits() {
-      return sortByUpdatedDesc(await listByPrefix(ASSIGNMENT_AUDIT_PREFIX))
+    async listAssignmentAudits(tenantId = DEFAULT_TENANT_ID) {
+      return sortByUpdatedDesc(filterByTenant(await listByPrefix(ASSIGNMENT_AUDIT_PREFIX), tenantId))
     },
     async putAssignmentAudit(audit) {
+      audit = buildAssignmentAudit(audit)
       await kv.put(`${ASSIGNMENT_AUDIT_PREFIX}${audit.id}`, JSON.stringify(audit))
+    },
+    async getClassroomByJoinCode(joinCode) {
+      const normalizedJoinCode = normalizeJoinCode(joinCode)
+      const classrooms = await listByPrefix(CLASSROOM_PREFIX)
+      return classrooms.find((item) => normalizeJoinCode(item.join_code) === normalizedJoinCode) || null
+    },
+    async listAssignmentsByClassroomId(classroomId, tenantId = DEFAULT_TENANT_ID) {
+      return (await this.listAssignments(tenantId)).filter((item) => item.classroom_id === classroomId)
+    },
+    async listAssignmentAuditsByAssignmentId(assignmentId, tenantId = DEFAULT_TENANT_ID) {
+      return (await this.listAssignmentAudits(tenantId)).filter((item) => item.assignment_id === assignmentId)
+    },
+    async getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId = DEFAULT_TENANT_ID) {
+      const studentKey = normalizedStudentKey(studentName)
+      return (
+        (await this.listLiveSessions(tenantId)).find(
+          (item) => item.assignment_id === assignmentId && normalizedStudentKey(item.student_name) === studentKey,
+        ) || null
+      )
+    },
+    async putDashboardSummary(summary) {
+      const item = buildDashboardSummaryRecord(summary)
+      await kv.put(`${DASHBOARD_SUMMARY_PREFIX}${item.tenant_id}`, JSON.stringify(item))
+    },
+    async getDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+      const raw = await kv.get(`${DASHBOARD_SUMMARY_PREFIX}${normalizeTenantId(tenantId)}`)
+      return raw ? JSON.parse(raw) : null
+    },
+    async refreshDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+      const [classrooms, assignments, liveSessions, replays, audits] = await Promise.all([
+        this.listClassrooms(tenantId),
+        this.listAssignments(tenantId),
+        this.listLiveSessions(tenantId),
+        this.listReplays(tenantId),
+        this.listAssignmentAudits(tenantId),
+      ])
+      const summary = buildDashboardSummaryRecord({
+        tenantId,
+        classrooms: classrooms.length,
+        assignments: assignments.length,
+        live_sessions: liveSessions.length,
+        replays_available: replays.length,
+        audits_recorded: audits.length,
+        active_students: liveSessions.length,
+      })
+      await this.putDashboardSummary(summary)
+      return summary
+    },
+    async runMaintenance() {
+      return false
     },
   }
 }
 
 export function createD1EduStore(db) {
   let schemaReady = null
+  let maintenanceRanAt = 0
 
   async function ensureSchema() {
     if (!schemaReady) {
@@ -482,11 +824,13 @@ export function createD1EduStore(db) {
     await schemaReady
   }
 
-  async function listKind(kind) {
+  async function listKind(kind, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const response = await db
-      .prepare('SELECT json FROM edu_records WHERE kind = ? ORDER BY updated_at DESC, id DESC')
-      .bind(kind)
+      .prepare(
+        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC, id DESC',
+      )
+      .bind(normalizeTenantId(tenantId), kind)
       .all()
     return (response.results || []).map((row) => JSON.parse(row.json))
   }
@@ -500,39 +844,128 @@ export function createD1EduStore(db) {
     return row ? JSON.parse(row.json) : null
   }
 
+  async function getByKindAndJoinCode(kind, joinCode) {
+    await ensureSchema()
+    const row = await db
+      .prepare('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
+      .bind(kind, normalizeJoinCode(joinCode))
+      .first()
+    return row ? JSON.parse(row.json) : null
+  }
+
+  async function listKindByClassroom(kind, classroomId, tenantId = DEFAULT_TENANT_ID) {
+    await ensureSchema()
+    const response = await db
+      .prepare(
+        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
+      )
+      .bind(normalizeTenantId(tenantId), kind, classroomId)
+      .all()
+    return (response.results || []).map((row) => JSON.parse(row.json))
+  }
+
+  async function listKindByParent(kind, parentId, tenantId = DEFAULT_TENANT_ID) {
+    await ensureSchema()
+    const response = await db
+      .prepare(
+        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC, id DESC',
+      )
+      .bind(normalizeTenantId(tenantId), kind, parentId)
+      .all()
+    return (response.results || []).map((row) => JSON.parse(row.json))
+  }
+
+  async function getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId = DEFAULT_TENANT_ID) {
+    await ensureSchema()
+    const row = await db
+      .prepare(
+        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC, id DESC LIMIT 1',
+      )
+      .bind(normalizeTenantId(tenantId), 'live_session', assignmentId, normalizedStudentKey(studentName))
+      .first()
+    return row ? JSON.parse(row.json) : null
+  }
+
   async function putRecord(kind, id, record, extras = {}) {
     await ensureSchema()
     await db
       .prepare(
-        `INSERT INTO edu_records (kind, id, updated_at, json, email, join_code, classroom_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO edu_records (
+           kind, id, updated_at, json, tenant_id, email, join_code, classroom_id, student_key, parent_id, expires_at
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(kind, id) DO UPDATE SET
            updated_at = excluded.updated_at,
            json = excluded.json,
+           tenant_id = excluded.tenant_id,
            email = excluded.email,
            join_code = excluded.join_code,
-           classroom_id = excluded.classroom_id`,
+           classroom_id = excluded.classroom_id,
+           student_key = excluded.student_key,
+           parent_id = excluded.parent_id,
+           expires_at = excluded.expires_at`,
       )
       .bind(
         kind,
         id,
         recordUpdatedAt(record),
         JSON.stringify(record),
+        normalizeTenantId(extras.tenant_id || record?.tenant_id),
         extras.email || null,
         extras.join_code || null,
         extras.classroom_id || null,
+        extras.student_key || null,
+        extras.parent_id || null,
+        extras.expires_at ?? expiryForKind(kind, record),
       )
       .run()
   }
 
+  async function recomputeDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+    const [classrooms, assignments, liveSessions, replays, audits] = await Promise.all([
+      listKind('classroom', tenantId),
+      listKind('assignment', tenantId),
+      listKind('live_session', tenantId),
+      listKind('replay', tenantId),
+      listKind('assignment_audit', tenantId),
+    ])
+    const summary = buildDashboardSummaryRecord({
+      tenantId,
+      classrooms: classrooms.length,
+      assignments: assignments.length,
+      live_sessions: liveSessions.length,
+      replays_available: replays.length,
+      audits_recorded: audits.length,
+      active_students: liveSessions.length,
+    })
+    await putRecord('dashboard_summary', summary.id, summary, {
+      tenant_id: summary.tenant_id,
+    })
+    return summary
+  }
+
+  async function performMaintenance({ force = false } = {}) {
+    const now = Date.now()
+    if (!force && now - maintenanceRanAt < 60_000) {
+      return false
+    }
+    maintenanceRanAt = now
+    await ensureSchema()
+    await db.prepare('DELETE FROM edu_records WHERE expires_at IS NOT NULL AND expires_at < ?').bind(nowIso()).run()
+    return true
+  }
+
   return {
-    async listClassrooms() {
-      return listKind('classroom')
+    async listClassrooms(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('classroom', tenantId)
     },
     async putClassroom(classroom) {
+      classroom = buildClassroom(classroom)
       await putRecord('classroom', classroom.id, classroom, {
+        tenant_id: classroom.tenant_id,
         join_code: normalizeJoinCode(classroom.join_code),
       })
+      await recomputeDashboardSummary(classroom.tenant_id)
     },
     async getClassroom(id) {
       return getByKindAndId('classroom', id)
@@ -541,13 +974,19 @@ export function createD1EduStore(db) {
       await ensureSchema()
       await db.prepare('DELETE FROM edu_records WHERE kind = ? AND id = ?').bind('classroom', id).run()
     },
-    async listAssignments() {
-      return listKind('assignment')
+    async getClassroomByJoinCode(joinCode) {
+      return getByKindAndJoinCode('classroom', joinCode)
+    },
+    async listAssignments(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('assignment', tenantId)
     },
     async putAssignment(assignment) {
+      assignment = buildAssignment(assignment)
       await putRecord('assignment', assignment.id, assignment, {
+        tenant_id: assignment.tenant_id,
         classroom_id: assignment.classroom_id || null,
       })
+      await recomputeDashboardSummary(assignment.tenant_id)
     },
     async getAssignment(id) {
       return getByKindAndId('assignment', id)
@@ -556,24 +995,31 @@ export function createD1EduStore(db) {
       await ensureSchema()
       await db.prepare('DELETE FROM edu_records WHERE kind = ? AND id = ?').bind('assignment', id).run()
     },
-    async listTeachers() {
-      return listKind('teacher')
+    async listAssignmentsByClassroomId(classroomId, tenantId = DEFAULT_TENANT_ID) {
+      return listKindByClassroom('assignment', classroomId, tenantId)
+    },
+    async listTeachers(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('teacher', tenantId)
     },
     async putTeacher(teacher) {
+      teacher = buildTeacher(teacher)
       await putRecord('teacher', teacher.id, teacher, {
+        tenant_id: teacher.tenant_id,
         email: normalizeEmail(teacher.email),
       })
     },
-    async getTeacherByEmail(email) {
+    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
       await ensureSchema()
       const row = await db
-        .prepare('SELECT json FROM edu_records WHERE kind = ? AND email = ? LIMIT 1')
-        .bind('teacher', normalizeEmail(email))
+        .prepare('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
+        .bind(normalizeTenantId(tenantId), 'teacher', normalizeEmail(email))
         .first()
       return row ? JSON.parse(row.json) : null
     },
     async putTeacherSession(session) {
-      await putRecord('teacher_session', session.id, session)
+      await putRecord('teacher_session', session.id, session, {
+        tenant_id: session.tenant_id,
+      })
     },
     async getTeacherSession(id) {
       return getByKindAndId('teacher_session', id)
@@ -582,93 +1028,122 @@ export function createD1EduStore(db) {
       await ensureSchema()
       await db.prepare('DELETE FROM edu_records WHERE kind = ? AND id = ?').bind('teacher_session', id).run()
     },
-    async listLiveSessions() {
-      return listKind('live_session')
+    async listLiveSessions(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('live_session', tenantId)
     },
     async putLiveSession(session) {
+      session = buildLiveSession(session)
       const summary = buildLiveSessionSummary(session)
       await putRecord('live_session', session.id, session, {
+        tenant_id: session.tenant_id,
         classroom_id: session.assignment_id || null,
+        student_key: normalizedStudentKey(session.student_name),
       })
       await putRecord('live_session_summary', summary.id, summary, {
+        tenant_id: summary.tenant_id,
         classroom_id: summary.assignment_id || null,
+        student_key: normalizedStudentKey(summary.student_name),
       })
+      await recomputeDashboardSummary(session.tenant_id)
     },
     async getLiveSession(id) {
       return getByKindAndId('live_session', id)
     },
-    async listLiveSessionSummariesForAssignment(assignmentId) {
-      await ensureSchema()
-      const response = await db
-        .prepare(
-          'SELECT json FROM edu_records WHERE kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
-        )
-        .bind('live_session_summary', assignmentId)
-        .all()
-      return (response.results || []).map((row) => JSON.parse(row.json))
+    async getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId = DEFAULT_TENANT_ID) {
+      return getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId)
     },
-    async listLiveReplayHeads() {
-      return listKind('live_replay_head')
+    async listLiveSessionSummariesForAssignment(assignmentId, tenantId = DEFAULT_TENANT_ID) {
+      return listKindByClassroom('live_session_summary', assignmentId, tenantId)
+    },
+    async listLiveReplayHeads(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('live_replay_head', tenantId)
     },
     async putLiveReplayHead(head) {
       const normalized = buildLiveReplayHead(head)
       await putRecord('live_replay_head', normalized.id, normalized, {
+        tenant_id: normalized.tenant_id,
         classroom_id: normalized.assignment_id || null,
+        parent_id: normalized.live_session_id || null,
+        student_key: normalizedStudentKey(normalized.student_name),
       })
     },
     async getLiveReplayHead(id) {
       return getByKindAndId('live_replay_head', id)
     },
-    async listLiveReplayEvents(liveSessionId) {
-      await ensureSchema()
-      const response = await db
-        .prepare(
-          'SELECT json FROM edu_records WHERE kind = ? AND classroom_id = ? ORDER BY updated_at ASC, id ASC',
-        )
-        .bind('live_replay_event', liveSessionId)
-        .all()
-      return (response.results || [])
-        .map((row) => buildLiveReplayEvent(JSON.parse(row.json)))
+    async listLiveReplayEvents(liveSessionId, tenantId = DEFAULT_TENANT_ID) {
+      return (await listKindByParent('live_replay_event', liveSessionId, tenantId))
+        .map((row) => buildLiveReplayEvent(row))
         .sort((a, b) => a.seq - b.seq || String(a.updated_at).localeCompare(String(b.updated_at)))
     },
     async appendLiveReplayEvent(event) {
       const normalized = buildLiveReplayEvent(event)
       await putRecord('live_replay_event', normalized.id, normalized, {
-        classroom_id: normalized.live_session_id || null,
+        tenant_id: normalized.tenant_id,
+        classroom_id: normalized.assignment_id || null,
+        parent_id: normalized.live_session_id || null,
+        student_key: normalizedStudentKey(normalized.student_name),
       })
     },
-    async listReplays() {
-      return listKind('replay')
+    async listReplays(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('replay', tenantId)
     },
     async putReplay(replay) {
+      replay = buildEduReplay(replay)
       await putRecord('replay', replay.id, replay, {
+        tenant_id: replay.tenant_id,
         classroom_id: replay.assignment_id || null,
+        parent_id: replay.live_session_id || null,
+        student_key: normalizedStudentKey(replay.student_name),
       })
+      await recomputeDashboardSummary(replay.tenant_id)
     },
     async getReplay(id) {
       return getByKindAndId('replay', id)
     },
-    async listAssignmentAudits() {
-      return listKind('assignment_audit')
+    async listAssignmentAudits(tenantId = DEFAULT_TENANT_ID) {
+      return listKind('assignment_audit', tenantId)
     },
     async putAssignmentAudit(audit) {
+      audit = buildAssignmentAudit(audit)
       await putRecord('assignment_audit', audit.id, audit, {
+        tenant_id: audit.tenant_id,
         classroom_id: audit.assignment_id || null,
       })
+      await recomputeDashboardSummary(audit.tenant_id)
+    },
+    async listAssignmentAuditsByAssignmentId(assignmentId, tenantId = DEFAULT_TENANT_ID) {
+      return listKindByClassroom('assignment_audit', assignmentId, tenantId)
+    },
+    async putDashboardSummary(summary) {
+      const item = buildDashboardSummaryRecord(summary)
+      await putRecord('dashboard_summary', item.id, item, {
+        tenant_id: item.tenant_id,
+      })
+    },
+    async getDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+      return getByKindAndId('dashboard_summary', `dashboard:${normalizeTenantId(tenantId)}`)
+    },
+    async refreshDashboardSummary(tenantId = DEFAULT_TENANT_ID) {
+      return recomputeDashboardSummary(tenantId)
+    },
+    async runMaintenance(options = {}) {
+      return performMaintenance(options)
     },
   }
 }
 
 export async function ensureEduSeedData(store) {
-  const classrooms = await store.listClassrooms()
-  const assignments = await store.listAssignments()
-  const liveSessions = await store.listLiveSessions()
-  const teachers = await store.listTeachers()
+  const tenantId = DEFAULT_TENANT_ID
+  const classrooms = await store.listClassrooms(tenantId)
+  const assignments = await store.listAssignments(tenantId)
+  const liveSessions = await store.listLiveSessions(tenantId)
+  const teachers = await store.listTeachers(tenantId)
 
   if (!teachers.length) {
     const runtimeEnv = globalThis.process?.env || {}
     await store.putTeacher(
       buildTeacher({
+        tenant_id: tenantId,
         id: 'teacher_default',
         name: 'Joseph Tan',
         email: runtimeEnv.EDU_TEACHER_EMAIL || 'teacher@edu.handtyped.app',
@@ -682,6 +1157,7 @@ export async function ensureEduSeedData(store) {
   }
 
   const classroomOne = buildClassroom({
+    tenant_id: tenantId,
     id: 'period-1',
     name: 'English 11 - Period 1',
     join_code: 'P1EN11',
@@ -689,6 +1165,7 @@ export async function ensureEduSeedData(store) {
     students: ['Ava L.', 'Mason R.'],
   })
   const classroomTwo = buildClassroom({
+    tenant_id: tenantId,
     id: 'period-3',
     name: 'English 11 - Period 3',
     join_code: 'P3EN11',
@@ -700,6 +1177,7 @@ export async function ensureEduSeedData(store) {
   await store.putClassroom(classroomTwo)
 
   const assignmentOne = buildAssignment({
+    tenant_id: tenantId,
     id: 'gatsby-close-reading',
     title: 'Gatsby Close Reading',
     course: 'English 11',
@@ -715,6 +1193,7 @@ export async function ensureEduSeedData(store) {
     },
   })
   const assignmentTwo = buildAssignment({
+    tenant_id: tenantId,
     id: 'macbeth-timed-essay',
     title: 'Macbeth Timed Essay',
     course: 'English 11',
@@ -735,6 +1214,7 @@ export async function ensureEduSeedData(store) {
 
   await store.putLiveSession(
     buildLiveSession({
+      tenant_id: tenantId,
       id: 'live_ava',
       assignment_id: assignmentOne.id,
       assignment_title: assignmentOne.title,
@@ -749,6 +1229,7 @@ export async function ensureEduSeedData(store) {
   )
   await store.putLiveSession(
     buildLiveSession({
+      tenant_id: tenantId,
       id: 'live_mason',
       assignment_id: assignmentTwo.id,
       assignment_title: assignmentTwo.title,
@@ -763,6 +1244,7 @@ export async function ensureEduSeedData(store) {
   )
   await store.putReplay(
     buildEduReplay({
+      tenant_id: tenantId,
       id: 'edu_replay_ava',
       live_session_id: 'live_ava',
       assignment_id: assignmentOne.id,
@@ -784,34 +1266,29 @@ export async function ensureEduSeedData(store) {
       ],
     }),
   )
+  await store.refreshDashboardSummary?.(tenantId)
 }
 
-export async function buildEduDashboard(store) {
-  const classrooms = await store.listClassrooms()
-  const assignments = await store.listAssignments()
-  const live_sessions = (await store.listLiveSessions()).map((item) => buildLiveSession(item))
-  const replays = await store.listReplays()
-  const assignment_audits = await store.listAssignmentAudits()
+export async function buildEduDashboard(store, tenantId = DEFAULT_TENANT_ID) {
+  const classrooms = await store.listClassrooms(tenantId)
+  const assignments = await store.listAssignments(tenantId)
+  const liveSessions = await store.listLiveSessions(tenantId)
+  const assignmentAudits = await store.listAssignmentAudits(tenantId)
+  const summary = (await store.getDashboardSummary?.(tenantId)) || (await store.refreshDashboardSummary?.(tenantId))
 
   return {
-    updated_at: nowIso(),
+    updated_at: summary?.updated_at || nowIso(),
     product: {
       host: 'edu.handtyped.app',
       teacher_surface: 'web',
       student_surface: 'native',
       student_runtime: 'native-app',
     },
-    summary: {
-      classrooms: classrooms.length,
-      assignments: assignments.length,
-      live_sessions: live_sessions.length,
-      replays_available: replays.length,
-      audits_recorded: assignment_audits.length,
-    },
+    summary: summary || buildDashboardSummaryRecord({ tenantId, classrooms: classrooms.length, assignments: assignments.length }),
     classrooms,
     assignments,
-    live_sessions,
-    assignment_audits,
+    live_sessions: liveSessions,
+    assignment_audits: assignmentAudits,
     architecture: {
       teacher_web_origin: 'https://edu.handtyped.app',
       replay_origin: 'https://replay.handtyped.app',
@@ -821,37 +1298,33 @@ export async function buildEduDashboard(store) {
 }
 
 export async function buildAssignmentLiveSummaries(store, assignmentId) {
-  return (await store.listLiveSessionSummariesForAssignment(assignmentId)).map((item) =>
+  const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
+  const tenantId = assignment?.tenant_id || DEFAULT_TENANT_ID
+  return (await store.listLiveSessionSummariesForAssignment(assignmentId, tenantId)).map((item) =>
     buildLiveSessionSummary(item),
   )
 }
 
-export async function buildEduDashboardDelta(store, { since } = {}) {
+export async function buildEduDashboardDelta(store, tenantId = DEFAULT_TENANT_ID, { since } = {}) {
   const normalizedSince = String(since || '')
-  const classrooms = await store.listClassrooms()
-  const assignments = await store.listAssignments()
-  const live_sessions = (await store.listLiveSessions()).map((item) => buildLiveSession(item))
-  const replays = await store.listReplays()
-  const assignment_audits = await store.listAssignmentAudits()
+  const classrooms = await store.listClassrooms(tenantId)
+  const assignments = await store.listAssignments(tenantId)
+  const liveSessions = await store.listLiveSessions(tenantId)
+  const assignmentAudits = await store.listAssignmentAudits(tenantId)
+  const summary = (await store.getDashboardSummary?.(tenantId)) || (await store.refreshDashboardSummary?.(tenantId))
 
   const changedSince = (items) =>
     (items || []).filter((item) => String(item.updated_at || '') > normalizedSince)
 
   return {
-    updated_at: nowIso(),
+    updated_at: summary?.updated_at || nowIso(),
     since: normalizedSince || null,
     classrooms,
     assignments,
-    live_sessions: changedSince(live_sessions),
-    replays: changedSince(replays),
-    assignment_audits: changedSince(assignment_audits),
-    summary: {
-      classrooms: classrooms.length,
-      assignments: assignments.length,
-      live_sessions: live_sessions.length,
-      replays_available: replays.length,
-      audits_recorded: assignment_audits.length,
-    },
+    live_sessions: liveSessions,
+    replays: [],
+    assignment_audits: changedSince(assignmentAudits),
+    summary: summary || buildDashboardSummaryRecord({ tenantId, classrooms: classrooms.length, assignments: assignments.length }),
   }
 }
 
@@ -908,6 +1381,7 @@ export function buildAssignmentAuditRecord({
           : 'Reviewed assignment settings'
 
   return buildAssignmentAudit({
+    tenant_id: assignment?.tenant_id || previousAssignment?.tenant_id || DEFAULT_TENANT_ID,
     assignment_id: assignment?.id || previousAssignment?.id || '',
     classroom_id: assignment?.classroom_id || previousAssignment?.classroom_id || null,
     assignment_title: assignment?.title || previousAssignment?.title || '',
@@ -922,26 +1396,26 @@ export function buildAssignmentAuditRecord({
 }
 
 export async function buildStudentConfig(store, { joinCode, studentName } = {}) {
-  const classrooms = await store.listClassrooms()
-  let classroom = classrooms.find((item) => item.join_code.toUpperCase() === String(joinCode || '').toUpperCase())
+  let classroom = await getClassroomByJoinCodeCompat(store, joinCode)
   if (!classroom) {
     return { classroom: null, assignments: [] }
   }
   classroom = await rememberStudentInClassroom(store, classroom, studentName)
-  const liveSessions = await store.listLiveSessions()
-  const assignments = (await store.listAssignments())
-    .filter((item) => item.classroom_id === classroom.id)
+  const assignments = (await listAssignmentsByClassroomCompat(store, classroom))
     .filter((item) => assignmentTargetsStudent(item, studentName))
-    .map((item) =>
-      assignmentForStudentConfig(
+  const assignmentsWithFeedback = await Promise.all(
+    assignments.map(async (item) => {
+      const liveSession = await getLiveSessionForAssignmentStudentCompat(store, item.id, studentName, classroom.tenant_id)
+      return assignmentForStudentConfig(
         {
           ...item,
-          student_feedback: studentFeedbackForAssignment(liveSessions, item.id, studentName),
+          student_feedback: liveSession?.grading || null,
         },
         studentName,
-      ),
-    )
-  return { classroom, assignments }
+      )
+    }),
+  )
+  return { classroom, assignments: assignmentsWithFeedback }
 }
 
 export async function buildStudentAssignmentConfig(
@@ -970,8 +1444,12 @@ export async function buildStudentAssignmentConfig(
     return { classroom, assignment: null }
   }
 
-  const liveSessionId = `${String(studentName || 'Student')}:${assignment.id}`
-  const liveSession = await store.getLiveSession(liveSessionId)
+  const liveSession = await getLiveSessionForAssignmentStudentCompat(
+    store,
+    assignment.id,
+    studentName,
+    assignment.tenant_id,
+  )
   return {
     classroom,
     assignment: assignmentForStudentConfig(
@@ -981,5 +1459,37 @@ export async function buildStudentAssignmentConfig(
       },
       studentName,
     ),
+  }
+}
+
+export async function buildStudentActiveAssignmentState(
+  store,
+  {
+    assignmentId,
+    joinCode,
+    studentName,
+  } = {},
+) {
+  const result = await buildStudentAssignmentConfig(store, {
+    assignmentId,
+    joinCode,
+    studentName,
+  })
+  if (!result.classroom || !result.assignment) {
+    return {
+      classroom: result.classroom || null,
+      assignment: null,
+      linked_references: [],
+      schedule_open: false,
+      session_end_at: null,
+    }
+  }
+  const schedule = scheduleStateForAssignment(result.assignment, studentName)
+  return {
+    classroom: result.classroom,
+    assignment: result.assignment,
+    linked_references: await buildLinkedAssignmentReferences(store, result.assignment, studentName),
+    schedule_open: schedule.schedule_open,
+    session_end_at: schedule.session_end_at,
   }
 }

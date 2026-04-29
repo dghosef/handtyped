@@ -55,20 +55,33 @@ class FakeD1Database {
     }
 
     if (sql.includes('INSERT INTO edu_records')) {
-      const [kind, id, updated_at, json, email, join_code, classroom_id] = args
+      const [kind, id, updated_at, json, tenant_id, email, join_code, classroom_id, student_key, parent_id, expires_at] = args
       this.records.set(this.key(kind, id), {
         kind,
         id,
         updated_at,
         json,
+        tenant_id,
         email,
         join_code,
         classroom_id,
+        student_key,
+        parent_id,
+        expires_at,
       })
       return
     }
 
     if (sql.startsWith('DELETE FROM edu_records')) {
+      if (sql.includes('expires_at')) {
+        const [cutoff] = args
+        for (const [key, row] of this.records.entries()) {
+          if (row.expires_at && String(row.expires_at) < String(cutoff)) {
+            this.records.delete(key)
+          }
+        }
+        return
+      }
       const [kind, id] = args
       this.records.delete(this.key(kind, id))
       return
@@ -80,10 +93,10 @@ class FakeD1Database {
   query(sql, args) {
     const records = [...this.records.values()]
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? ORDER BY updated_at DESC')) {
-      const [kind] = args
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')) {
+      const [tenant_id, kind] = args
       return records
-        .filter((row) => row.kind === kind)
+        .filter((row) => row.kind === kind && row.tenant_id === tenant_id)
         .sort((a, b) => {
           const updatedCompare = String(b.updated_at).localeCompare(String(a.updated_at))
           return updatedCompare || String(b.id).localeCompare(String(a.id))
@@ -97,9 +110,39 @@ class FakeD1Database {
       return row ? [{ json: row.json }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND email = ? LIMIT 1')) {
-      const [kind, email] = args
-      const row = records.find((item) => item.kind === kind && item.email === email)
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')) {
+      const [tenant_id, kind, email] = args
+      const row = records.find((item) => item.tenant_id === tenant_id && item.kind === kind && item.email === email)
+      return row ? [{ json: row.json }] : []
+    }
+
+    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')) {
+      const [kind, join_code] = args
+      const row = records.find((item) => item.kind === kind && item.join_code === join_code)
+      return row ? [{ json: row.json }] : []
+    }
+
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')) {
+      const [tenant_id, kind, classroom_id] = args
+      return records
+        .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.classroom_id === classroom_id)
+        .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))
+        .map((row) => ({ json: row.json }))
+    }
+
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')) {
+      const [tenant_id, kind, parent_id] = args
+      return records
+        .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.parent_id === parent_id)
+        .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))
+        .map((row) => ({ json: row.json }))
+    }
+
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')) {
+      const [tenant_id, kind, classroom_id, student_key] = args
+      const row = records
+        .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.classroom_id === classroom_id && item.student_key === student_key)
+        .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))[0]
       return row ? [{ json: row.json }] : []
     }
 

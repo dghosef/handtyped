@@ -10,15 +10,18 @@ import {
   buildAfterSchoolRanges,
   dashboardDeltaNeedsFullRefresh,
   deriveSessionRisk,
+  formatWindowSummary,
   isSessionActive,
   localDateTimeInputValue,
   nextLocalTimeAtOrAfter,
+  parseTimestamp,
   recentEditActivity,
   reconcileTeacherNavigation,
   replayLocalDateInputValue,
   sessionStatusLabel,
   sessionsForAssignment,
   sortSessionsForDisplay,
+  timeAgoLabel,
   todayAtLocalTime,
   todayAtLocalTimeIso,
 } from './public/edu/app-ui.js'
@@ -80,10 +83,12 @@ describe('teacher navigation', () => {
   })
 
   it('refreshes the dashboard slowly by default and immediately when a review opens', () => {
-    expect(teacherAppJs).toContain('const DASHBOARD_IDLE_REFRESH_MS = 15000')
-    expect(teacherAppJs).toContain('const DASHBOARD_REVIEW_REFRESH_MS = 1000')
+    expect(teacherAppJs).toContain('const DASHBOARD_IDLE_REFRESH_MS = 60000')
+    expect(teacherAppJs).toContain('const DASHBOARD_REVIEW_REFRESH_MS = 60000')
     expect(teacherAppJs).toContain('scheduleDashboardRefresh()')
     expect(teacherAppJs).toContain('await refreshDashboard()')
+    expect(teacherAppJs).toContain('function syncRealtimeSubscriptions()')
+    expect(teacherAppJs).toContain("new EventSource(url)")
     expect(teacherAppJs).toContain('function activeReviewEditorElement()')
     expect(teacherAppJs).toContain('/api/edu/live-replays/')
   })
@@ -684,10 +689,18 @@ describe('teacher navigation', () => {
     expect(teacherAppHtml).toContain('id="assignment-add-student-override"')
     expect(teacherAppHtml).not.toContain('assignment-student-override-suggestions')
     expect(teacherAppHtml).toContain('id="assignment-linked-options"')
+    expect(teacherAppHtml).toContain('id="assignment-reference-upload"')
+    expect(teacherAppHtml).toContain('id="assignment-reference-document-list"')
     expect(teacherAppHtml).not.toContain('name="temporary_access_until" type="datetime-local"')
     expect(teacherAppHtml).toContain('name="allow_dictation"')
     expect(teacherAppHtml).toContain('name="require_lockdown" checked')
     expect(teacherAppHtml).toContain('name="browser_allowed_domains"')
+    expect(teacherAppHtml).toContain('name="editor_font_size"')
+    expect(teacherAppHtml).toContain('name="starter_document"')
+    expect(teacherAppJs).toContain('function populateAssignmentFontSizeOptions()')
+    expect(teacherAppJs).toContain('STUDENT_OVERRIDE_FONT_SIZE_OPTIONS')
+    expect(teacherAppJs).toContain('reviewSessionHasAccess(')
+    expect(teacherAppJs).toContain('handleReferenceDocumentUpload(')
   })
 
   it('requests a full refresh when delta summary counts shrink below local merged state', () => {
@@ -720,5 +733,189 @@ describe('teacher navigation', () => {
         },
       ),
     ).toBe(false)
+  })
+
+  it('treats missing delta summaries or missing local state as non-fatal no-refresh cases', () => {
+    expect(dashboardDeltaNeedsFullRefresh(null, { summary: { live_sessions: 1, audits_recorded: 1 } })).toBe(false)
+    expect(dashboardDeltaNeedsFullRefresh({ live_sessions: [], assignment_audits: [] }, null)).toBe(false)
+    expect(dashboardDeltaNeedsFullRefresh({ live_sessions: [], assignment_audits: [] }, { summary: null })).toBe(
+      false,
+    )
+  })
+
+  it('parses timestamps defensively and formats human-relative age labels', () => {
+    const now = Date.UTC(2026, 3, 28, 12, 0, 0)
+    expect(parseTimestamp('2026-04-28T11:59:55.000Z')).toBe(Date.UTC(2026, 3, 28, 11, 59, 55))
+    expect(parseTimestamp('not-a-time')).toBeNull()
+    expect(timeAgoLabel('2026-04-28T11:59:58.000Z', now)).toBe('just now')
+    expect(timeAgoLabel('2026-04-28T11:59:20.000Z', now)).toBe('40s ago')
+    expect(timeAgoLabel('2026-04-28T11:15:00.000Z', now)).toBe('45m ago')
+    expect(timeAgoLabel('2026-04-28T09:00:00.000Z', now)).toBe('3h ago')
+    expect(timeAgoLabel('2026-04-25T12:00:00.000Z', now)).toBe('3d ago')
+    expect(timeAgoLabel('bad input', now)).toBe('Unknown')
+  })
+
+  it('summarizes assignment windows for both configured and missing schedules', () => {
+    expect(
+      formatWindowSummary({
+        windows: [
+          {
+            days: {
+              monday: true,
+              tuesday: true,
+              wednesday: false,
+              thursday: true,
+              friday: false,
+              saturday: false,
+              sunday: false,
+            },
+            start_hour: 8,
+            start_minute: 5,
+            end_hour: 14,
+            end_minute: 30,
+            end_date: '2026-05-01',
+          },
+        ],
+      }),
+    ).toBe('mon, tue, thu • 08:05–14:30 until 2026-05-01')
+    expect(formatWindowSummary({ windows: [] })).toBe('No writing window configured.')
+  })
+
+  it('supports overnight writing windows that cross midnight', () => {
+    const overnight = {
+      windows: [
+        {
+          days: {
+            monday: true,
+            tuesday: true,
+            wednesday: true,
+            thursday: true,
+            friday: true,
+            saturday: false,
+            sunday: false,
+          },
+          start_hour: 22,
+          start_minute: 0,
+          end_hour: 1,
+          end_minute: 30,
+        },
+      ],
+    }
+
+    expect(assignmentIsOpenNow(overnight, new Date(2026, 3, 27, 22, 15))).toBe(true)
+    expect(assignmentIsOpenNow(overnight, new Date(2026, 3, 28, 0, 45))).toBe(true)
+    expect(assignmentIsOpenNow(overnight, new Date(2026, 3, 28, 2, 0))).toBe(false)
+  })
+
+  it('keeps active-session meta empty when no classroom or assignment is selected', () => {
+    expect(assignmentViewMeta(null, classrooms[0], [])).toBe('')
+    expect(assignmentViewMeta(assignments[0], null, [])).toBe('')
+  })
+
+  it('accepts precomputed recent edit counts when sessions already carry bucket totals', () => {
+    const activity = aggregateRecentEditActivity([
+      { recent_edit_count: 5 },
+      { recent_edit_count: 0 },
+      { recent_edit_count: 3 },
+    ])
+
+    expect(activity.totalEdits).toBe(8)
+    expect(activity.activeStudents).toBe(2)
+    expect(activity.buckets).toEqual([8, 0, 0, 0, 0])
+  })
+
+  it('merges empty replay update polls without losing accumulated history', () => {
+    expect(
+      applyLiveReplayUpdates(
+        {
+          current_text: 'Existing draft',
+          document_history: [{ t: 100, pos: 0, del: '', ins: 'Existing draft' }],
+          url_history: [{ t: 120, url: 'https://example.org', allowed: true }],
+          last_seq: 2,
+        },
+        {
+          last_seq: 2,
+          events: [],
+          current_url: 'https://example.org',
+          current_url_title: 'Example',
+        },
+      ),
+    ).toMatchObject({
+      current_text: 'Existing draft',
+      document_history: [{ t: 100, pos: 0, del: '', ins: 'Existing draft' }],
+      url_history: [{ t: 120, url: 'https://example.org', allowed: true }],
+      current_url: 'https://example.org',
+      current_url_title: 'Example',
+      last_seq: 2,
+    })
+  })
+
+  it('normalizes unknown navigation views back to the classes page', () => {
+    expect(
+      reconcileTeacherNavigation({
+        classrooms,
+        assignments,
+        selectedClassroomId: 'english-11',
+        selectedAssignmentId: 'essay-1',
+        currentView: 'mystery-view',
+      }),
+    ).toEqual({
+      selectedClassroomId: 'english-11',
+      selectedAssignmentId: null,
+      currentView: 'classes',
+    })
+  })
+
+  it('counts blank current text as a small risk even for otherwise active sessions', () => {
+    const now = Date.UTC(2026, 3, 28, 12, 0, 0)
+    const risk = deriveSessionRisk(
+      {
+        schedule_open: true,
+        focused: true,
+        hid_active: true,
+        current_text: '',
+        last_activity_at: new Date(now - 2_000).toISOString(),
+        violations: [],
+        focus_events: [],
+      },
+      now,
+    )
+
+    expect(risk.score).toBeGreaterThan(0)
+    expect(risk.reasons).toContain('No current writing')
+    expect(risk.needsAttention).toBe(false)
+  })
+
+  it('counts non-focused foreground transitions as focus leaves in risk summaries', () => {
+    const now = Date.UTC(2026, 3, 28, 12, 0, 0)
+    const risk = deriveSessionRisk(
+      {
+        schedule_open: true,
+        focused: false,
+        hid_active: true,
+        current_text: 'Draft text',
+        last_activity_at: new Date(now - 2_000).toISOString(),
+        violations: [],
+        focus_events: [{ state: 'foreground' }, { state: 'background' }, { state: 'blurred' }],
+      },
+      now,
+    )
+
+    expect(risk.focusLeaves).toBe(2)
+    expect(risk.reasons).toContain('2 focus changes')
+    expect(risk.needsAttention).toBe(true)
+  })
+
+  it('treats sessions without parseable activity timestamps as offline', () => {
+    const now = Date.UTC(2026, 3, 28, 12, 0, 0)
+    const session = {
+      schedule_open: true,
+      focused: true,
+      last_activity_at: 'definitely-not-a-timestamp',
+      updated_at: '',
+    }
+
+    expect(isSessionActive(session, now)).toBe(false)
+    expect(sessionStatusLabel(session, now)).toBe('Offline')
   })
 })

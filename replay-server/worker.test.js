@@ -180,6 +180,23 @@ function payloadFromEnvelope(envelope) {
 }
 
 describe('worker host routing', () => {
+  it('runs scheduled edu maintenance without throwing', async () => {
+    const env = makeEnv()
+    const jobs = []
+    await worker.scheduled(
+      { cron: '*/15 * * * *', scheduledTime: Date.now() },
+      env,
+      {
+        waitUntil(promise) {
+          jobs.push(promise)
+        },
+      },
+    )
+
+    await Promise.all(jobs)
+    expect(jobs.length).toBe(1)
+  })
+
   it('returns 404 at the replay host root', async () => {
     const res = await worker.fetch(new Request('https://replay.handtyped.app/', { method: 'GET' }), makeEnv())
 
@@ -1544,12 +1561,41 @@ describe('worker per-student assignment extensions', () => {
           course: classroom.name,
           classroom_id: classroom.id,
           classroom_name: classroom.name,
+          temporary_access_until: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
       }),
       env,
     )
     const assignment = await assignmentRes.json()
     expect(assignmentRes.status).toBe(201)
+
+    const linkedAssignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Earlier Draft',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+        }),
+      }),
+      env,
+    )
+    const linkedAssignment = await linkedAssignmentRes.json()
+    expect(linkedAssignmentRes.status).toBe(201)
+
+    const updatedAssignmentRes = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          linked_assignment_ids: [linkedAssignment.id],
+        }),
+      }),
+      env,
+    )
+    expect(updatedAssignmentRes.status).toBe(200)
 
     const liveSessionRes = await worker.fetch(
       new Request('https://edu.handtyped.app/api/edu/live-sessions', {
@@ -1585,6 +1631,34 @@ describe('worker per-student assignment extensions', () => {
     )
     expect(liveSessionRes.status).toBe(201)
 
+    const linkedLiveSessionRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `Ada Lovelace:${linkedAssignment.id}`,
+          assignment_id: linkedAssignment.id,
+          assignment_title: linkedAssignment.title,
+          course: linkedAssignment.course,
+          classroom: classroom.name,
+          student_name: 'Ada Lovelace',
+          current_text: 'Earlier draft reference text',
+          document_history: [{ t: 1, ins: 'Earlier', del: '', pos: 0 }],
+          focus_events: [{ t: 1, state: 'focused' }],
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: new Date().toISOString(),
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+          updated_at: new Date().toISOString(),
+        }),
+      }),
+      env,
+    )
+    expect(linkedLiveSessionRes.status).toBe(201)
+
     const summariesRes = await worker.fetch(
       new Request(`https://edu.handtyped.app/api/edu/assignments/${assignment.id}/live-summaries`, {
         method: 'GET',
@@ -1616,10 +1690,22 @@ describe('worker per-student assignment extensions', () => {
     )
     expect(studentAssignmentRes.status).toBe(200)
     expect(await studentAssignmentRes.json()).toMatchObject({
+      classroom: {
+        id: classroom.id,
+      },
       assignment: {
         id: assignment.id,
         access_revoked: false,
       },
+      schedule_open: expect.any(Boolean),
+      session_end_at: expect.any(String),
+      linked_references: [
+        expect.objectContaining({
+          assignment_id: linkedAssignment.id,
+          available: true,
+          markdown: 'Earlier draft reference text',
+        }),
+      ],
     })
   })
 

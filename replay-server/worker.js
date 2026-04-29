@@ -2,10 +2,20 @@ import { parseReplayAttestation, buildReplayUrl } from './session-store.js'
 import { parseTrustedSignerAllowlist } from './trusted-signers.js'
 import { createReplayGuardrails, resolveReplayUploadRateLimit } from './guardrails.js'
 import {
+  buildAssignmentChannel,
+  buildReplayChannel,
+  buildStudentAssignmentChannel,
+  buildStudentAssignmentGroupChannel,
+  buildTenantChannel,
+  EduRealtimeHub,
+  publishRealtimeEvent,
+} from './edu-realtime.js'
+import {
   buildAssignmentLiveSummaries,
   buildAssignmentAuditRecord,
   buildEduDashboard,
   buildEduDashboardDelta,
+  buildStudentActiveAssignmentState,
   buildStudentAssignmentConfig,
   buildStudentConfig,
   createD1EduStore,
@@ -13,6 +23,7 @@ import {
   ensureEduSeedData,
 } from './edu-store.js'
 import {
+  DEFAULT_TENANT_ID,
   buildAssignment,
   buildClassroom,
   buildEduReplay,
@@ -260,6 +271,121 @@ function getEduAuthStore(env) {
   return createKvEduStore(env.SESSIONS)
 }
 
+async function prepareEduStore(store) {
+  await ensureEduSeedData(store)
+  await store.runMaintenance?.()
+  return store
+}
+
+async function runScheduledEduMaintenance(env) {
+  const store = getEduStore(env)
+  await ensureEduSeedData(store)
+  await store.runMaintenance?.({ force: true })
+}
+
+function teacherTenantId(session) {
+  return session?.tenant_id || DEFAULT_TENANT_ID
+}
+
+function maybeAuthSession(session) {
+  return session?.authenticated ? session : null
+}
+
+async function publishTeacherDashboard(env, tenantId) {
+  const store = getEduStore(env)
+  const payload = await buildEduDashboardDelta(store, tenantId, { since: '' })
+  await publishRealtimeEvent(env, {
+    channels: [buildTenantChannel(tenantId, 'dashboard')],
+    event: 'dashboard',
+    payload,
+  })
+}
+
+async function publishAssignmentSummary(env, assignmentId, tenantId) {
+  const store = getEduStore(env)
+  const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
+  if (!assignment) {
+    return
+  }
+  const payload = {
+    assignment,
+    live_sessions: await buildAssignmentLiveSummaries(store, assignmentId),
+    assignment_audits: await store.listAssignmentAuditsByAssignmentId(assignmentId, tenantId),
+    updated_at: nowIso(),
+  }
+  await publishRealtimeEvent(env, {
+    channels: [buildAssignmentChannel(tenantId, assignmentId)],
+    event: 'assignment',
+    payload,
+  })
+}
+
+async function publishReplayUpdate(env, liveSessionId, tenantId) {
+  const store = getEduStore(env)
+  const head = liveSessionId ? await store.getLiveReplayHead(liveSessionId) : null
+  if (!head) {
+    return
+  }
+  const replay = head.replay_session_id ? await store.getReplay(head.replay_session_id) : null
+  const events = await store.listLiveReplayEvents(head.id, tenantId)
+  await publishRealtimeEvent(env, {
+    channels: [buildReplayChannel(tenantId, liveSessionId)],
+    event: 'replay',
+    payload: buildLiveReplayResponse(head, events, replay),
+  })
+}
+
+async function publishStudentAssignment(env, assignment, studentName, joinCode) {
+  if (!assignment || !studentName || !joinCode) {
+    return
+  }
+  const store = getEduStore(env)
+  const result = await buildStudentActiveAssignmentState(store, {
+    assignmentId: assignment.id,
+    joinCode,
+    studentName,
+  })
+  if (!result.assignment || !result.classroom) {
+    return
+  }
+  await publishRealtimeEvent(env, {
+    channels: [
+      buildStudentAssignmentChannel({
+        tenantId: result.assignment.tenant_id,
+        classroomId: result.assignment.classroom_id,
+        assignmentId: result.assignment.id,
+        studentKey: String(studentName || '').trim().toLowerCase(),
+      }),
+    ],
+    event: 'student-assignment',
+    payload: {
+      ...result,
+      updated_at: nowIso(),
+    },
+  })
+}
+
+async function publishStudentAssignmentInvalidation(env, assignment, { deleted = false } = {}) {
+  if (!assignment) {
+    return
+  }
+  await publishRealtimeEvent(env, {
+    channels: [
+      buildStudentAssignmentGroupChannel({
+        tenantId: assignment.tenant_id,
+        classroomId: assignment.classroom_id,
+        assignmentId: assignment.id,
+      }),
+    ],
+    event: 'student-assignment-invalidated',
+    payload: {
+      assignment_id: assignment.id,
+      deleted: Boolean(deleted),
+      updated_at: nowIso(),
+    },
+  })
+}
+
 async function safeList(load, fallback = []) {
   try {
     const result = await load()
@@ -400,23 +526,71 @@ export default {
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/dashboard') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      return json(await buildSafeEduDashboard(store))
+      return json(await buildEduDashboard(store, teacherTenantId(session)))
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/dashboard/updates') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      return json(await buildEduDashboardDelta(store, { since: url.searchParams.get('since') || '' }))
+      return json(await buildEduDashboardDelta(store, teacherTenantId(session), { since: url.searchParams.get('since') || '' }))
+    }
+
+    if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/realtime') {
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated || !env.EDU_REALTIME) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const tenantId = teacherTenantId(session)
+      const requested = url.searchParams.getAll('channel')
+      const allowedPrefix = `tenant:${tenantId}:`
+      const allowed = requested.filter((channel) => String(channel || '').startsWith(allowedPrefix))
+      if (!allowed.length) {
+        allowed.push(buildTenantChannel(tenantId, 'dashboard'))
+      }
+      const hubUrl = new URL('https://edu-realtime.internal/subscribe')
+      for (const channel of allowed) {
+        hubUrl.searchParams.append('channel', channel)
+      }
+      const id = env.EDU_REALTIME.idFromName('tenant-realtime-hub')
+      return env.EDU_REALTIME.get(id).fetch(hubUrl)
+    }
+
+    if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/student/realtime') {
+      if (!env.EDU_REALTIME) {
+        return new Response('Realtime unavailable', { status: 503 })
+      }
+      const store = await prepareEduStore(getEduStore(env))
+      const assignmentId = url.searchParams.get('assignment_id') || ''
+      const studentName = url.searchParams.get('student_name') || ''
+      const joinCode = url.searchParams.get('join_code') || ''
+      const result = await buildStudentAssignmentConfig(store, { assignmentId, joinCode, studentName })
+      if (!result.classroom || !result.assignment) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const personalChannel = buildStudentAssignmentChannel({
+        tenantId: result.assignment.tenant_id,
+        classroomId: result.assignment.classroom_id,
+        assignmentId: result.assignment.id,
+        studentKey: studentName.trim().toLowerCase(),
+      })
+      const groupChannel = buildStudentAssignmentGroupChannel({
+        tenantId: result.assignment.tenant_id,
+        classroomId: result.assignment.classroom_id,
+        assignmentId: result.assignment.id,
+      })
+      const hubUrl = new URL('https://edu-realtime.internal/subscribe')
+      hubUrl.searchParams.append('channel', personalChannel)
+      hubUrl.searchParams.append('channel', groupChannel)
+      const id = env.EDU_REALTIME.idFromName('tenant-realtime-hub')
+      return env.EDU_REALTIME.get(id).fetch(hubUrl)
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/config') {
@@ -455,7 +629,7 @@ export default {
           mockVerifier: env.__googleTokenVerifier || null,
         }).catch(() => null)
 
-        await ensureEduSeedData(getEduStore(env))
+        await prepareEduStore(getEduStore(env))
         teacher = profile
           ? await authenticateTeacherWithGoogle(getEduStore(env), profile)
           : null
@@ -502,54 +676,54 @@ export default {
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/classrooms') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      return json(await store.listClassrooms())
+      return json(await store.listClassrooms(teacherTenantId(session)))
     }
 
     if (eduHost && request.method === 'POST' && url.pathname === '/api/edu/classrooms') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      const classroom = buildClassroom(await parseJsonRequest(request))
+      const classroom = buildClassroom({ ...(await parseJsonRequest(request)), tenant_id: teacherTenantId(session) })
       const conflict = await findJoinCodeConflict(store, classroom.join_code)
       if (conflict) {
         return json({ error: 'Join code already in use', join_code: classroom.join_code }, { status: 409 })
       }
       classroom.updated_at = nowIso()
       await store.putClassroom(classroom)
+      await publishTeacherDashboard(env, classroom.tenant_id)
       return json(classroom, { status: 201 })
     }
 
     if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/classrooms/')) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const id = url.pathname.split('/').pop()
       const classroom = id ? await store.getClassroom(id) : null
+      if (classroom && classroom.tenant_id !== teacherTenantId(session)) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
       return classroom ? json(classroom) : json({ error: 'Not found' }, { status: 404 })
     }
 
     if (eduHost && request.method === 'PUT' && url.pathname.startsWith('/api/edu/classrooms/')) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const id = url.pathname.split('/').pop()
       const existing = id ? await store.getClassroom(id) : null
-      if (!existing) {
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       const classroom = buildClassroom({ ...existing, ...(await parseJsonRequest(request)), id, updated_at: nowIso() })
@@ -558,52 +732,55 @@ export default {
         return json({ error: 'Join code already in use', join_code: classroom.join_code }, { status: 409 })
       }
       await store.putClassroom(classroom)
+      await publishTeacherDashboard(env, classroom.tenant_id)
       return json(classroom)
     }
 
     if (eduHost && request.method === 'DELETE' && url.pathname.startsWith('/api/edu/classrooms/')) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const id = url.pathname.split('/').pop()
       const existing = id ? await store.getClassroom(id) : null
-      if (!existing) {
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
-      const assignments = await store.listAssignments()
+      const assignments = await store.listAssignments(existing.tenant_id)
       for (const assignment of assignments.filter((item) => item.classroom_id === id)) {
+        await publishStudentAssignmentInvalidation(env, assignment, { deleted: true })
         await store.deleteAssignment(assignment.id)
       }
       await store.deleteClassroom(id)
+      await store.refreshDashboardSummary?.(existing.tenant_id)
+      await publishTeacherDashboard(env, existing.tenant_id)
       return json({ deleted: true, classroom_id: id })
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/assignments') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      return json(await store.listAssignments())
+      return json(await store.listAssignments(teacherTenantId(session)))
     }
 
     if (eduHost && request.method === 'POST' && url.pathname === '/api/edu/assignments') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      const assignment = buildAssignment(await parseJsonRequest(request))
+      const assignment = buildAssignment({ ...(await parseJsonRequest(request)), tenant_id: teacherTenantId(session) })
       assignment.updated_at = nowIso()
       await store.putAssignment(assignment)
       await store.putAssignmentAudit(
         buildAssignmentAuditRecord({ action: 'created', assignment, actor: session }),
       )
+      await publishTeacherDashboard(env, assignment.tenant_id)
+      await publishAssignmentSummary(env, assignment.id, assignment.tenant_id)
       return json(assignment, { status: 201 })
     }
 
@@ -612,8 +789,7 @@ export default {
       request.method === 'GET' &&
       /\/api\/edu\/assignments\/[^/]+\/live-summaries$/.test(url.pathname)
     ) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
@@ -621,7 +797,7 @@ export default {
       const parts = url.pathname.split('/')
       const assignmentId = parts[parts.length - 2]
       const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
-      if (!assignment) {
+      if (!assignment || assignment.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       return json({
@@ -638,14 +814,16 @@ export default {
       !url.pathname.endsWith('/audit') &&
       !url.pathname.endsWith('/live-summaries')
     ) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const id = url.pathname.split('/').pop()
       const assignment = id ? await store.getAssignment(id) : null
+      if (assignment && assignment.tenant_id !== teacherTenantId(session)) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
       return assignment ? json(assignment) : json({ error: 'Not found' }, { status: 404 })
     }
 
@@ -654,8 +832,7 @@ export default {
       request.method === 'POST' &&
       /\/api\/edu\/assignments\/[^/]+\/access-requests$/.test(url.pathname)
     ) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const parts = url.pathname.split('/')
       const assignmentId = parts[parts.length - 2]
       const existing = assignmentId ? await store.getAssignment(assignmentId) : null
@@ -689,6 +866,12 @@ export default {
           actor: null,
         }),
       )
+      await publishTeacherDashboard(env, updatedAssignment.tenant_id)
+      await publishAssignmentSummary(env, updatedAssignment.id, updatedAssignment.tenant_id)
+      const classroom = updatedAssignment.classroom_id ? await store.getClassroom(updatedAssignment.classroom_id) : null
+      if (classroom) {
+        await publishStudentAssignment(env, updatedAssignment, studentName, classroom.join_code)
+      }
       return json(
         {
           assignment_id: updatedAssignment.id,
@@ -699,15 +882,14 @@ export default {
     }
 
     if (eduHost && request.method === 'PUT' && url.pathname.startsWith('/api/edu/assignments/')) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const id = url.pathname.split('/').pop()
       const existing = id ? await store.getAssignment(id) : null
-      if (!existing) {
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       const assignment = buildAssignment({ ...existing, ...(await parseJsonRequest(request)), id, updated_at: nowIso() })
@@ -720,6 +902,9 @@ export default {
           actor: session,
         }),
       )
+      await publishTeacherDashboard(env, assignment.tenant_id)
+      await publishAssignmentSummary(env, assignment.id, assignment.tenant_id)
+      await publishStudentAssignmentInvalidation(env, assignment)
       return json(assignment)
     }
 
@@ -729,15 +914,14 @@ export default {
       url.pathname.startsWith('/api/edu/assignments/') &&
       !url.pathname.endsWith('/audit')
     ) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
       const id = url.pathname.split('/').pop()
       const existing = id ? await store.getAssignment(id) : null
-      if (!existing) {
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       await store.deleteAssignment(id)
@@ -748,12 +932,14 @@ export default {
           actor: session,
         }),
       )
+      await store.refreshDashboardSummary?.(existing.tenant_id)
+      await publishTeacherDashboard(env, existing.tenant_id)
+      await publishStudentAssignmentInvalidation(env, existing, { deleted: true })
       return json({ deleted: true, assignment_id: id })
     }
 
     if (eduHost && request.method === 'GET' && /\/api\/edu\/assignments\/[^/]+\/audit$/.test(url.pathname)) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
@@ -761,10 +947,10 @@ export default {
       const parts = url.pathname.split('/')
       const assignmentId = parts[parts.length - 2]
       const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
-      if (!assignment) {
+      if (!assignment || assignment.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
-      const audits = (await store.listAssignmentAudits()).filter((item) => item.assignment_id === assignmentId)
+      const audits = await store.listAssignmentAuditsByAssignmentId(assignmentId, assignment.tenant_id)
       return json(audits)
     }
 
@@ -774,7 +960,7 @@ export default {
       if (!session.authenticated) {
         return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
       }
-      return json((await store.listLiveSessions()).map((item) => buildLiveSession(item)))
+      return json((await store.listLiveSessions(teacherTenantId(session))).map((item) => buildLiveSession(item)))
     }
 
     if (eduHost && request.method === 'POST' && url.pathname === '/api/edu/live-sessions') {
@@ -787,6 +973,7 @@ export default {
       const session = buildLiveSession({
         ...existing,
         ...incoming,
+        tenant_id: existing?.tenant_id || incoming.tenant_id || DEFAULT_TENANT_ID,
         id: nextId,
         grading:
           incoming.grading && typeof incoming.grading === 'object'
@@ -796,6 +983,9 @@ export default {
       })
       await store.putLiveSession(session)
       await appendLiveReplayUpdate(store, session)
+      await publishTeacherDashboard(env, session.tenant_id)
+      await publishAssignmentSummary(env, session.assignment_id, session.tenant_id)
+      await publishReplayUpdate(env, session.id, session.tenant_id)
       return json(session, { status: 201 })
     }
 
@@ -812,7 +1002,7 @@ export default {
       const parts = url.pathname.split('/')
       const sessionId = parts[parts.length - 2]
       const existing = sessionId ? await store.getLiveSession(sessionId) : null
-      if (!existing) {
+      if (!existing || existing.tenant_id !== teacherTenantId(teacherSession)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       const body = await parseJsonRequest(request)
@@ -838,6 +1028,12 @@ export default {
         updated_at: nowIso(),
       })
       await store.putLiveSession(updated)
+      await publishAssignmentSummary(env, updated.assignment_id, updated.tenant_id)
+      const assignment = updated.assignment_id ? await store.getAssignment(updated.assignment_id) : null
+      const classroom = assignment?.classroom_id ? await store.getClassroom(assignment.classroom_id) : null
+      if (assignment && classroom) {
+        await publishStudentAssignment(env, assignment, updated.student_name, classroom.join_code)
+      }
       return json(updated)
     }
 
@@ -849,6 +1045,9 @@ export default {
       }
       const id = url.pathname.split('/').pop()
       const liveSession = id ? await store.getLiveSession(id) : null
+      if (liveSession && liveSession.tenant_id !== teacherTenantId(teacherSession)) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
       return liveSession ? json(buildLiveSession(liveSession)) : json({ error: 'Not found' }, { status: 404 })
     }
 
@@ -860,11 +1059,11 @@ export default {
       }
       const headId = url.pathname.split('/')[4]
       const head = headId ? await store.getLiveReplayHead(headId) : null
-      if (!head) {
+      if (!head || head.tenant_id !== teacherTenantId(teacherSession)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       const sinceSeq = Math.max(0, Number(url.searchParams.get('since_seq') || 0) || 0)
-      const events = (await store.listLiveReplayEvents(head.id)).filter((event) => event.seq > sinceSeq)
+      const events = (await store.listLiveReplayEvents(head.id, head.tenant_id)).filter((event) => event.seq > sinceSeq)
       const replay = head.replay_session_id ? await store.getReplay(head.replay_session_id) : null
       return json({
         id: head.id,
@@ -893,11 +1092,14 @@ export default {
       const headId = url.pathname.split('/').pop()
       const head = headId ? await store.getLiveReplayHead(headId) : null
       if (head) {
+        if (head.tenant_id !== teacherTenantId(teacherSession)) {
+          return json({ error: 'Not found' }, { status: 404 })
+        }
         const replay = head.replay_session_id ? await store.getReplay(head.replay_session_id) : null
-        return json(buildLiveReplayResponse(head, await store.listLiveReplayEvents(head.id), replay))
+        return json(buildLiveReplayResponse(head, await store.listLiveReplayEvents(head.id, head.tenant_id), replay))
       }
       const liveSession = headId ? await store.getLiveSession(headId) : null
-      if (!liveSession) {
+      if (!liveSession || liveSession.tenant_id !== teacherTenantId(teacherSession)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
       const replay = liveSession.replay_session_id ? await store.getReplay(liveSession.replay_session_id) : null
@@ -958,12 +1160,12 @@ export default {
           )
         }
       }
+      await publishReplayUpdate(env, replay.live_session_id, replay.tenant_id)
       return json(replay, { status: 201 })
     }
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/student/config') {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       return json(
         await buildStudentConfig(store, {
           joinCode: url.searchParams.get('join_code') || '',
@@ -973,10 +1175,9 @@ export default {
     }
 
     if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/student/assignments/')) {
-      const store = getEduStore(env)
-      await ensureEduSeedData(store)
+      const store = await prepareEduStore(getEduStore(env))
       const assignmentId = url.pathname.split('/').pop()
-      const result = await buildStudentAssignmentConfig(store, {
+      const result = await buildStudentActiveAssignmentState(store, {
         assignmentId,
         joinCode: url.searchParams.get('join_code') || '',
         studentName: url.searchParams.get('student_name') || '',
@@ -1086,4 +1287,9 @@ export default {
 
     return env.ASSETS.fetch(request)
   },
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(runScheduledEduMaintenance(env))
+  },
 }
+
+export { EduRealtimeHub }

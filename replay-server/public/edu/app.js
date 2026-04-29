@@ -20,10 +20,10 @@ import {
 } from './app-ui.js'
 import { buildAttributedDocument, latestTextFromHistory } from '../replay-view.js'
 
-const DASHBOARD_IDLE_REFRESH_MS = 15000
-const DASHBOARD_REVIEW_REFRESH_MS = 1000
-const ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS = 5000
-const ASSIGNMENT_VIEW_AUDIT_REFRESH_MS = 15000
+const DASHBOARD_IDLE_REFRESH_MS = 60000
+const DASHBOARD_REVIEW_REFRESH_MS = 60000
+const ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS = 30000
+const ASSIGNMENT_VIEW_AUDIT_REFRESH_MS = 60000
 
 let dashboardState = null
 let refreshTimer = null
@@ -37,6 +37,7 @@ let dashboardCursor = ''
 let sessionFilter = 'all'
 let sessionSearch = ''
 let assignmentStudentOverrideDrafts = []
+let assignmentReferenceDocuments = []
 let selectedReviewSessionId = null
 let reviewWorkspaceOpen = false
 let reviewState = null
@@ -48,6 +49,12 @@ const reviewReplayCache = new Map()
 let dashboardVisibilityRefreshBound = false
 let lastAssignmentViewSummaryRefreshAt = 0
 let lastAssignmentViewAuditRefreshAt = 0
+let teacherRealtime = null
+let assignmentRealtime = null
+let replayRealtime = null
+let teacherRealtimeKey = ''
+let assignmentRealtimeKey = ''
+let replayRealtimeKey = ''
 
 const elements = {
   authPanel: document.getElementById('auth-panel'),
@@ -84,8 +91,13 @@ const elements = {
   assignmentStudentOverrideList: document.getElementById('assignment-student-override-list'),
   assignmentAddStudentOverride: document.getElementById('assignment-add-student-override'),
   assignmentLinkedOptions: document.getElementById('assignment-linked-options'),
+  assignmentReferenceUpload: document.getElementById('assignment-reference-upload'),
+  assignmentReferenceDocumentList: document.getElementById('assignment-reference-document-list'),
   assignmentRubricList: document.getElementById('assignment-rubric-list'),
   assignmentAddRubric: document.getElementById('assignment-add-rubric'),
+  starterDocumentToolbar: document.getElementById('starter-document-toolbar'),
+  starterDocumentEditor: document.getElementById('starter-document-editor'),
+  starterDocumentField: document.getElementById('starter-document-field'),
   classroomModal: document.getElementById('classroom-modal'),
   assignmentModal: document.getElementById('assignment-modal'),
   feedbackModal: document.getElementById('feedback-modal'),
@@ -169,6 +181,313 @@ const STUDENT_OVERRIDE_LINE_HEIGHT_OPTIONS = [
   ['double', 'Double'],
 ]
 
+function populateAssignmentFontSizeOptions() {
+  const fontSizeSelect = elements.assignmentForm?.elements?.namedItem('editor_font_size')
+  if (!(fontSizeSelect instanceof HTMLSelectElement)) {
+    return
+  }
+  const currentValue = STUDENT_OVERRIDE_FONT_SIZE_OPTIONS.includes(fontSizeSelect.value)
+    ? fontSizeSelect.value
+    : '12'
+  fontSizeSelect.innerHTML = STUDENT_OVERRIDE_FONT_SIZE_OPTIONS
+    .map((value) => `<option value="${value}">${value} px</option>`)
+    .join('')
+  fontSizeSelect.value = currentValue
+}
+
+function escapeInlineHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function renderStarterInlineMarkdown(value = '') {
+  return escapeInlineHtml(value)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/__([^_]+)__/g, '<u>$1</u>')
+}
+
+function starterMarkdownToHtml(markdown = '') {
+  const text = String(markdown || '').replace(/\r/g, '').trim()
+  if (!text) {
+    return ''
+  }
+  const lines = text.split('\n')
+  const blocks = []
+  let index = 0
+  while (index < lines.length) {
+    const line = lines[index]
+    if (!line.trim()) {
+      index += 1
+      continue
+    }
+    if (/^###\s+/.test(line)) {
+      blocks.push(`<h3>${renderStarterInlineMarkdown(line.replace(/^###\s+/, ''))}</h3>`)
+      index += 1
+      continue
+    }
+    if (/^##\s+/.test(line)) {
+      blocks.push(`<h2>${renderStarterInlineMarkdown(line.replace(/^##\s+/, ''))}</h2>`)
+      index += 1
+      continue
+    }
+    if (/^#\s+/.test(line)) {
+      blocks.push(`<h1>${renderStarterInlineMarkdown(line.replace(/^#\s+/, ''))}</h1>`)
+      index += 1
+      continue
+    }
+    if (/^>\s?/.test(line)) {
+      const quoteLines = []
+      while (index < lines.length && /^>\s?/.test(lines[index])) {
+        quoteLines.push(renderStarterInlineMarkdown(lines[index].replace(/^>\s?/, '')))
+        index += 1
+      }
+      blocks.push(`<blockquote><p>${quoteLines.join('<br>')}</p></blockquote>`)
+      continue
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items = []
+      while (index < lines.length && /^[-*]\s+/.test(lines[index])) {
+        items.push(`<li>${renderStarterInlineMarkdown(lines[index].replace(/^[-*]\s+/, ''))}</li>`)
+        index += 1
+      }
+      blocks.push(`<ul>${items.join('')}</ul>`)
+      continue
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      const items = []
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
+        items.push(`<li>${renderStarterInlineMarkdown(lines[index].replace(/^\d+\.\s+/, ''))}</li>`)
+        index += 1
+      }
+      blocks.push(`<ol>${items.join('')}</ol>`)
+      continue
+    }
+    const paragraphLines = []
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^(#{1,3}\s+|>\s?|[-*]\s+|\d+\.\s+)/.test(lines[index])
+    ) {
+      paragraphLines.push(renderStarterInlineMarkdown(lines[index]))
+      index += 1
+    }
+    blocks.push(`<p>${paragraphLines.join('<br>')}</p>`)
+  }
+  return blocks.join('')
+}
+
+function starterInlineHtmlToMarkdown(node) {
+  if (!node) {
+    return ''
+  }
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent || ''
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return ''
+  }
+  const tag = node.tagName.toLowerCase()
+  const childText = Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('')
+  if (tag === 'strong' || tag === 'b') {
+    return `**${childText}**`
+  }
+  if (tag === 'em' || tag === 'i') {
+    return `*${childText}*`
+  }
+  if (tag === 'u') {
+    return `__${childText}__`
+  }
+  if (tag === 'a') {
+    const href = node.getAttribute('href') || ''
+    return href ? `[${childText}](${href})` : childText
+  }
+  if (tag === 'br') {
+    return '\n'
+  }
+  return childText
+}
+
+function starterBlockHtmlToMarkdown(node) {
+  if (!node) {
+    return ''
+  }
+  if (node.nodeType === Node.TEXT_NODE) {
+    return (node.textContent || '').trim()
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return ''
+  }
+  const tag = node.tagName.toLowerCase()
+  if (tag === 'h1') {
+    return `# ${Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()}`
+  }
+  if (tag === 'h2') {
+    return `## ${Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()}`
+  }
+  if (tag === 'h3') {
+    return `### ${Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()}`
+  }
+  if (tag === 'blockquote') {
+    return Array.from(node.querySelectorAll('p'))
+      .flatMap((paragraph) =>
+        Array.from(paragraph.textContent.split('\n')).map((line) => `> ${line}`.trimEnd()),
+      )
+      .join('\n')
+  }
+  if (tag === 'ul') {
+    return Array.from(node.children)
+      .filter((child) => child.tagName?.toLowerCase() === 'li')
+      .map((child) => `- ${Array.from(child.childNodes).map((nested) => starterInlineHtmlToMarkdown(nested)).join('').trim()}`)
+      .join('\n')
+  }
+  if (tag === 'ol') {
+    return Array.from(node.children)
+      .filter((child) => child.tagName?.toLowerCase() === 'li')
+      .map((child, index) => `${index + 1}. ${Array.from(child.childNodes).map((nested) => starterInlineHtmlToMarkdown(nested)).join('').trim()}`)
+      .join('\n')
+  }
+  return Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()
+}
+
+function syncStarterDocumentField() {
+  if (!elements.starterDocumentEditor || !elements.starterDocumentField) {
+    return ''
+  }
+  const markdown = Array.from(elements.starterDocumentEditor.childNodes)
+    .map((node) => starterBlockHtmlToMarkdown(node))
+    .filter(Boolean)
+    .join('\n\n')
+    .trim()
+  elements.starterDocumentField.value = markdown
+  return markdown
+}
+
+function setStarterDocumentMarkdown(markdown = '') {
+  if (!elements.starterDocumentEditor || !elements.starterDocumentField) {
+    return
+  }
+  elements.starterDocumentField.value = String(markdown || '')
+  elements.starterDocumentEditor.innerHTML = starterMarkdownToHtml(markdown)
+}
+
+function execStarterDocumentCommand(command) {
+  if (!elements.starterDocumentEditor) {
+    return
+  }
+  elements.starterDocumentEditor.focus()
+  switch (command) {
+    case 'bold':
+      document.execCommand('bold')
+      break
+    case 'italic':
+      document.execCommand('italic')
+      break
+    case 'underline':
+      document.execCommand('underline')
+      break
+    case 'bullet':
+      document.execCommand('insertUnorderedList')
+      break
+    case 'number':
+      document.execCommand('insertOrderedList')
+      break
+    case 'quote':
+      document.execCommand('formatBlock', false, 'blockquote')
+      break
+    case 'h1':
+      document.execCommand('formatBlock', false, 'h1')
+      break
+    case 'h2':
+      document.execCommand('formatBlock', false, 'h2')
+      break
+    case 'clear':
+      document.execCommand('removeFormat')
+      document.execCommand('formatBlock', false, 'p')
+      break
+    default:
+      return
+  }
+  syncStarterDocumentField()
+}
+
+function referenceDocumentLabel(document) {
+  const size = Number(document?.size_bytes || 0)
+  if (!size) {
+    return 'PDF ready'
+  }
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB PDF`
+  }
+  return `${Math.max(1, Math.round(size / 1024))} KB PDF`
+}
+
+function renderReferenceDocumentList(documents = assignmentReferenceDocuments) {
+  if (!elements.assignmentReferenceDocumentList) {
+    return
+  }
+  assignmentReferenceDocuments = Array.isArray(documents) ? [...documents] : []
+  elements.assignmentReferenceDocumentList.innerHTML = assignmentReferenceDocuments.length
+    ? assignmentReferenceDocuments
+        .map(
+          (document) => `
+            <div class="linked-assignment-item" data-reference-document-id="${escapeHtml(document.id)}">
+              <div>
+                <div class="linked-assignment-title">${escapeHtml(document.title || 'Reference PDF')}</div>
+                <div class="linked-assignment-meta">${escapeHtml(referenceDocumentLabel(document))}</div>
+              </div>
+              <button class="button button-secondary small-button" type="button" data-remove-reference-document>Remove</button>
+            </div>
+          `,
+        )
+        .join('')
+    : '<div class="linked-assignment-empty">No reference PDFs yet.</div>'
+
+  elements.assignmentReferenceDocumentList.querySelectorAll('[data-remove-reference-document]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const row = button.closest('[data-reference-document-id]')
+      if (!row) {
+        return
+      }
+      assignmentReferenceDocuments = assignmentReferenceDocuments.filter(
+        (document) => document.id !== row.dataset.referenceDocumentId,
+      )
+      renderReferenceDocumentList(assignmentReferenceDocuments)
+    })
+  })
+}
+
+async function readReferencePdfFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`))
+    reader.onload = () =>
+      resolve({
+        id: `refdoc-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`,
+        title: String(file.name || 'Reference PDF').replace(/\.pdf$/i, '') || 'Reference PDF',
+        mime_type: 'application/pdf',
+        data_url: typeof reader.result === 'string' ? reader.result : '',
+        size_bytes: file.size || 0,
+      })
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleReferenceDocumentUpload(fileList) {
+  const files = Array.from(fileList || []).filter((file) => /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name || ''))
+  if (!files.length) {
+    return
+  }
+  const nextDocuments = await Promise.all(files.map((file) => readReferencePdfFile(file)))
+  renderReferenceDocumentList([...assignmentReferenceDocuments, ...nextDocuments])
+  if (elements.assignmentReferenceUpload) {
+    elements.assignmentReferenceUpload.value = ''
+  }
+}
+
 function buildReviewReplayCacheEntry(replay) {
   return {
     replay,
@@ -178,6 +497,15 @@ function buildReviewReplayCacheEntry(replay) {
       doc_text: replay.current_text || '',
     }),
   }
+}
+
+function reviewSessionHasAccess(session, assignment = getSelectedAssignment()) {
+  if (!session || !assignment) {
+    return false
+  }
+  const temporaryAccess = temporaryAccessUntilFor(assignment, session.student_name)
+  const temporaryOpen = temporaryAccess ? Date.parse(temporaryAccess) > Date.now() : false
+  return Boolean(session.schedule_open || temporaryOpen)
 }
 
 async function request(path, options = {}) {
@@ -202,6 +530,39 @@ async function request(path, options = {}) {
   }
 
   return data
+}
+
+function closeRealtimeConnection(connection) {
+  try {
+    connection?.close()
+  } catch {
+    // Ignore shutdown errors.
+  }
+}
+
+function openRealtimeConnection(channels, handlers = {}) {
+  const selectedChannels = (channels || []).filter(Boolean)
+  if (!selectedChannels.length) {
+    return null
+  }
+  const url = new URL('/api/edu/realtime', window.location.origin)
+  for (const channel of selectedChannels) {
+    url.searchParams.append('channel', channel)
+  }
+  const source = new EventSource(url)
+  source.addEventListener('dashboard', (event) => {
+    handlers.dashboard?.(JSON.parse(event.data))
+  })
+  source.addEventListener('assignment', (event) => {
+    handlers.assignment?.(JSON.parse(event.data))
+  })
+  source.addEventListener('replay', (event) => {
+    handlers.replay?.(JSON.parse(event.data))
+  })
+  source.onerror = () => {
+    handlers.error?.()
+  }
+  return source
 }
 
 function escapeHtml(value) {
@@ -336,6 +697,22 @@ function getSelectedClassroom() {
 
 function getSelectedAssignment() {
   return getAssignments().find((assignment) => assignment.id === selectedAssignmentId) || null
+}
+
+function tenantId() {
+  return dashboardState?.summary?.tenant_id || 'tenant_demo'
+}
+
+function dashboardChannel() {
+  return `tenant:${tenantId()}:dashboard`
+}
+
+function assignmentChannel(assignmentId = selectedAssignmentId) {
+  return assignmentId ? `tenant:${tenantId()}:assignment:${assignmentId}` : ''
+}
+
+function replayChannel(sessionId = selectedReviewSessionId) {
+  return sessionId ? `tenant:${tenantId()}:replay:${sessionId}` : ''
 }
 
 function getSelectedAssignmentAudits() {
@@ -833,6 +1210,10 @@ function studentSpecificExtensionFor(assignment, studentName) {
     return null
   }
   return assignment?.student_temporary_access_until?.[key] || null
+}
+
+function temporaryAccessUntilFor(assignment, studentName) {
+  return studentSpecificExtensionFor(assignment, studentName) || assignment?.temporary_access_until || null
 }
 
 function studentAccessRevokedFor(assignment, studentName) {
@@ -1432,12 +1813,15 @@ function clearReviewComposer() {
 
 function renderReviewSelectionUi() {
   if (!reviewState) return
+  const reviewLocked = reviewSessionHasAccess(currentReviewSession(), getSelectedAssignment())
   const selection = reviewState.selection
   elements.reviewSelectionCount.textContent = selection
     ? `${selection.end - selection.start} char${selection.end - selection.start === 1 ? '' : 's'} selected`
     : 'No text selected'
   elements.reviewSelectionQuote.textContent = selection
-    ? selection.text
+    ? reviewLocked
+      ? 'Inline notes unlock after the student loses assignment access.'
+      : selection.text
     : 'Select text in the draft to add a comment or suggestion.'
   const composerOpen = Boolean(selection && reviewState.composerMode)
   elements.reviewComposer.hidden = !composerOpen
@@ -1446,10 +1830,16 @@ function renderReviewSelectionUi() {
     reviewState.composerMode === 'suggestion' ? 'New suggestion' : 'New comment'
   elements.reviewCommentMode.classList.toggle('is-selected', reviewState.composerMode === 'comment')
   elements.reviewSuggestMode.classList.toggle('is-selected', reviewState.composerMode === 'suggestion')
+  elements.reviewCommentMode.disabled = reviewLocked || !selection
+  elements.reviewSuggestMode.disabled = reviewLocked || !selection
+  elements.reviewAddAnnotation.disabled = reviewLocked
+  if (reviewLocked && reviewState.composerMode) {
+    clearReviewComposer()
+  }
 }
 
 function beginReviewComposer(mode) {
-  if (!reviewState?.selection) return
+  if (!reviewState?.selection || reviewSessionHasAccess(currentReviewSession(), getSelectedAssignment())) return
   reviewState.composerMode = mode
   reviewState.composerNote = ''
   reviewState.composerReplacement = ''
@@ -1468,7 +1858,7 @@ function annotationsOverlap(start, end, excludeId = null) {
 }
 
 function addReviewAnnotation() {
-  if (!reviewState?.selection || !reviewState.composerMode) return
+  if (!reviewState?.selection || !reviewState.composerMode || reviewSessionHasAccess(currentReviewSession(), getSelectedAssignment())) return
   const { start, end, text } = reviewState.selection
   if (annotationsOverlap(start, end)) {
     window.alert('Inline comments and suggestions cannot overlap yet. Choose a different span of text.')
@@ -1720,6 +2110,89 @@ async function loadReviewReplayData(session) {
     reviewState.replayLoadState = 'error'
     reviewState.replayError = error.message || 'Could not load replay data.'
     renderReviewHighlightUi(session, getSelectedAssignment())
+  }
+}
+
+function handleRealtimeDashboard(delta) {
+  applyDashboardDelta(delta)
+}
+
+function handleRealtimeAssignment(payload) {
+  if (!payload) return
+  if (payload.assignment) {
+    upsertAssignmentInState(payload.assignment)
+  }
+  if (Array.isArray(payload.live_sessions)) {
+    dashboardState = {
+      ...dashboardState,
+      live_sessions: mergeById(
+        getLiveSessions().filter((session) => session.assignment_id !== payload.assignment?.id),
+        payload.live_sessions,
+      ),
+      assignment_audits: Array.isArray(payload.assignment_audits)
+        ? mergeById(
+            getAssignmentAudits().filter((audit) => audit.assignment_id !== payload.assignment?.id),
+            payload.assignment_audits,
+          )
+        : getAssignmentAudits(),
+    }
+    renderStudentCards()
+  }
+}
+
+function handleRealtimeReplay(payload) {
+  if (!payload?.id) return
+  const nextCache = buildReviewReplayCacheEntry(payload)
+  reviewReplayCache.set(payload.id, nextCache)
+  if (!reviewState || reviewState.sessionId !== payload.id) {
+    return
+  }
+  reviewState.replayData = nextCache
+  reviewState.replayLoadState = 'ready'
+  renderReviewWorkspace(getSelectedAssignment())
+}
+
+function syncRealtimeSubscriptions() {
+  const nextTeacherKey = dashboardState ? dashboardChannel() : ''
+  if (nextTeacherKey !== teacherRealtimeKey) {
+    closeRealtimeConnection(teacherRealtime)
+    teacherRealtimeKey = nextTeacherKey
+    teacherRealtime = nextTeacherKey
+      ? openRealtimeConnection([nextTeacherKey], {
+          dashboard: handleRealtimeDashboard,
+          error: () => {
+            refreshDashboard().catch(() => {})
+          },
+        })
+      : null
+  }
+
+  const nextAssignmentKey = currentView === 'assignment' && selectedAssignmentId ? assignmentChannel() : ''
+  if (nextAssignmentKey !== assignmentRealtimeKey) {
+    closeRealtimeConnection(assignmentRealtime)
+    assignmentRealtimeKey = nextAssignmentKey
+    assignmentRealtime = nextAssignmentKey
+      ? openRealtimeConnection([nextAssignmentKey], {
+          assignment: handleRealtimeAssignment,
+          error: () => {
+            refreshAssignmentViewData().catch(() => {})
+          },
+        })
+      : null
+  }
+
+  const nextReplayKey = reviewWorkspaceOpen && selectedReviewSessionId ? replayChannel() : ''
+  if (nextReplayKey !== replayRealtimeKey) {
+    closeRealtimeConnection(replayRealtime)
+    replayRealtimeKey = nextReplayKey
+    replayRealtime = nextReplayKey
+      ? openRealtimeConnection([nextReplayKey], {
+          replay: handleRealtimeReplay,
+          error: () => {
+            refreshSelectedReviewReplayData().catch(() => {})
+          },
+        })
+      : null
   }
 }
 
@@ -2238,7 +2711,7 @@ function renderDashboard(data) {
   dashboardState = data
   dashboardCursor = String(data?.updated_at || dashboardCursor || '')
   syncSelectionState()
-  populateAssignmentCourseSelect()
+  syncRealtimeSubscriptions()
   renderView()
 }
 
@@ -2329,6 +2802,16 @@ function replaceAssignmentInState(assignment) {
   dashboardState = {
     ...dashboardState,
     assignments: getAssignments().map((item) => (item.id === assignment.id ? assignment : item)),
+  }
+}
+
+function upsertAssignmentInState(assignment) {
+  if (!dashboardState || !assignment) {
+    return
+  }
+  dashboardState = {
+    ...dashboardState,
+    assignments: mergeById(getAssignments(), [assignment]),
   }
 }
 
@@ -2428,6 +2911,7 @@ function applyDashboardDelta(delta) {
 
 function renderView() {
   syncSelectionState()
+  syncRealtimeSubscriptions()
   if (elements.deleteClassroomButton) {
     elements.deleteClassroomButton.disabled = !getSelectedClassroom()
   }
@@ -2514,6 +2998,7 @@ async function refreshDashboard() {
 
 function startDashboardRefresh() {
   scheduleDashboardRefresh()
+  syncRealtimeSubscriptions()
   if (!dashboardVisibilityRefreshBound) {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
@@ -2688,6 +3173,22 @@ function wireModalButtons() {
     ]
     renderStudentOverrideCards(assignmentStudentOverrideDrafts)
   })
+  elements.assignmentReferenceUpload?.addEventListener('change', async (event) => {
+    try {
+      await handleReferenceDocumentUpload(event.currentTarget.files)
+    } catch (error) {
+      window.alert(error.message)
+    }
+  })
+  elements.starterDocumentToolbar?.querySelectorAll('[data-starter-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+      execStarterDocumentCommand(button.dataset.starterCommand)
+    })
+  })
+  elements.starterDocumentEditor?.addEventListener('input', () => {
+    syncStarterDocumentField()
+    updateAssignmentFormGuidance()
+  })
   elements.assignmentAddRubric?.addEventListener('click', () => {
     renderRubricBuilder([...selectedRubricFromForm(), createRubricDraft({ title: '', points: 4 })])
   })
@@ -2718,6 +3219,7 @@ function resetAssignmentModal() {
   elements.assignmentForm.reset()
   elements.assignmentForm.elements.namedItem('require_lockdown').checked = true
   elements.assignmentForm.elements.namedItem('editor_font_locked').checked = false
+  setStarterDocumentMarkdown('')
   elements.assignmentForm.elements.namedItem('editor_font_family').value = 'arial'
   elements.assignmentForm.elements.namedItem('editor_font_size').value = '12'
   elements.assignmentForm.elements.namedItem('editor_line_height').value = 'relaxed'
@@ -2726,9 +3228,11 @@ function resetAssignmentModal() {
     elements.quickExtendStatus.textContent = ''
   }
   assignmentStudentOverrideDrafts = []
+  assignmentReferenceDocuments = []
   renderAssignedStudentOptions([])
   renderStudentOverrideCards([])
   renderLinkedAssignmentOptions([])
+  renderReferenceDocumentList([])
   renderRubricBuilder([])
   updateAssignmentFormGuidance()
 }
@@ -2770,10 +3274,13 @@ function populateAssignmentModalForEdit(assignment) {
   }
 
   if (assignment.editor_policy) {
+    setStarterDocumentMarkdown(assignment.starter_document || '')
     form.editor_font_family.value = assignment.editor_policy.font_family || 'arial'
     form.editor_font_size.value = String(assignment.editor_policy.font_size ?? 12)
     form.editor_line_height.value = assignment.editor_policy.line_height || 'relaxed'
     form.editor_font_locked.checked = assignment.editor_policy.font_locked ?? false
+  } else {
+    setStarterDocumentMarkdown(assignment.starter_document || '')
   }
 
   if (assignment.browser_policy) {
@@ -2786,6 +3293,7 @@ function populateAssignmentModalForEdit(assignment) {
   renderAssignedStudentOptions(assignedStudents)
   renderStudentOverrideCards(draftsFromAssignmentStudentOverrides(assignment))
   renderLinkedAssignmentOptions(assignment.linked_assignment_ids || [])
+  renderReferenceDocumentList(assignment.reference_documents || [])
   renderRubricBuilder(assignment.rubric || [])
   updateAssignmentFormGuidance()
 }
@@ -2825,6 +3333,7 @@ function wireForms() {
     }
 
     try {
+      syncStarterDocumentField()
       const form = new FormData(formEl)
       const assignmentId = form.get('assignment_id')
       const isEditing = !!assignmentId
@@ -2845,6 +3354,7 @@ function wireForms() {
         classroom_name: isEditing ? undefined : activeClassroom?.name,
         assigned_students: selectedAssignedStudentsFromForm(),
         prompt: form.get('prompt'),
+        starter_document: form.get('starter_document') || '',
         windows: [
           {
             label: 'Teacher writing window',
@@ -2885,16 +3395,18 @@ function wireForms() {
         },
         student_overrides: studentOverrides.studentOverrides,
         linked_assignment_ids: [...new Set(form.getAll('linked_assignment_ids').map((value) => String(value).trim()).filter(Boolean))],
+        reference_documents: assignmentReferenceDocuments,
         rubric: selectedRubricFromForm(),
       }
 
+      let savedAssignment
       if (isEditing) {
-        await request(`/api/edu/assignments/${assignmentId}`, {
+        savedAssignment = await request(`/api/edu/assignments/${assignmentId}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         })
       } else {
-        await request('/api/edu/assignments', {
+        savedAssignment = await request('/api/edu/assignments', {
           method: 'POST',
           body: JSON.stringify(payload),
         })
@@ -2903,9 +3415,15 @@ function wireForms() {
       formEl.reset()
       resetAssignmentModal()
       closeModal(elements.assignmentModal)
-      dashboardState = null
-      await refreshDashboard()
+      if (savedAssignment) {
+        upsertAssignmentInState(savedAssignment)
+        selectedAssignmentId = savedAssignment.id
+        if (selectedClassroomId === savedAssignment.classroom_id) {
+          currentView = 'assignments'
+        }
+      }
       renderView()
+      refreshDashboard().catch(() => {})
     } catch (error) {
       window.alert(`Could not save assignment: ${error.message}`)
     }
@@ -3031,6 +3549,7 @@ async function loadApp() {
   `
 
   wireModalButtons()
+  populateAssignmentFontSizeOptions()
   wireForms()
   wireMonitoringControls()
   wireReviewWorkspace()

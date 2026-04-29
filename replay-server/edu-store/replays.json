@@ -34,7 +34,7 @@
   {
     "id": "edu-replay-integration",
     "live_session_id": "student:hamlet",
-    "assignment_id": "assignment_61038c4e51184f25",
+    "assignment_id": "assignment_e84ee34e24f94ae2",
     "assignment_title": "Hamlet timed write",
     "course": "AP Literature",
     "classroom": "AP Literature",
@@ -53,10 +53,55 @@
     "url_history": [],
     "violation_count": 0,
     "violations": [],
-    "last_activity_at": "2026-04-27T21:07:28.375Z",
+    "last_activity_at": "2026-04-29T00:53:25.242Z",
     "focused": true,
     "hid_active": true,
     "start_wall_ns": 0,
-    "updated_at": "2026-04-27T21:07:28.375Z"
+    "replay_origin_wall_ms": null,
+    "recorded_timezone_offset_minutes": null,
+    "recorded_timezone": null,
+    "created_at": "2026-04-29T00:53:25.242Z",
+    "updated_at": "2026-04-29T00:53:25.242Z"
+  },
+  {
+    "id": "edu-replay-metadata",
+    "live_session_id": "replay:metadata:student",
+    "assignment_id": "assignment_7e006964a88d4e33",
+    "assignment_title": "After-school audit",
+    "course": "Replay Analysis",
+    "classroom": "Replay Analysis",
+    "student_name": "Ada",
+    "current_text": "Hello world",
+    "document_history": [
+      {
+        "op": "insert",
+        "text": "Hello"
+      },
+      {
+        "op": "insert",
+        "text": " world"
+      }
+    ],
+    "keystroke_log": "",
+    "focus_events": [
+      {
+        "t": 2000,
+        "state": "inactive"
+      }
+    ],
+    "current_url": null,
+    "current_url_title": null,
+    "url_history": [],
+    "violation_count": 0,
+    "violations": [],
+    "last_activity_at": "2026-04-28T12:02:00Z",
+    "focused": true,
+    "hid_active": true,
+    "start_wall_ns": 1700000000000000000,
+    "replay_origin_wall_ms": 1700000000000,
+    "recorded_timezone_offset_minutes": -240,
+    "recorded_timezone": "AST",
+    "created_at": "2026-04-29T00:53:27.107Z",
+    "updated_at": "2026-04-29T00:53:27.107Z"
   }
 ]

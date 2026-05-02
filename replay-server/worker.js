@@ -15,6 +15,7 @@ import {
   buildAssignmentAuditRecord,
   buildEduDashboard,
   buildEduDashboardDelta,
+  scheduleStateForAssignment,
   buildStudentActiveAssignmentState,
   buildStudentAssignmentConfig,
   buildStudentConfig,
@@ -48,6 +49,7 @@ const REPLAY_HOSTS = new Set(['replay.handtyped.app'])
 const EDU_HOSTS = new Set(['edu.handtyped.app'])
 let guardrailsState = null
 let guardrailsStateKey = ''
+const LIVE_SESSION_STALE_MS = 6000
 
 function json(data, init = {}) {
   return new Response(JSON.stringify(data), {
@@ -56,6 +58,136 @@ function json(data, init = {}) {
       'content-type': 'application/json; charset=utf-8',
       ...(init.headers || {}),
     },
+  })
+}
+
+function parseTimestamp(value) {
+  const parsed = Date.parse(String(value || ''))
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+function isLiveSessionActive(session, nowMs = Date.now()) {
+  if (!session?.schedule_open) {
+    return false
+  }
+  const lastActivityAt = parseTimestamp(session.last_activity_at || session.updated_at)
+  if (!lastActivityAt) {
+    return false
+  }
+  return nowMs - lastActivityAt <= LIVE_SESSION_STALE_MS
+}
+
+function normalizedSuggestionAnnotation(annotation = {}) {
+  const type = annotation?.type === 'suggestion' ? 'suggestion' : 'comment'
+  if (type !== 'suggestion') {
+    return null
+  }
+  const start = Math.max(0, Number(annotation?.start ?? 0) || 0)
+  const end = Math.max(start, Number(annotation?.end ?? start) || start)
+  return JSON.stringify({
+    type,
+    start,
+    end,
+    quote: String(annotation?.quote || ''),
+    note: String(annotation?.note || ''),
+    replacement: String(annotation?.replacement || ''),
+  })
+}
+
+function suggestionsIntroduceUnsafeChanges(existingAnnotations = [], incomingAnnotations = []) {
+  const existingSet = new Set(
+    (Array.isArray(existingAnnotations) ? existingAnnotations : [])
+      .map(normalizedSuggestionAnnotation)
+      .filter(Boolean),
+  )
+
+  return (Array.isArray(incomingAnnotations) ? incomingAnnotations : [])
+    .map(normalizedSuggestionAnnotation)
+    .filter(Boolean)
+    .some((serialized) => !existingSet.has(serialized))
+}
+
+function canSafelySubmitSuggestions(session, assignment, now = new Date()) {
+  if (!session || !assignment) {
+    return false
+  }
+  if (assignment?.policy?.allow_offline_editing !== false) {
+    return false
+  }
+
+  const schedule = scheduleStateForAssignment(assignment, session.student_name, now)
+  if (!schedule.schedule_open) {
+    return true
+  }
+
+  return !isLiveSessionActive(session, now.getTime())
+}
+
+function gradingHasStudentVisibleFeedback(grading = {}) {
+  return Boolean(
+    String(grading?.teacher_comment || '').trim() ||
+      String(grading?.grade_label || '').trim() ||
+      grading?.grade_score != null ||
+      Boolean(grading?.returned_for_revision) ||
+      (Array.isArray(grading?.inline_annotations) && grading.inline_annotations.length > 0) ||
+      (grading?.rubric_scores &&
+        typeof grading.rubric_scores === 'object' &&
+        Object.values(grading.rubric_scores).some((value) => Number(value || 0) > 0)),
+  )
+}
+
+async function liveSessionFromGradingSnapshot(store, sessionId, body = {}, teacherTenant = DEFAULT_TENANT_ID) {
+  const snapshot = body?.session_snapshot && typeof body.session_snapshot === 'object' ? body.session_snapshot : null
+  if (!snapshot) {
+    return null
+  }
+  const assignmentId = String(snapshot.assignment_id || '')
+  const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
+  if (!assignment || assignment.tenant_id !== teacherTenant) {
+    return null
+  }
+  return buildLiveSession({
+    ...snapshot,
+    id: snapshot.id || sessionId,
+    tenant_id: assignment.tenant_id,
+    assignment_id: assignment.id,
+    assignment_title: snapshot.assignment_title || assignment.title,
+    course: snapshot.course || assignment.course,
+    classroom: snapshot.classroom || assignment.classroom_name,
+  })
+}
+
+async function resolveLiveSessionForGrading(store, sessionId) {
+  if (!sessionId) {
+    return null
+  }
+  const liveSession = await store.getLiveSession(sessionId)
+  if (liveSession) {
+    return liveSession
+  }
+  const replayId = String(sessionId).startsWith('replay:') ? String(sessionId).replace(/^replay:/, '') : ''
+  if (replayId) {
+    const replayLiveSession = await store.getLiveSession(replayId)
+    if (replayLiveSession) {
+      return replayLiveSession
+    }
+  }
+  const head =
+    (await store.getLiveReplayHead?.(sessionId)) ||
+    (replayId ? await store.getLiveReplayHead?.(replayId) : null)
+  if (!head) {
+    return null
+  }
+  const headLiveSession =
+    (head.live_session_id ? await store.getLiveSession(head.live_session_id) : null) ||
+    (head.id ? await store.getLiveSession(head.id) : null)
+  if (headLiveSession) {
+    return headLiveSession
+  }
+  return buildLiveSession({
+    ...head,
+    id: head.live_session_id || head.id,
+    schedule_open: false,
   })
 }
 
@@ -210,6 +342,27 @@ function buildLiveReplayResponse(head, events = [], replay = null) {
   }
 }
 
+function replayFromLiveSessionFallback(replayId, liveSession) {
+  return buildEduReplay({
+    id: replayId,
+    live_session_id: liveSession.id,
+    assignment_id: liveSession.assignment_id,
+    assignment_title: liveSession.assignment_title,
+    course: liveSession.course,
+    classroom: liveSession.classroom,
+    student_name: liveSession.student_name,
+    current_text: liveSession.current_text,
+    document_history: liveSession.document_history,
+    keystroke_log: liveSession.keystroke_log,
+    focus_events: liveSession.focus_events,
+    url_history: liveSession.url_history,
+    violations: liveSession.violations,
+    last_activity_at: liveSession.last_activity_at,
+    focused: liveSession.focused,
+    hid_active: liveSession.hid_active,
+  })
+}
+
 async function appendLiveReplayUpdate(store, session, replay = null) {
   const existingHead = await store.getLiveReplayHead(session.id)
   const previousHistoryCount = Number(existingHead?.snapshot_history_count ?? 0)
@@ -301,7 +454,26 @@ async function publishTeacherDashboard(env, tenantId) {
   })
 }
 
-async function publishAssignmentSummary(env, assignmentId, tenantId) {
+async function publishTeacherDashboardLiveSession(env, session) {
+  if (!session?.tenant_id) {
+    return
+  }
+  const store = getEduStore(env)
+  const summary =
+    (await store.getDashboardSummary?.(session.tenant_id)) ||
+    (await store.refreshDashboardSummary?.(session.tenant_id))
+  await publishRealtimeEvent(env, {
+    channels: [buildTenantChannel(session.tenant_id, 'dashboard')],
+    event: 'dashboard',
+    payload: {
+      updated_at: summary?.updated_at || session.updated_at || nowIso(),
+      live_sessions: [session],
+      summary,
+    },
+  })
+}
+
+async function publishAssignmentSummary(env, assignmentId, tenantId, { includeAudits = true } = {}) {
   const store = getEduStore(env)
   const assignment = assignmentId ? await store.getAssignment(assignmentId) : null
   if (!assignment) {
@@ -310,8 +482,10 @@ async function publishAssignmentSummary(env, assignmentId, tenantId) {
   const payload = {
     assignment,
     live_sessions: await buildAssignmentLiveSummaries(store, assignmentId),
-    assignment_audits: await store.listAssignmentAuditsByAssignmentId(assignmentId, tenantId),
     updated_at: nowIso(),
+  }
+  if (includeAudits) {
+    payload.assignment_audits = await store.listAssignmentAuditsByAssignmentId(assignmentId, tenantId)
   }
   await publishRealtimeEvent(env, {
     channels: [buildAssignmentChannel(tenantId, assignmentId)],
@@ -966,14 +1140,16 @@ export default {
     if (eduHost && request.method === 'POST' && url.pathname === '/api/edu/live-sessions') {
       const store = getEduStore(env)
       const incoming = await parseJsonRequest(request)
+      const shouldCaptureReplay = Boolean(incoming?.capture_replay)
       const nextId =
         incoming.id ||
         `${incoming.student_name || 'student'}:${incoming.assignment_id || 'assignment'}`
       const existing = await store.getLiveSession(nextId)
+      const assignment = incoming.assignment_id ? await store.getAssignment(incoming.assignment_id) : null
       const session = buildLiveSession({
         ...existing,
         ...incoming,
-        tenant_id: existing?.tenant_id || incoming.tenant_id || DEFAULT_TENANT_ID,
+        tenant_id: existing?.tenant_id || assignment?.tenant_id || incoming.tenant_id || DEFAULT_TENANT_ID,
         id: nextId,
         grading:
           incoming.grading && typeof incoming.grading === 'object'
@@ -982,10 +1158,14 @@ export default {
         updated_at: nowIso(),
       })
       await store.putLiveSession(session)
-      await appendLiveReplayUpdate(store, session)
-      await publishTeacherDashboard(env, session.tenant_id)
-      await publishAssignmentSummary(env, session.assignment_id, session.tenant_id)
-      await publishReplayUpdate(env, session.id, session.tenant_id)
+      if (shouldCaptureReplay) {
+        await appendLiveReplayUpdate(store, session)
+      }
+      await publishTeacherDashboardLiveSession(env, session)
+      await publishAssignmentSummary(env, session.assignment_id, session.tenant_id, { includeAudits: false })
+      if (shouldCaptureReplay) {
+        await publishReplayUpdate(env, session.id, session.tenant_id)
+      }
       return json(session, { status: 201 })
     }
 
@@ -1001,12 +1181,34 @@ export default {
       }
       const parts = url.pathname.split('/')
       const sessionId = parts[parts.length - 2]
-      const existing = sessionId ? await store.getLiveSession(sessionId) : null
-      if (!existing || existing.tenant_id !== teacherTenantId(teacherSession)) {
+      const body = await parseJsonRequest(request)
+      const teacherTenant = teacherTenantId(teacherSession)
+      let existing =
+        (await resolveLiveSessionForGrading(store, sessionId)) ||
+        (await liveSessionFromGradingSnapshot(store, sessionId, body, teacherTenant))
+      if (!existing) {
         return json({ error: 'Not found' }, { status: 404 })
       }
-      const body = await parseJsonRequest(request)
-      const grading = {
+      const assignment = existing.assignment_id ? await store.getAssignment(existing.assignment_id) : null
+      if (existing.tenant_id !== teacherTenant) {
+        if (!assignment || assignment.tenant_id !== teacherTenant) {
+          return json({ error: 'Not found' }, { status: 404 })
+        }
+        existing = buildLiveSession({ ...existing, tenant_id: assignment.tenant_id })
+      }
+      const incomingAnnotations = Array.isArray(body?.inline_annotations) ? body.inline_annotations : []
+      if (
+        suggestionsIntroduceUnsafeChanges(existing?.grading?.inline_annotations, incomingAnnotations) &&
+        !canSafelySubmitSuggestions(existing, assignment)
+      ) {
+        return json(
+          {
+            error: 'Suggestions can only be added when the student can no longer edit this draft with certainty.',
+          },
+          { status: 409 },
+        )
+      }
+      let grading = {
         rubric_scores:
           body?.rubric_scores && typeof body.rubric_scores === 'object'
             ? { ...body.rubric_scores }
@@ -1016,11 +1218,20 @@ export default {
         grade_label: String(body?.grade_label || ''),
         grade_score:
           body?.grade_score === '' || body?.grade_score == null ? null : Number(body?.grade_score),
-        inline_annotations: Array.isArray(body?.inline_annotations) ? body.inline_annotations : [],
+        inline_annotations: incomingAnnotations,
         updated_at: nowIso(),
         actor_id: teacherSession.teacher_id || null,
         actor_name: teacherSession.teacher_name || null,
         actor_email: teacherSession.teacher_email || null,
+      }
+      if (gradingHasStudentVisibleFeedback(existing?.grading) && !gradingHasStudentVisibleFeedback(grading)) {
+        grading = {
+          ...existing.grading,
+          updated_at: nowIso(),
+          actor_id: teacherSession.teacher_id || existing.grading.actor_id || null,
+          actor_name: teacherSession.teacher_name || existing.grading.actor_name || null,
+          actor_email: teacherSession.teacher_email || existing.grading.actor_email || null,
+        }
       }
       const updated = buildLiveSession({
         ...existing,
@@ -1028,11 +1239,19 @@ export default {
         updated_at: nowIso(),
       })
       await store.putLiveSession(updated)
+      let assignmentForStudentPublish = assignment
+      if (assignment) {
+        assignmentForStudentPublish = buildAssignment({
+          ...assignment,
+          student_feedback: grading,
+          updated_at: nowIso(),
+        })
+        await store.putAssignment(assignmentForStudentPublish)
+      }
       await publishAssignmentSummary(env, updated.assignment_id, updated.tenant_id)
-      const assignment = updated.assignment_id ? await store.getAssignment(updated.assignment_id) : null
       const classroom = assignment?.classroom_id ? await store.getClassroom(assignment.classroom_id) : null
-      if (assignment && classroom) {
-        await publishStudentAssignment(env, assignment, updated.student_name, classroom.join_code)
+      if (assignmentForStudentPublish && classroom) {
+        await publishStudentAssignment(env, assignmentForStudentPublish, updated.student_name, classroom.join_code)
       }
       return json(updated)
     }
@@ -1115,22 +1334,7 @@ export default {
       if (!stored) {
         const liveSession = await store.getLiveSession(replayId.replace('replay:', ''))
         if (liveSession) {
-          stored = buildEduReplay({
-            id: replayId,
-            live_session_id: replayId,
-            assignment_id: liveSession.assignment_id,
-            assignment_title: liveSession.assignment_title,
-            course: liveSession.course,
-            classroom: liveSession.classroom,
-            student_name: liveSession.student_name,
-            current_text: liveSession.current_text,
-            document_history: liveSession.document_history,
-            keystroke_log: liveSession.keystroke_log,
-            focus_events: liveSession.focus_events,
-            last_activity_at: liveSession.last_activity_at,
-            focused: liveSession.focused,
-            hid_active: liveSession.hid_active,
-          })
+          stored = replayFromLiveSessionFallback(replayId, liveSession)
         }
       }
       
@@ -1186,6 +1390,38 @@ export default {
         return json({ error: 'Not found' }, { status: 404 })
       }
       return json(result)
+    }
+
+    if (eduHost && request.method === 'POST' && /^\/api\/edu\/student\/assignments\/[^/]+\/open$/.test(url.pathname)) {
+      const store = await prepareEduStore(getEduStore(env))
+      const assignmentId = url.pathname.split('/').slice(-2, -1)[0]
+      const body = await request.json().catch(() => ({}))
+      const studentName = String(body?.student_name || '').trim()
+      const joinCode = String(body?.join_code || '').trim()
+      const result = await buildStudentAssignmentConfig(store, {
+        assignmentId,
+        joinCode,
+        studentName,
+      })
+      if (!result.classroom || !result.assignment || !studentName) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      await store.putAssignmentAudit({
+        tenant_id: result.assignment.tenant_id,
+        assignment_id: result.assignment.id,
+        classroom_id: result.assignment.classroom_id,
+        assignment_title: result.assignment.title,
+        action: 'student_opened',
+        actor_id: null,
+        actor_name: null,
+        actor_email: null,
+        summary: `${studentName} opened the assignment`,
+        changes: [{ label: 'Student assignment open', before: null, after: studentName }],
+        snapshot: result.assignment,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      })
+      return json({ recorded: true, assignment_id: result.assignment.id, student_name: studentName }, { status: 201 })
     }
 
     if (request.method === 'GET' && url.pathname === '/api/health') {

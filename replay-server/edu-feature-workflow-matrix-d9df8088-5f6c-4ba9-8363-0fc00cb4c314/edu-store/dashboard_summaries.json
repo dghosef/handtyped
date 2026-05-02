@@ -1,0 +1,13 @@
+[
+  {
+    "id": "dashboard:tenant_demo",
+    "tenant_id": "tenant_demo",
+    "classrooms": 32,
+    "assignments": 38,
+    "live_sessions": 13,
+    "replays_available": 0,
+    "audits_recorded": 65,
+    "active_students": 13,
+    "updated_at": "2026-04-30T02:11:38.707Z"
+  }
+]

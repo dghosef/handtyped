@@ -320,6 +320,180 @@ export function compressIdleGaps(history, maxGapMs = 5000) {
   return makeStrictlyIncreasingTimeline(dedupeHistory(compressed))
 }
 
+function keyEventElapsedMs(event, replayOriginWallMs, fallbackOriginNs) {
+  const rawT = Number(event?.t)
+  if (!Number.isFinite(rawT)) {
+    return null
+  }
+
+  if (Number.isFinite(replayOriginWallMs) && replayOriginWallMs > 0) {
+    if (rawT >= 1e12) {
+      return Math.max(0, Math.round((rawT / 1e6) - replayOriginWallMs))
+    }
+    return Math.max(0, Math.round(rawT - replayOriginWallMs))
+  }
+
+  if (Number.isFinite(fallbackOriginNs) && fallbackOriginNs > 0 && rawT >= fallbackOriginNs) {
+    return Math.max(0, Math.round((rawT - fallbackOriginNs) / 1e6))
+  }
+
+  return Math.max(0, Math.round(rawT))
+}
+
+function buildOperationTimes(operationCount, startT, endT, keydownTimes = []) {
+  if (operationCount <= 0) {
+    return []
+  }
+
+  const normalizedStart = Math.max(0, Number(startT) || 0)
+  const normalizedEnd = Math.max(normalizedStart, Number(endT) || 0)
+  const usableKeydowns = keydownTimes
+    .map((time) => Math.max(normalizedStart, Math.min(normalizedEnd, Number(time) || 0)))
+    .filter((time) => Number.isFinite(time))
+
+  if (!usableKeydowns.length) {
+    return Array.from({ length: operationCount }, (_, index) => {
+      if (normalizedEnd === normalizedStart) {
+        return normalizedStart + index + 1
+      }
+      const pct = (index + 1) / operationCount
+      return Math.round(normalizedStart + ((normalizedEnd - normalizedStart) * pct))
+    })
+  }
+
+  if (usableKeydowns.length === 1) {
+    return Array.from({ length: operationCount }, () => usableKeydowns[0])
+  }
+
+  return Array.from({ length: operationCount }, (_, index) => {
+    if (operationCount === 1) {
+      return usableKeydowns[usableKeydowns.length - 1]
+    }
+
+    const scaledIndex = (index * (usableKeydowns.length - 1)) / (operationCount - 1)
+    const lowerIndex = Math.floor(scaledIndex)
+    const upperIndex = Math.min(usableKeydowns.length - 1, Math.ceil(scaledIndex))
+    const pct = scaledIndex - lowerIndex
+    return Math.round(
+      usableKeydowns[lowerIndex] +
+      ((usableKeydowns[upperIndex] - usableKeydowns[lowerIndex]) * pct),
+    )
+  })
+}
+
+function buildTransitionSteps(previousText, nextText, startT, endT, keydownTimes = []) {
+  const previousChars = Array.from(String(previousText || ''))
+  const nextChars = Array.from(String(nextText || ''))
+  let prefix = 0
+
+  while (
+    prefix < previousChars.length &&
+    prefix < nextChars.length &&
+    previousChars[prefix] === nextChars[prefix]
+  ) {
+    prefix += 1
+  }
+
+  let previousSuffix = previousChars.length
+  let nextSuffix = nextChars.length
+  while (
+    previousSuffix > prefix &&
+    nextSuffix > prefix &&
+    previousChars[previousSuffix - 1] === nextChars[nextSuffix - 1]
+  ) {
+    previousSuffix -= 1
+    nextSuffix -= 1
+  }
+
+  const removals = Math.max(0, previousSuffix - prefix)
+  const insertions = nextChars.slice(prefix, nextSuffix)
+  const operationCount = removals + insertions.length
+  if (operationCount === 0) {
+    return []
+  }
+
+  const currentChars = previousChars.slice()
+  const steps = []
+  const operationTimes = buildOperationTimes(operationCount, startT, endT, keydownTimes)
+  let operationIndex = 0
+
+  for (let i = 0; i < removals; i += 1) {
+    currentChars.splice(prefix, 1)
+    steps.push({
+      t: operationTimes[operationIndex] ?? Math.max(0, Number(endT) || 0),
+      text: currentChars.join(''),
+    })
+    operationIndex += 1
+  }
+
+  for (let i = 0; i < insertions.length; i += 1) {
+    currentChars.splice(prefix + i, 0, insertions[i])
+    steps.push({
+      t: operationTimes[operationIndex] ?? Math.max(0, Number(endT) || 0),
+      text: currentChars.join(''),
+    })
+    operationIndex += 1
+  }
+
+  return steps
+}
+
+export function buildCharacterReplayHistory(history, keyEvents = [], options = {}) {
+  if (!Array.isArray(history) || history.length === 0) {
+    return []
+  }
+
+  const replayOriginWallMs = Number(options?.replayOriginWallMs)
+  const fallbackOriginNs = Number(options?.startWallNs)
+  const keydownTimes = Array.isArray(keyEvents)
+    ? keyEvents
+      .map((event) => keyEventElapsedMs(event, replayOriginWallMs, fallbackOriginNs))
+      .filter((time) => Number.isFinite(time))
+      .sort((a, b) => a - b)
+    : []
+  const steps = []
+  let previousText = ''
+  let previousT = 0
+  let keydownIndex = 0
+
+  for (const entry of history) {
+    const nextText = String(entry?.text || '')
+    const nextT = Math.max(0, Number(entry?.t) || 0)
+    while (keydownIndex < keydownTimes.length && keydownTimes[keydownIndex] < previousT) {
+      keydownIndex += 1
+    }
+
+    let keydownEndIndex = keydownIndex
+    while (keydownEndIndex < keydownTimes.length && keydownTimes[keydownEndIndex] <= nextT) {
+      keydownEndIndex += 1
+    }
+
+    const transitionSteps = buildTransitionSteps(
+      previousText,
+      nextText,
+      previousT,
+      nextT,
+      keydownTimes.slice(keydownIndex, keydownEndIndex),
+    )
+
+    if (transitionSteps.length) {
+      steps.push(...transitionSteps)
+    } else if (!steps.length || steps[steps.length - 1]?.text !== nextText) {
+      steps.push({ t: nextT, text: nextText })
+    }
+
+    previousText = nextText
+    previousT = nextT
+    keydownIndex = keydownEndIndex
+  }
+
+  if (!steps.length) {
+    return [{ t: previousT, text: previousText }]
+  }
+
+  return makeStrictlyIncreasingTimeline(dedupeHistory(steps))
+}
+
 export function buildRhythmSamples(history, keyEvents = []) {
   if (Array.isArray(history) && history.length > 1) {
     const samples = []

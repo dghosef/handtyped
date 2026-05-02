@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildFocusSegments,
   buildAttributedDocument,
+  buildCharacterReplayHistory,
   buildInactiveSpans,
   buildTimelineGapMarkers,
   buildSyntheticHistory,
@@ -45,7 +46,7 @@ const eduAppJs = fs.readFileSync(
 describe('replay history start state', () => {
   it('keeps the edu replay page on the shared history parser', () => {
     expect(eduReplayPageHtml).toContain('parseHistory,')
-    expect(eduReplayPageHtml).toContain('const rawHistory = parseHistory(')
+    expect(eduReplayPageHtml).toContain('const rawHistory = buildCharacterReplayHistory(parseHistory(')
     expect(eduReplayPageHtml).not.toContain("text: h.ins || ''")
   })
 
@@ -62,9 +63,17 @@ describe('replay history start state', () => {
     expect(eduReplayPageHtml).toContain('id="highlight-after-school"')
     expect(eduReplayPageHtml).toContain('id="highlight-outside-window"')
     expect(eduReplayPageHtml).toContain('buildAttributedDocument')
+    expect(eduReplayPageHtml).toContain('buildCharacterReplayHistory')
     expect(eduReplayPageHtml).toContain('renderInsertedRangeHtml')
     expect(eduReplayPageHtml).toContain('renderInsertedRangesHtml')
     expect(eduReplayPageHtml).toContain('id="highlight-doc"')
+  })
+
+  it('shows absolute replay time above both replay surfaces and removes gap markers', () => {
+    expect(replayPageHtml).toContain('id="progress-readout">Absolute time: --</div>')
+    expect(eduReplayPageHtml).toContain('id="progress-readout">Absolute time: --</div>')
+    expect(replayPageHtml).not.toContain('progress-gap-markers')
+    expect(eduReplayPageHtml).not.toContain('progress-gap-markers')
   })
 
   it('hides numeric risk scores from teacher student cards', () => {
@@ -754,6 +763,39 @@ describe('replay history start state', () => {
     expect(samples).toEqual([
       { t: 20, weight: 5 },
       { t: 40, weight: 6 },
+    ])
+  })
+
+  it('expands snapshot history into character-by-character replay steps', () => {
+    const replay = buildCharacterReplayHistory([
+      { t: 120, text: 'cat' },
+      { t: 240, text: 'cart' },
+    ])
+
+    expect(replay).toEqual([
+      { t: 40, text: 'c' },
+      { t: 80, text: 'ca' },
+      { t: 120, text: 'cat' },
+      { t: 240, text: 'cart' },
+    ])
+  })
+
+  it('uses recorded keydown timing to shape character playback for coarse snapshot history', () => {
+    const replay = buildCharacterReplayHistory(
+      [{ t: 1600, text: 'word' }],
+      [
+        { type: 'down', t: 100 },
+        { type: 'down', t: 140 },
+        { type: 'down', t: 800 },
+        { type: 'down', t: 1500 },
+      ],
+    )
+
+    expect(replay).toEqual([
+      { t: 100, text: 'w' },
+      { t: 140, text: 'wo' },
+      { t: 800, text: 'wor' },
+      { t: 1500, text: 'word' },
     ])
   })
 

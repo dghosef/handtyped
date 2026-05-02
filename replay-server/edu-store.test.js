@@ -129,7 +129,8 @@ class FakeD1Database {
       return this.columns.map((name, index) => ({ cid: index, name }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind] = args
       return records
         .filter((row) => row.kind === kind && row.tenant_id === tenant_id)
@@ -137,49 +138,55 @@ class FakeD1Database {
           const updatedCompare = String(b.updated_at).localeCompare(String(a.updated_at))
           return updatedCompare || String(b.id).localeCompare(String(a.id))
         })
-        .map((row) => ({ json: row.json }))
+        .map((row) => ({ ...row }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')) {
       const [kind, id] = args
       const row = this.records.get(this.key(kind, id))
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')) {
       const [tenant_id, kind, email] = args
       const row = records.find((item) => item.tenant_id === tenant_id && item.kind === kind && item.email === email)
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')) {
       const [kind, join_code] = args
       const row = records.find((item) => item.kind === kind && item.join_code === join_code)
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind, classroom_id] = args
       return records
         .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.classroom_id === classroom_id)
         .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))
-        .map((row) => ({ json: row.json }))
+        .map((row) => ({ ...row }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind, parent_id] = args
       return records
         .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.parent_id === parent_id)
         .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))
-        .map((row) => ({ json: row.json }))
+        .map((row) => ({ ...row }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind, classroom_id, student_key] = args
       const row = records
         .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.classroom_id === classroom_id && item.student_key === student_key)
         .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))[0]
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
     throw new Error(`Unsupported D1 query SQL in test: ${sql}`)

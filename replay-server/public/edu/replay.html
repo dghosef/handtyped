@@ -18,8 +18,6 @@
       --timeline-inactive: #b94d46;
       --timeline-inactive-dark: #923631;
       --timeline-inactive-bg: #efe5e1;
-      --timeline-jump: #d39a21;
-      --timeline-jump-dark: #8b6400;
       --line: #dddddd;
     }
 
@@ -176,6 +174,14 @@
       position: relative;
     }
 
+    .progress-readout {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
     .progress-track {
       height: 10px;
       background: #e5e5e5;
@@ -198,35 +204,6 @@
       background: var(--timeline-inactive-dark);
     }
 
-    .timeline-key {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 12px;
-      font-size: 11px;
-      color: var(--muted);
-      align-items: center;
-      justify-content: flex-end;
-    }
-
-    .timeline-key-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      white-space: nowrap;
-    }
-
-    .timeline-key-swatch {
-      display: inline-block;
-      width: 14px;
-      height: 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-    }
-
-    .timeline-key-swatch.inactive {
-      background: linear-gradient(180deg, rgba(185, 77, 70, 0.55), rgba(146, 54, 49, 0.72));
-    }
-
     .progress-fill {
       height: 100%;
       width: 0%;
@@ -245,24 +222,6 @@
       border-radius: 999px;
       transform: translate(-50%, -50%);
       z-index: 2;
-    }
-
-    .progress-gap-markers {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .progress-gap-marker {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 4px;
-      transform: translateX(-50%);
-      background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
-      border: 1px solid var(--timeline-jump-dark);
-      border-radius: 999px;
     }
 
     .progress-inactive-spans {
@@ -588,16 +547,16 @@
           <div class="progress-wrap">
             <div class="progress-track" id="progress-track">
               <div class="progress-inactive-spans" id="progress-inactive-spans"></div>
-              <div class="progress-gap-markers" id="progress-gap-markers"></div>
               <div class="progress-fill" id="progress-fill"></div>
               <div class="progress-thumb" id="progress-thumb"></div>
             </div>
+            <div class="progress-readout" id="progress-readout">Absolute time: --</div>
           </div>
           <div class="time-display" id="time-display">0:00 / 0:00</div>
           <select class="speed-select" id="speed-select">
             <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
+            <option value="1">1×</option>
+            <option value="2" selected>2×</option>
             <option value="5">5×</option>
             <option value="10">10×</option>
             <option value="25">25×</option>
@@ -651,6 +610,7 @@
   <script type="module">
     import {
       compressIdleGaps,
+      buildCharacterReplayHistory,
       findHistoryIndex,
       getDurationFromHistory,
       getDurationFromKeydowns,
@@ -658,11 +618,12 @@
       parseKeydowns,
       parseFocusEvents,
       buildInactiveSpans,
-      buildTimelineGapMarkers,
       buildAttributedDocument,
       formatAbsoluteReplayTime,
       getFocusStateAtElapsedMs,
       compressedTimeForRawMs,
+      getElapsedRawTime,
+      getReplayOriginWallMs,
       renderInsertedRangeHtml,
       renderInsertedRangesHtml,
     } from '/replay-view.js'
@@ -679,10 +640,9 @@
     let focusEvents = []
     let replayFocusEvents = []
     let inactiveSpans = []
-    let gapMarkers = []
     let keydowns = []
     let playing = false
-    let speed = 1
+    let speed = 2
     let currentElapsedMs = 0
     let replayStartTime = null
     let animationHandle = null
@@ -692,9 +652,9 @@
     const statusMsgEl = document.getElementById('status-msg')
     const playBtnEl = document.getElementById('btn-play')
     const replayTimeEl = document.getElementById('replay-time')
+    const progressReadoutEl = document.getElementById('progress-readout')
     const progressTrackEl = document.getElementById('progress-track')
     const progressInactiveSpansEl = document.getElementById('progress-inactive-spans')
-    const progressGapMarkersEl = document.getElementById('progress-gap-markers')
     const eventJumpListEl = document.getElementById('event-jump-list')
     const speedSelectEl = document.getElementById('speed-select')
     const highlightStartEl = document.getElementById('highlight-start')
@@ -726,6 +686,11 @@
     function formatTime(ms) {
       const seconds = Math.floor(ms / 1000)
       return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    function getRawElapsedForCompressedElapsed(elapsedMs) {
+      const idx = findHistoryIndex(history, elapsedMs)
+      return idx >= 0 ? getElapsedRawTime(history, idx) : 0
     }
 
     function localDateTimeInputValue(ms) {
@@ -891,22 +856,6 @@
       renderHighlightAnalysis()
     }
 
-    function renderGapMarkers() {
-      if (!progressGapMarkersEl) return
-      progressGapMarkersEl.innerHTML = ''
-
-      const total = getTotalDuration()
-      if (total <= 0 || !gapMarkers.length) return
-
-      for (const marker of gapMarkers) {
-        const left = Math.max(0, Math.min(100, (marker.end / total) * 100))
-        const el = document.createElement('span')
-        el.className = 'progress-gap-marker'
-        el.style.left = `${left}%`
-        progressGapMarkersEl.appendChild(el)
-      }
-    }
-
     function renderInactiveSpans() {
       if (!progressInactiveSpansEl) return
       progressInactiveSpansEl.innerHTML = ''
@@ -1040,6 +989,9 @@
       document.getElementById('progress-fill').style.width = pct + '%'
       document.getElementById('progress-thumb').style.left = pct + '%'
       document.getElementById('time-display').textContent = `${formatTime(elapsedMs)} / ${formatTime(total)}`
+      if (progressReadoutEl) {
+        progressReadoutEl.textContent = `Absolute time: ${formatAbsoluteReplayTime(session, getRawElapsedForCompressedElapsed(elapsedMs))}`
+      }
     }
 
     function startPlay() {
@@ -1109,14 +1061,17 @@
         keydowns = parseKeydowns(session.keystroke_log || '')
         focusEvents = parseFocusEvents(session)
 
-        const rawHistory = parseHistory(
+        const rawHistory = buildCharacterReplayHistory(parseHistory(
           {
             doc_history: session.document_history || [],
             doc_text: session.current_text || '',
           },
           keydowns,
-        )
-        history = compressIdleGaps(rawHistory)
+        ), keydowns, {
+          replayOriginWallMs: getReplayOriginWallMs(session),
+          startWallNs: session.start_wall_ns,
+        })
+        history = compressIdleGaps(rawHistory, 1200)
 
         replayFocusEvents = focusEvents.map(event => ({
           ...event,
@@ -1125,10 +1080,8 @@
 
         const totalDuration = getDurationFromHistory(history)
         inactiveSpans = buildInactiveSpans(focusEvents, history, totalDuration)
-        gapMarkers = buildTimelineGapMarkers(history, 15000)
 
         renderInactiveSpans()
-        renderGapMarkers()
         renderEventJumps()
         initializeHighlightAnalysis()
 

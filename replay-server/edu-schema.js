@@ -384,14 +384,20 @@ function normalizeInlineAnnotation(input = {}) {
   const start = Math.max(0, Number(input.start ?? 0) || 0)
   const end = Math.max(start, Number(input.end ?? start) || start)
   const type = input.type === 'suggestion' ? 'suggestion' : 'comment'
+  const originalStart = Math.max(0, Number(input.original_start ?? start) || 0)
+  const originalEnd = Math.max(originalStart, Number(input.original_end ?? end) || end)
   return {
     id: input.id || randomId('annotation'),
     type,
     start,
     end,
+    original_start: originalStart,
+    original_end: originalEnd,
     quote: String(input.quote || ''),
     note: String(input.note || ''),
     replacement: type === 'suggestion' ? String(input.replacement || '') : '',
+    context_before: String(input.context_before || ''),
+    context_after: String(input.context_after || ''),
     created_at: createdAt,
     updated_at: String(input.updated_at || createdAt),
   }

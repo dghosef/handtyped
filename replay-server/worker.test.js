@@ -6,6 +6,7 @@ import worker from './worker.js'
 function makeEnv() {
   const kv = new Map()
   return {
+    __kv: kv,
     REPLAY_TRUSTED_SIGNER_KEYS: '',
     REPLAY_UPLOAD_RATE_LIMIT_COUNT: '',
     REPLAY_UPLOAD_RATE_LIMIT_WINDOW_MS: '',
@@ -699,6 +700,7 @@ describe('worker host routing', () => {
           classroom_id: createdClassroom.id,
           classroom_name: createdClassroom.name,
           prompt: 'Draft and revise with teacher comments.',
+          policy: { allow_offline_editing: false },
           rubric: [
             { id: 'claim', title: 'Claim', description: 'Clear argument', points: 4 },
             { id: 'evidence', title: 'Evidence', description: 'Specific support', points: 4 },
@@ -738,6 +740,12 @@ describe('worker host routing', () => {
       env,
     )
     expect(initialLive.status).toBe(201)
+    const initialLiveBody = await initialLive.clone().json()
+    expect(initialLiveBody.tenant_id).toBe(createdAssignment.tenant_id)
+    env.__kv.set(
+      `${'edu:live_sessions:'}${liveSessionId}`,
+      JSON.stringify({ ...initialLiveBody, tenant_id: 'legacy-default-tenant' }),
+    )
 
     const grading = await worker.fetch(
       new Request(`https://edu.handtyped.app/api/edu/live-sessions/${liveSessionId}/grading`, {
@@ -784,6 +792,48 @@ describe('worker host routing', () => {
           expect.objectContaining({ type: 'suggestion', replacement: 'since' }),
         ],
       },
+    })
+
+    const studentAssignment = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/assignments/${encodeURIComponent(createdAssignment.id)}?join_code=${encodeURIComponent(createdClassroom.join_code)}&student_name=${encodeURIComponent('Ada')}`,
+      ),
+      env,
+    )
+    expect(studentAssignment.status).toBe(200)
+    expect((await studentAssignment.json()).assignment).toMatchObject({
+      student_feedback: expect.objectContaining({
+        teacher_comment: 'Push the thesis one step further.',
+        grade_label: 'A-',
+        returned_for_revision: true,
+      }),
+    })
+
+    const accidentalEmptySave = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-sessions/${liveSessionId}/grading`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          rubric_scores: {},
+          teacher_comment: '',
+          returned_for_revision: false,
+          grade_label: '',
+          grade_score: null,
+          inline_annotations: [],
+        }),
+      }),
+      env,
+    )
+    expect(accidentalEmptySave.status).toBe(200)
+    expect((await accidentalEmptySave.json()).grading).toMatchObject({
+      teacher_comment: 'Push the thesis one step further.',
+      inline_annotations: [
+        expect.objectContaining({ note: 'Clarify what kind of delay this is.' }),
+        expect.objectContaining({ replacement: 'since' }),
+      ],
     })
 
     const studentSyncUpdate = await worker.fetch(
@@ -841,6 +891,563 @@ describe('worker host routing', () => {
           expect.objectContaining({ type: 'suggestion', replacement: 'since' }),
         ],
       },
+    })
+  })
+
+  it('saves grading when the review selection points at a live replay head without a live-session row', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Replay Review',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'HEAD22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Replay-only feedback',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Review a captured replay.',
+          policy: { allow_offline_editing: false },
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    env.__kv.set(
+      'edu:live_replay_heads:replay-head-only',
+      JSON.stringify({
+        id: 'replay-head-only',
+        tenant_id: createdAssignment.tenant_id,
+        live_session_id: 'missing-live-session',
+        assignment_id: createdAssignment.id,
+        assignment_title: createdAssignment.title,
+        course: createdAssignment.course,
+        classroom: createdClassroom.name,
+        student_name: 'Ada',
+        current_text: 'Selected draft',
+        document_history: [{ op: 'insert', text: 'Selected draft' }],
+        url_history: [],
+        last_activity_at: '2026-05-02T17:00:00.000Z',
+        focused: true,
+        hid_active: true,
+        updated_at: '2026-05-02T17:00:00.000Z',
+      }),
+    )
+
+    const grading = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions/replay-head-only/grading', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          teacher_comment: 'Replay feedback.',
+          inline_annotations: [
+            {
+              type: 'comment',
+              start: 0,
+              end: 8,
+              quote: 'Selected',
+              note: 'Clarify this opening.',
+            },
+          ],
+        }),
+      }),
+      env,
+    )
+    expect(grading.status).toBe(200)
+    expect(await grading.json()).toMatchObject({
+      id: 'missing-live-session',
+      assignment_id: createdAssignment.id,
+      grading: {
+        teacher_comment: 'Replay feedback.',
+        inline_annotations: [expect.objectContaining({ note: 'Clarify this opening.' })],
+      },
+    })
+
+    const studentAssignment = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/assignments/${encodeURIComponent(createdAssignment.id)}?join_code=${encodeURIComponent(createdClassroom.join_code)}&student_name=${encodeURIComponent('Ada')}`,
+      ),
+      env,
+    )
+    expect(studentAssignment.status).toBe(200)
+    expect((await studentAssignment.json()).assignment).toMatchObject({
+      student_feedback: expect.objectContaining({
+        teacher_comment: 'Replay feedback.',
+        inline_annotations: [expect.objectContaining({ note: 'Clarify this opening.' })],
+      }),
+    })
+  })
+
+  it('saves grading from the teacher snapshot when no stored review session exists yet', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Snapshot Review',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'SNAP22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Snapshot feedback',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Review a teacher-held snapshot.',
+          policy: { allow_offline_editing: false },
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    const grading = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions/not-stored-yet/grading', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          session_snapshot: {
+            id: 'not-stored-yet',
+            assignment_id: createdAssignment.id,
+            assignment_title: createdAssignment.title,
+            course: createdAssignment.course,
+            classroom: createdClassroom.name,
+            student_name: 'Ada',
+            current_text: 'Selected draft',
+            document_history: [{ op: 'insert', text: 'Selected draft' }],
+            last_activity_at: '2026-05-02T17:00:00.000Z',
+            schedule_open: true,
+            focused: true,
+            hid_active: true,
+          },
+          teacher_comment: 'Snapshot feedback.',
+          inline_annotations: [
+            {
+              type: 'comment',
+              start: 0,
+              end: 8,
+              quote: 'Selected',
+              note: 'Persist this snapshot comment.',
+            },
+          ],
+        }),
+      }),
+      env,
+    )
+    expect(grading.status).toBe(200)
+    expect(await grading.json()).toMatchObject({
+      id: 'not-stored-yet',
+      assignment_id: createdAssignment.id,
+      grading: {
+        teacher_comment: 'Snapshot feedback.',
+        inline_annotations: [expect.objectContaining({ note: 'Persist this snapshot comment.' })],
+      },
+    })
+  })
+
+  it('keeps ordinary live typing updates out of replay history until replay capture is explicitly requested', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Live Replay Gating',
+          teacher_name: 'Ms. Torres',
+          join_code: 'GATE22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Live replay gating',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Type live without turning every keystroke into replay history.',
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    const liveSessionId = 'replay-gating-student'
+    const liveOnlyPublish = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: liveSessionId,
+          assignment_id: createdAssignment.id,
+          assignment_title: createdAssignment.title,
+          course: createdAssignment.course,
+          classroom: createdClassroom.name,
+          student_name: 'Ada',
+          current_text: 'Teacher should still see this instantly.',
+          document_history: [{ t: 1, ins: 'Teacher should still see this instantly.', del: '', pos: 0 }],
+          focus_events: [{ t: 1, state: 'focused' }],
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: '2026-04-27T12:00:00Z',
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+          updated_at: '2026-04-27T12:00:00Z',
+        }),
+      }),
+      env,
+    )
+    expect(liveOnlyPublish.status).toBe(201)
+
+    const liveOnlyReplayUpdates = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-replays/${encodeURIComponent(liveSessionId)}/updates`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(liveOnlyReplayUpdates.status).toBe(404)
+
+    const liveOnlyReplayFallback = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-replays/${encodeURIComponent(liveSessionId)}`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(liveOnlyReplayFallback.status).toBe(200)
+    expect(await liveOnlyReplayFallback.json()).toMatchObject({
+      id: liveSessionId,
+      current_text: 'Teacher should still see this instantly.',
+      events: [],
+    })
+
+    const liveOnlyStoredReplayFallback = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/replays/replay:${encodeURIComponent(liveSessionId)}`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(liveOnlyStoredReplayFallback.status).toBe(200)
+    expect(await liveOnlyStoredReplayFallback.json()).toMatchObject({
+      id: `replay:${liveSessionId}`,
+      live_session_id: liveSessionId,
+      current_text: 'Teacher should still see this instantly.',
+      document_history: [{ t: 1, ins: 'Teacher should still see this instantly.', del: '', pos: 0 }],
+    })
+
+    const replayCapturePublish = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: liveSessionId,
+          assignment_id: createdAssignment.id,
+          assignment_title: createdAssignment.title,
+          course: createdAssignment.course,
+          classroom: createdClassroom.name,
+          student_name: 'Ada',
+          current_text: 'This update should advance replay history too.',
+          document_history: [{ t: 2, ins: 'This update should advance replay history too.', del: '', pos: 0 }],
+          focus_events: [{ t: 2, state: 'focused' }],
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: '2026-04-27T12:00:05Z',
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+          capture_replay: true,
+          updated_at: '2026-04-27T12:00:05Z',
+        }),
+      }),
+      env,
+    )
+    expect(replayCapturePublish.status).toBe(201)
+
+    const replayUpdates = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-replays/${encodeURIComponent(liveSessionId)}/updates`, {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(replayUpdates.status).toBe(200)
+    expect(await replayUpdates.json()).toMatchObject({
+      id: liveSessionId,
+      current_text: 'This update should advance replay history too.',
+      last_seq: 1,
+      events: [expect.objectContaining({ seq: 1, current_text: 'This update should advance replay history too.' })],
+    })
+  })
+
+  it('refreshes dashboard summary counts immediately after a live session publish', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Live Summary',
+          teacher_name: 'Ms. Rivera',
+          join_code: 'SUMM22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Live summary check',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Check dashboard summary updates.',
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    const beforeDashboard = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/dashboard', {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(beforeDashboard.status).toBe(200)
+    const beforeSummary = (await beforeDashboard.json()).summary
+
+    const publish = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'live-summary-student',
+          assignment_id: createdAssignment.id,
+          assignment_title: createdAssignment.title,
+          course: createdAssignment.course,
+          classroom: createdClassroom.name,
+          student_name: 'Ada',
+          current_text: 'Teacher should see me live.',
+          document_history: [{ t: 1, ins: 'Teacher should see me live.', del: '', pos: 0 }],
+          focus_events: [{ t: 1, state: 'focused' }],
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: '2026-04-27T12:00:00Z',
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+          updated_at: '2026-04-27T12:00:00Z',
+        }),
+      }),
+      env,
+    )
+    expect(publish.status).toBe(201)
+
+    const afterDashboard = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/dashboard', {
+        method: 'GET',
+        headers: { Cookie: cookie },
+      }),
+      env,
+    )
+    expect(afterDashboard.status).toBe(200)
+    const afterSummary = (await afterDashboard.json()).summary
+    expect(Number(afterSummary.live_sessions || 0)).toBe(Number(beforeSummary.live_sessions || 0) + 1)
+    expect(Number(afterSummary.active_students || 0)).toBe(Number(beforeSummary.active_students || 0) + 1)
+  })
+
+  it('rejects new suggestions while the student is still actively editing', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroom = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          name: 'Suggestion Safety',
+          teacher_name: 'Ms. Alvarez',
+          join_code: 'SAFE22',
+        }),
+      }),
+      env,
+    )
+    expect(classroom.status).toBe(201)
+    const createdClassroom = await classroom.json()
+
+    const assignment = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          title: 'Unsafe live suggestion',
+          course: 'English',
+          classroom_id: createdClassroom.id,
+          classroom_name: createdClassroom.name,
+          prompt: 'Keep drafting while the window is still open.',
+          policy: { allow_offline_editing: false },
+          temporary_access_until: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      }),
+      env,
+    )
+    expect(assignment.status).toBe(201)
+    const createdAssignment = await assignment.json()
+
+    const liveSessionId = 'unsafe-suggestion:student'
+    const livePublish = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: liveSessionId,
+          assignment_id: createdAssignment.id,
+          assignment_title: createdAssignment.title,
+          course: createdAssignment.course,
+          classroom: createdClassroom.name,
+          student_name: 'Ada',
+          current_text: 'A working draft is still changing.',
+          document_history: [{ op: 'insert', text: 'A working draft is still changing.' }],
+          current_url: null,
+          current_url_title: null,
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: new Date().toISOString(),
+          schedule_open: true,
+          focused: true,
+          hid_active: true,
+        }),
+      }),
+      env,
+    )
+    expect(livePublish.status).toBe(201)
+
+    const unsafeSuggestion = await worker.fetch(
+      new Request(`https://edu.handtyped.app/api/edu/live-sessions/${liveSessionId}/grading`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
+        body: JSON.stringify({
+          teacher_comment: 'Keep pushing the idea.',
+          inline_annotations: [
+            {
+              type: 'comment',
+              start: 0,
+              end: 9,
+              quote: 'A working',
+              note: 'Open more directly.',
+            },
+            {
+              type: 'suggestion',
+              start: 10,
+              end: 15,
+              quote: 'draft',
+              replacement: 'claim',
+              note: 'Name the argument more precisely.',
+            },
+          ],
+        }),
+      }),
+      env,
+    )
+    expect(unsafeSuggestion.status).toBe(409)
+    expect(await unsafeSuggestion.json()).toMatchObject({
+      error: expect.stringContaining('Suggestions can only be added'),
     })
   })
 

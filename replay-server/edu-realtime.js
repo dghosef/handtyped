@@ -112,7 +112,7 @@ export class EduRealtimeHub {
         clearInterval(this.heartbeatTimer)
         this.heartbeatTimer = null
       }
-    }, 15000)
+    }, 5000)
   }
 
   dropClient(clientId) {

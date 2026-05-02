@@ -575,6 +575,76 @@ describe('edu teacher and student flow', () => {
     })
   })
 
+  it('falls back to live session snapshots when a teacher opens a missing replay record', async () => {
+    const login = await teacherLogin()
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: 'Live replay fallback', join_code: `LRF${shortId(5)}` },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        classroom_id: classroom.body.id,
+        title: 'Fallback draft',
+        course: 'English 11',
+        classroom_name: classroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = `fallback-student-${shortId(6)}`
+    const documentHistory = [{ t: 1_000, ins: 'Recovered from live snapshot.', del: '', pos: 0 }]
+    const livePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: 'Recovered from live snapshot.',
+      document_history: documentHistory,
+      focus_events: [{ t: 1_000, state: 'focused' }],
+      url_history: [{ at: '2026-04-27T12:00:00Z', url: 'https://example.test/draft' }],
+      violation_count: 0,
+      violations: [{ kind: 'blocked-url', at: '2026-04-27T12:00:02Z' }],
+      last_activity_at: '2026-04-27T12:00:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+      replay_session_id: `replay:${liveSessionId}`,
+    })
+    expect(livePublish.status).toBe(201)
+
+    const prefixedReplayRead = await request('GET', `/api/edu/replays/replay:${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(prefixedReplayRead.status).toBe(200)
+    expect(prefixedReplayRead.body).toMatchObject({
+      id: `replay:${liveSessionId}`,
+      live_session_id: liveSessionId,
+      student_name: 'Ada',
+      current_text: 'Recovered from live snapshot.',
+      document_history: documentHistory,
+      assignment: expect.objectContaining({ id: assignment.body.id }),
+    })
+
+    const directReplayRead = await request('GET', `/api/edu/replays/${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(directReplayRead.status).toBe(200)
+    expect(directReplayRead.body).toMatchObject({
+      id: liveSessionId,
+      live_session_id: liveSessionId,
+      current_text: 'Recovered from live snapshot.',
+    })
+  })
+
   it('reflects assignment create, update, and delete changes in student config', async () => {
     const joinCode = `REA${shortId(5)}`
     const login = await teacherLogin()
@@ -725,6 +795,7 @@ describe('edu teacher and student flow', () => {
         classroom_id: classroom.body.id,
         classroom_name: classroom.body.name,
         prompt: 'Draft quickly and revise from teacher feedback.',
+        policy: { allow_offline_editing: false },
         rubric: [
           { id: 'claim', title: 'Claim', description: 'Clear argument', points: 4 },
           { id: 'evidence', title: 'Evidence', description: 'Specific support', points: 4 },
@@ -896,6 +967,7 @@ describe('edu teacher and student flow', () => {
       hid_active: true,
     })
     expect(firstPublish.status).toBe(201)
+    expect(firstPublish.body.tenant_id).toBe(assignment.body.tenant_id)
 
     const firstDashboard = await request('GET', '/api/edu/dashboard', undefined, {
       Cookie: login.cookie,
@@ -1005,6 +1077,7 @@ describe('edu teacher and student flow', () => {
         classroom_id: classroom.body.id,
         classroom_name: classroom.body.name,
         prompt: 'Verify teacher feedback survives round-trips.',
+        policy: { allow_offline_editing: false },
         rubric: [
           { id: 'idea', title: 'Idea', description: 'Clear controlling idea', points: 4 },
         ],
@@ -1171,6 +1244,7 @@ describe('edu teacher and student flow', () => {
         classroom_id: classroom.body.id,
         classroom_name: classroom.body.name,
         prompt: 'Revise your claim and connect each piece of evidence back to it.',
+        policy: { allow_offline_editing: false },
       },
       { Cookie: login.cookie },
     )

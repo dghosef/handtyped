@@ -448,6 +448,56 @@ describe("generated student config matrix", () => {
       }
     });
   });
+
+  it("buildStudentConfig preserves persisted student feedback when no live session is present", async () => {
+    const classroom = baseClassroom();
+    const assignment = baseAssignment({
+      student_feedback: {
+        teacher_comment: "Persisted teacher comment.",
+        returned_for_revision: true,
+      },
+    });
+    const store = makeStore({
+      classrooms: [classroom],
+      assignments: [assignment],
+      liveSessions: [],
+    });
+    const result = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: "Ada Lovelace",
+    });
+
+    expect(result.assignments).toHaveLength(1);
+    expect(result.assignments[0].student_feedback).toMatchObject({
+      teacher_comment: "Persisted teacher comment.",
+      returned_for_revision: true,
+    });
+  });
+
+  it("buildStudentAssignmentConfig preserves persisted student feedback when no live session is present", async () => {
+    const classroom = baseClassroom();
+    const assignment = baseAssignment({
+      student_feedback: {
+        teacher_comment: "Persisted teacher comment.",
+        grade_label: "Revise",
+      },
+    });
+    const store = makeStore({
+      classrooms: [classroom],
+      assignments: [assignment],
+      liveSessions: [],
+    });
+    const result = await buildStudentAssignmentConfig(store, {
+      assignmentId: assignment.id,
+      joinCode: classroom.join_code,
+      studentName: "Ada Lovelace",
+    });
+
+    expect(result.assignment?.student_feedback).toMatchObject({
+      teacher_comment: "Persisted teacher comment.",
+      grade_label: "Revise",
+    });
+  });
 });
 
 describe("generated teacher auth and session matrix", () => {

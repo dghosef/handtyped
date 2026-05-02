@@ -1,4 +1,4 @@
-export const LIVE_SESSION_STALE_MS = 15000
+export const LIVE_SESSION_STALE_MS = 6000
 export const RECENT_EDIT_WINDOW_MS = 5 * 60 * 1000
 export const RECENT_EDIT_BUCKET_MS = 60 * 1000
 
@@ -404,7 +404,7 @@ export function timeAgoLabel(value, now = Date.now()) {
     return 'Unknown'
   }
   const deltaSeconds = Math.max(0, Math.floor((now - parsed) / 1000))
-  if (deltaSeconds < 5) return 'just now'
+  if (deltaSeconds === 0) return 'just now'
   if (deltaSeconds < 60) return `${deltaSeconds}s ago`
   const minutes = Math.floor(deltaSeconds / 60)
   if (minutes < 60) return `${minutes}m ago`

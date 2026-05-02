@@ -50,6 +50,19 @@ function teacherTenantId(session) {
   return session?.tenant_id || DEFAULT_TENANT_ID
 }
 
+function gradingHasStudentVisibleFeedback(grading = {}) {
+  return Boolean(
+    String(grading?.teacher_comment || '').trim() ||
+      String(grading?.grade_label || '').trim() ||
+      grading?.grade_score != null ||
+      Boolean(grading?.returned_for_revision) ||
+      (Array.isArray(grading?.inline_annotations) && grading.inline_annotations.length > 0) ||
+      (grading?.rubric_scores &&
+        typeof grading.rubric_scores === 'object' &&
+        Object.values(grading.rubric_scores).some((value) => Number(value || 0) > 0)),
+  )
+}
+
 function loadTrustedSignerAllowlist(config = {}) {
   let getSource = () => 'missing'
 
@@ -181,6 +194,27 @@ function buildLiveReplayResponse(head, events = [], replay = null) {
     created_at: head.created_at,
     updated_at: head.updated_at,
   }
+}
+
+function replayFromLiveSessionFallback(replayId, liveSession) {
+  return buildEduReplay({
+    id: replayId,
+    live_session_id: liveSession.id,
+    assignment_id: liveSession.assignment_id,
+    assignment_title: liveSession.assignment_title,
+    course: liveSession.course,
+    classroom: liveSession.classroom,
+    student_name: liveSession.student_name,
+    current_text: liveSession.current_text,
+    document_history: liveSession.document_history,
+    keystroke_log: liveSession.keystroke_log,
+    focus_events: liveSession.focus_events,
+    url_history: liveSession.url_history,
+    violations: liveSession.violations,
+    last_activity_at: liveSession.last_activity_at,
+    focused: liveSession.focused,
+    hid_active: liveSession.hid_active,
+  })
 }
 
 async function appendLiveReplayUpdate(eduStore, session, replay = null) {
@@ -698,6 +732,7 @@ export function createApp(sessionsDir, config = {}) {
       req.body?.id ||
       `${req.body?.student_name || 'student'}:${req.body?.assignment_id || 'assignment'}`
     const existing = await eduStore.getLiveSession(nextId)
+    const assignment = req.body?.assignment_id ? await eduStore.getAssignment(req.body.assignment_id) : null
     const incomingCurrentText = Object.hasOwn(req.body || {}, 'current_text')
       ? String(req.body?.current_text || '')
       : null
@@ -705,6 +740,7 @@ export function createApp(sessionsDir, config = {}) {
     const session = buildLiveSession({
       ...existing,
       ...(req.body || {}),
+      tenant_id: existing?.tenant_id || assignment?.tenant_id || req.body?.tenant_id,
       id: nextId,
       current_text:
         incomingCurrentText != null
@@ -792,10 +828,19 @@ export function createApp(sessionsDir, config = {}) {
       return res.status(401).json({ error: 'Unauthorized', authenticated: false })
     }
     await ensureEduSeedData(eduStore)
-    const existing = await eduStore.getLiveSession(req.params.id)
+    let existing = await eduStore.getLiveSession(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
+    const assignment = existing.assignment_id ? await eduStore.getAssignment(existing.assignment_id) : null
+    if (
+      assignment?.tenant_id &&
+      teacherSession.tenant_id &&
+      existing.tenant_id !== teacherSession.tenant_id &&
+      assignment.tenant_id === teacherSession.tenant_id
+    ) {
+      existing = buildLiveSession({ ...existing, tenant_id: assignment.tenant_id })
+    }
 
-    const grading = {
+    let grading = {
       rubric_scores:
         req.body?.rubric_scores && typeof req.body.rubric_scores === 'object'
           ? { ...req.body.rubric_scores }
@@ -813,6 +858,15 @@ export function createApp(sessionsDir, config = {}) {
       actor_name: teacherSession.teacher_name || null,
       actor_email: teacherSession.teacher_email || null,
     }
+    if (gradingHasStudentVisibleFeedback(existing?.grading) && !gradingHasStudentVisibleFeedback(grading)) {
+      grading = {
+        ...existing.grading,
+        updated_at: nowIso(),
+        actor_id: teacherSession.teacher_id || existing.grading.actor_id || null,
+        actor_name: teacherSession.teacher_name || existing.grading.actor_name || null,
+        actor_email: teacherSession.teacher_email || existing.grading.actor_email || null,
+      }
+    }
     const updated = buildLiveSession({
       ...existing,
       grading,
@@ -828,7 +882,14 @@ export function createApp(sessionsDir, config = {}) {
       return res.status(401).json({ error: 'Unauthorized', authenticated: false })
     }
     await ensureEduSeedData(eduStore)
-    const replay = await eduStore.getReplay(req.params.id)
+    let replay = await eduStore.getReplay(req.params.id)
+    if (!replay) {
+      const liveSessionId = req.params.id.replace(/^replay:/, '')
+      const liveSession = await eduStore.getLiveSession(liveSessionId)
+      if (liveSession) {
+        replay = replayFromLiveSessionFallback(req.params.id, liveSession)
+      }
+    }
     if (!replay) return res.status(404).json({ error: 'Not found' })
     const assignment = replay.assignment_id ? await eduStore.getAssignment(replay.assignment_id) : null
     res.json({
@@ -872,15 +933,48 @@ export function createApp(sessionsDir, config = {}) {
 
   app.get('/api/edu/student/assignments/:id', async (req, res) => {
     await ensureEduSeedData(eduStore)
+    const studentName = String(req.query.student_name || '').trim()
     const result = await buildStudentAssignmentConfig(eduStore, {
       assignmentId: req.params.id,
       joinCode: req.query.join_code || '',
-      studentName: req.query.student_name || '',
+      studentName,
     })
     if (!result.classroom || !result.assignment) {
       return res.status(404).json({ error: 'Not found' })
     }
     res.json(result)
+  })
+
+  app.post('/api/edu/student/assignments/:id/open', async (req, res) => {
+    await ensureEduSeedData(eduStore)
+    const studentName = String(req.body?.student_name || '').trim()
+    const joinCode = String(req.body?.join_code || '').trim()
+    const result = await buildStudentAssignmentConfig(eduStore, {
+      assignmentId: req.params.id,
+      joinCode,
+      studentName,
+    })
+    if (!result.classroom || !result.assignment || !studentName) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+    await eduStore.putAssignmentAudit(
+      {
+        tenant_id: result.assignment.tenant_id,
+        assignment_id: result.assignment.id,
+        classroom_id: result.assignment.classroom_id,
+        assignment_title: result.assignment.title,
+        action: 'student_opened',
+        actor_id: null,
+        actor_name: null,
+        actor_email: null,
+        summary: `${studentName} opened the assignment`,
+        changes: [{ label: 'Student assignment open', before: null, after: studentName }],
+        snapshot: result.assignment,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      },
+    )
+    res.status(201).json({ recorded: true, assignment_id: result.assignment.id, student_name: studentName })
   })
 
   app.get('/api/health', (_req, res) => {

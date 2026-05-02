@@ -76,6 +76,17 @@ function normalizeStudentOverrideKey(studentName) {
   return String(studentName || '').trim().toLowerCase()
 }
 
+function mergeById(previous = [], incoming = []) {
+  const merged = new Map()
+  for (const item of Array.isArray(previous) ? previous : []) {
+    if (item?.id) merged.set(item.id, item)
+  }
+  for (const item of Array.isArray(incoming) ? incoming : []) {
+    if (item?.id) merged.set(item.id, item)
+  }
+  return [...merged.values()]
+}
+
 function assignmentTargetsStudent(assignment, studentName) {
   const assignedStudents = Array.isArray(assignment?.assigned_students)
     ? assignment.assigned_students.map((value) => String(value || '').trim()).filter(Boolean)
@@ -184,7 +195,7 @@ function assignmentWindowDeadline(window, now = new Date()) {
   return deadline
 }
 
-function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
+export function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
   const normalized = buildAssignment(assignment)
   if (normalized.access_revoked) {
     return { schedule_open: false, session_end_at: null }
@@ -522,6 +533,20 @@ export function createNodeEduStore(baseDir) {
       const nextSummaries = summaries.filter((item) => item.id !== summary.id)
       nextSummaries.push(summary)
       writeCollection('live_session_summaries', nextSummaries)
+      writeCollection(
+        'dashboard_summaries',
+        mergeById(readCollection('dashboard_summaries'), [
+          buildDashboardSummaryRecord({
+            tenantId: session.tenant_id,
+            classrooms: readCollection('classrooms').filter((item) => item.tenant_id === session.tenant_id).length,
+            assignments: readCollection('assignments').filter((item) => item.tenant_id === session.tenant_id).length,
+            live_sessions: next.filter((item) => item.tenant_id === session.tenant_id).length,
+            replays_available: readCollection('replays').filter((item) => item.tenant_id === session.tenant_id).length,
+            audits_recorded: readCollection('assignment_audits').filter((item) => item.tenant_id === session.tenant_id).length,
+            active_students: next.filter((item) => item.tenant_id === session.tenant_id).length,
+          }),
+        ]),
+      )
     },
     async getLiveSession(id) {
       return readCollection('live_sessions').find((item) => item.id === id) || null
@@ -709,6 +734,7 @@ export function createKvEduStore(kv) {
       const summary = buildLiveSessionSummary(session)
       await kv.put(`${LIVE_PREFIX}${session.id}`, JSON.stringify(session))
       await kv.put(`${LIVE_SUMMARY_PREFIX}${session.assignment_id}:${session.id}`, JSON.stringify(summary))
+      await this.refreshDashboardSummary(session.tenant_id)
     },
     async getLiveSession(id) {
       const raw = await kv.get(`${LIVE_PREFIX}${id}`)
@@ -813,6 +839,21 @@ export function createD1EduStore(db) {
   let schemaReady = null
   let maintenanceRanAt = 0
 
+  function hydrateRow(row) {
+    if (!row) {
+      return null
+    }
+    const parsed = JSON.parse(row.json)
+    return {
+      ...parsed,
+      tenant_id: parsed?.tenant_id || row.tenant_id || DEFAULT_TENANT_ID,
+      classroom_id: parsed?.classroom_id || row.classroom_id || parsed?.assignment_id || null,
+      student_key: parsed?.student_key || row.student_key || null,
+      parent_id: parsed?.parent_id || row.parent_id || parsed?.live_session_id || parsed?.replay_session_id || null,
+      expires_at: Object.hasOwn(parsed || {}, 'expires_at') ? parsed.expires_at : row.expires_at ?? null,
+    }
+  }
+
   async function schemaColumns() {
     const response = await db.prepare('PRAGMA table_info(edu_records)').all()
     return new Set((response.results || []).map((row) => String(row.name || '')))
@@ -878,62 +919,62 @@ export function createD1EduStore(db) {
     await ensureSchema()
     const response = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC, id DESC',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC, id DESC',
       )
       .bind(normalizeTenantId(tenantId), kind)
       .all()
-    return (response.results || []).map((row) => JSON.parse(row.json))
+    return (response.results || []).map((row) => hydrateRow(row))
   }
 
   async function getByKindAndId(kind, id) {
     await ensureSchema()
     const row = await db
-      .prepare('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
+      .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
       .bind(kind, id)
       .first()
-    return row ? JSON.parse(row.json) : null
+    return row ? hydrateRow(row) : null
   }
 
   async function getByKindAndJoinCode(kind, joinCode) {
     await ensureSchema()
     const row = await db
-      .prepare('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
+      .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
       .bind(kind, normalizeJoinCode(joinCode))
       .first()
-    return row ? JSON.parse(row.json) : null
+    return row ? hydrateRow(row) : null
   }
 
   async function listKindByClassroom(kind, classroomId, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const response = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
       )
       .bind(normalizeTenantId(tenantId), kind, classroomId)
       .all()
-    return (response.results || []).map((row) => JSON.parse(row.json))
+    return (response.results || []).map((row) => hydrateRow(row))
   }
 
   async function listKindByParent(kind, parentId, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const response = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC, id DESC',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC, id DESC',
       )
       .bind(normalizeTenantId(tenantId), kind, parentId)
       .all()
-    return (response.results || []).map((row) => JSON.parse(row.json))
+    return (response.results || []).map((row) => hydrateRow(row))
   }
 
   async function getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const row = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC, id DESC LIMIT 1',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC, id DESC LIMIT 1',
       )
       .bind(normalizeTenantId(tenantId), 'live_session', assignmentId, normalizedStudentKey(studentName))
       .first()
-    return row ? JSON.parse(row.json) : null
+    return row ? hydrateRow(row) : null
   }
 
   async function putRecord(kind, id, record, extras = {}) {
@@ -1061,10 +1102,10 @@ export function createD1EduStore(db) {
     async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
       await ensureSchema()
       const row = await db
-        .prepare('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
+        .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
         .bind(normalizeTenantId(tenantId), 'teacher', normalizeEmail(email))
         .first()
-      return row ? JSON.parse(row.json) : null
+      return row ? hydrateRow(row) : null
     },
     async putTeacherSession(session) {
       await putRecord('teacher_session', session.id, session, {
@@ -1459,7 +1500,7 @@ export async function buildStudentConfig(store, { joinCode, studentName } = {}) 
       return assignmentForStudentConfig(
         {
           ...item,
-          student_feedback: liveSession?.grading || null,
+          student_feedback: liveSession?.grading || item?.student_feedback || null,
         },
         studentName,
       )
@@ -1505,7 +1546,7 @@ export async function buildStudentAssignmentConfig(
     assignment: assignmentForStudentConfig(
       {
         ...assignment,
-        student_feedback: liveSession?.grading || null,
+        student_feedback: liveSession?.grading || assignment?.student_feedback || null,
       },
       studentName,
     ),

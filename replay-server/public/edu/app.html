@@ -140,6 +140,7 @@
                   <p class="muted" id="review-workspace-meta"></p>
                 </div>
                 <div class="review-workspace-actions">
+                  <div class="student-badge review-activity-status" id="review-activity-status" hidden>Not active</div>
                   <div class="review-sync-pill" id="review-sync-status">Saved</div>
                   <button class="button button-secondary small-button" id="review-close-button" type="button">Back to students</button>
                 </div>
@@ -170,18 +171,13 @@
                 <div class="review-draft-surface" id="review-draft-surface" tabindex="0" aria-label="Student draft review surface"></div>
                 <div class="review-selection-panel" id="review-selection-panel">
                   <div class="section-label">Selected text</div>
-                  <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment or suggestion.</div>
+                  <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment.</div>
                   <div class="review-selection-actions">
                     <button class="button button-secondary small-button" id="review-comment-mode" type="button">Comment</button>
-                    <button class="button button-secondary small-button" id="review-suggest-mode" type="button">Suggest</button>
                   </div>
                 </div>
                 <div class="review-composer" id="review-composer" hidden>
-                  <div class="section-label" id="review-composer-label">New annotation</div>
-                  <label id="review-replacement-field" hidden>
-                    <span>Suggested replacement</span>
-                    <textarea id="review-composer-replacement" rows="2" placeholder="Replace the selected text with..."></textarea>
-                  </label>
+                  <div class="section-label" id="review-composer-label">New comment</div>
                   <label>
                     <span>Note</span>
                     <textarea id="review-composer-note" rows="3" placeholder="What should the student notice here?"></textarea>
@@ -222,7 +218,7 @@
 
               <section class="review-card">
                 <div class="review-card-header">
-                  <div class="section-label">Inline comments and suggestions</div>
+                  <div class="section-label">Inline comments</div>
                   <div class="student-meta" id="review-annotation-meta">No inline notes yet.</div>
                 </div>
                 <div class="review-annotation-list" id="review-annotation-list"></div>
@@ -395,7 +391,7 @@
             </label>
           </div>
           <label>
-            <span>Line spacing</span>
+            <span>Locked line spacing</span>
             <select name="editor_line_height">
               <option value="single">Single</option>
               <option value="relaxed" selected>1.15</option>

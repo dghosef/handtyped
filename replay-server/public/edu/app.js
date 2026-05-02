@@ -3870,49 +3870,50 @@ function populateAssignmentModalForEdit(assignment) {
   elements.assignmentFormCancel.disabled = false
 
   const form = elements.assignmentForm
-  form.title.value = assignment.title || ''
-  form.prompt.value = assignment.prompt || ''
+  const field = (name) => form.elements.namedItem(name)
+  field('title').value = assignment.title || ''
+  field('prompt').value = assignment.prompt || ''
 
   if (assignment.windows?.[0]) {
     const win = assignment.windows[0]
-    form.window_start_time.value = `${String(win.start_hour).padStart(2, '0')}:${String(win.start_minute).padStart(2, '0')}`
-    form.window_end_time.value = `${String(win.end_hour).padStart(2, '0')}:${String(win.end_minute).padStart(2, '0')}`
-    form.window_end_date.value = win.end_date || ''
-    form.day_monday.checked = win.days?.monday ?? true
-    form.day_tuesday.checked = win.days?.tuesday ?? true
-    form.day_wednesday.checked = win.days?.wednesday ?? true
-    form.day_thursday.checked = win.days?.thursday ?? true
-    form.day_friday.checked = win.days?.friday ?? true
-    form.day_saturday.checked = win.days?.saturday ?? false
-    form.day_sunday.checked = win.days?.sunday ?? false
+    field('window_start_time').value = `${String(win.start_hour).padStart(2, '0')}:${String(win.start_minute).padStart(2, '0')}`
+    field('window_end_time').value = `${String(win.end_hour).padStart(2, '0')}:${String(win.end_minute).padStart(2, '0')}`
+    field('window_end_date').value = win.end_date || ''
+    field('day_monday').checked = win.days?.monday ?? true
+    field('day_tuesday').checked = win.days?.tuesday ?? true
+    field('day_wednesday').checked = win.days?.wednesday ?? true
+    field('day_thursday').checked = win.days?.thursday ?? true
+    field('day_friday').checked = win.days?.friday ?? true
+    field('day_saturday').checked = win.days?.saturday ?? false
+    field('day_sunday').checked = win.days?.sunday ?? false
   }
 
   if (assignment.policy) {
-    form.allow_dictation.checked = assignment.policy.allow_dictation ?? false
-    form.allow_offline_editing.checked = assignment.policy.allow_offline_editing ?? true
-    form.copy_paste_allowed.checked = assignment.policy.copy_paste_allowed ?? false
-    form.export_allowed.checked = assignment.policy.export_allowed ?? false
-    form.images_allowed.checked = assignment.policy.images_allowed ?? false
-    form.require_lockdown.checked = assignment.policy.require_lockdown ?? false
-    form.require_permission_to_rejoin.checked = assignment.policy.require_permission_to_rejoin ?? false
-    form.show_rubric_to_student.checked = assignment.policy.show_rubric_to_student ?? false
+    field('allow_dictation').checked = assignment.policy.allow_dictation ?? false
+    field('allow_offline_editing').checked = assignment.policy.allow_offline_editing ?? true
+    field('copy_paste_allowed').checked = assignment.policy.copy_paste_allowed ?? false
+    field('export_allowed').checked = assignment.policy.export_allowed ?? false
+    field('images_allowed').checked = assignment.policy.images_allowed ?? false
+    field('require_lockdown').checked = assignment.policy.require_lockdown ?? false
+    field('require_permission_to_rejoin').checked = assignment.policy.require_permission_to_rejoin ?? false
+    field('show_rubric_to_student').checked = assignment.policy.show_rubric_to_student ?? false
   }
 
   if (assignment.editor_policy) {
     setStarterDocumentMarkdown(assignment.starter_document || '')
-    form.editor_font_family.value = assignment.editor_policy.font_family || 'arial'
-    form.editor_font_size.value = String(assignment.editor_policy.font_size ?? 12)
-    form.editor_line_height.value = assignment.editor_policy.line_height || 'relaxed'
-    form.editor_font_locked.checked = assignment.editor_policy.font_locked ?? false
+    field('editor_font_family').value = assignment.editor_policy.font_family || 'arial'
+    field('editor_font_size').value = String(assignment.editor_policy.font_size ?? 12)
+    field('editor_line_height').value = assignment.editor_policy.line_height || 'relaxed'
+    field('editor_font_locked').checked = assignment.editor_policy.font_locked ?? false
   } else {
     setStarterDocumentMarkdown(assignment.starter_document || '')
   }
 
   if (assignment.browser_policy) {
-    form.browser_enabled.checked = assignment.browser_policy.browser_enabled ?? false
-    form.browser_mode.value = assignment.browser_policy.mode === 'blacklist' ? 'blacklist' : 'whitelist'
-    form.browser_home_url.value = assignment.browser_policy.home_url || ''
-    form.browser_allowed_domains.value = (assignment.browser_policy.allowed_domains || []).join('\n')
+    field('browser_enabled').checked = assignment.browser_policy.browser_enabled ?? false
+    field('browser_mode').value = assignment.browser_policy.mode === 'blacklist' ? 'blacklist' : 'whitelist'
+    field('browser_home_url').value = assignment.browser_policy.home_url || ''
+    field('browser_allowed_domains').value = (assignment.browser_policy.allowed_domains || []).join('\n')
   }
   const assignedStudents = Array.isArray(assignment.assigned_students) ? assignment.assigned_students : []
   renderAssignedStudentOptions(assignedStudents)

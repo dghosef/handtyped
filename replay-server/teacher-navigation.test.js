@@ -127,6 +127,12 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).toContain("'Saving...'")
   })
 
+  it('populates the edit assignment modal through named form controls', () => {
+    expect(teacherAppJs).toContain("const field = (name) => form.elements.namedItem(name)")
+    expect(teacherAppJs).toContain("field('title').value = assignment.title || ''")
+    expect(teacherAppJs).not.toContain('form.title.value')
+  })
+
   it('uses extend for reopening instead of offering an indefinite reopen button', () => {
     expect(teacherAppJs).toContain('data-close-student-access')
     expect(teacherAppJs).toContain("const closeAccessButton = accessRevoked")

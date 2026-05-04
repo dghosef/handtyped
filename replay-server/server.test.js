@@ -2688,6 +2688,122 @@ describe('per-student assignment extensions', () => {
     )
   })
 
+  it('clears feedback requests when dismissed or when a newer student draft syncs', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Feedback Lifecycle Local',
+        teacher_name: 'Ms. Keating',
+        join_code: `FBC${shortId(5)}`,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: `Feedback Lifecycle ${shortId(4)}`,
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const firstRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'Duplicate request.',
+      },
+    )
+    expect(firstRequest.status).toBe(201)
+
+    const dismiss = await request(
+      'DELETE',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests/${encodeURIComponent('Ada Lovelace')}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(dismiss.status).toBe(200)
+    expect(dismiss.body).toMatchObject({
+      assignment_id: assignment.body.id,
+      dismissed: true,
+      student_name: 'Ada Lovelace',
+      student_feedback_request: null,
+    })
+    expect(dismiss.body.assignment.student_feedback_requests).not.toHaveProperty('ada lovelace')
+
+    const secondRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'Please review this version.',
+      },
+    )
+    expect(secondRequest.status).toBe(201)
+
+    const sessionId = `feedback-local:${assignment.body.id}`
+    const staleSync = await request('POST', '/api/edu/live-sessions', {
+      id: sessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'Older draft sync.',
+      document_history: [{ op: 'insert', text: 'Older draft sync.' }],
+      last_activity_at: '2026-04-27T12:00:00.000Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(staleSync.status).toBe(201)
+
+    const afterStaleSync = await request('GET', '/api/edu/dashboard', undefined, { Cookie: login.cookie })
+    expect(afterStaleSync.status).toBe(200)
+    expect(afterStaleSync.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback_requests: expect.objectContaining({
+            'ada lovelace': expect.objectContaining({ note: 'Please review this version.' }),
+          }),
+        }),
+      ]),
+    )
+
+    const newerSync = await request('POST', '/api/edu/live-sessions', {
+      id: sessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'New draft after request.',
+      document_history: [{ op: 'insert', text: 'New draft after request.' }],
+      last_activity_at: new Date(Date.now() + 1000).toISOString(),
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(newerSync.status).toBe(201)
+
+    const afterNewerSync = await request('GET', '/api/edu/dashboard', undefined, { Cookie: login.cookie })
+    expect(afterNewerSync.status).toBe(200)
+    const dashboardAssignment = afterNewerSync.body.assignments.find((item) => item.id === assignment.body.id)
+    expect(dashboardAssignment.student_feedback_requests).not.toHaveProperty('ada lovelace')
+  })
+
   it('approves a student request into the normal class window when the assignment is already open', async () => {
     const joinCode = `OPN${shortId(5)}`
     const login = await teacherLogin()
@@ -3029,7 +3145,11 @@ describe('per-student assignment extensions', () => {
         }),
       ]),
     )
-    expect(summaries.body.live_sessions[0].document_history).toBeUndefined()
+    expect(summaries.body.live_sessions[0].document_history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ins: 'Draft' }),
+      ]),
+    )
     expect(summaries.body.live_sessions[0].url_history).toHaveLength(4)
 
     const studentAssignment = await request(

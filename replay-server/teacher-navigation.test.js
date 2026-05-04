@@ -17,6 +17,7 @@ import {
   nextLocalTimeAtOrAfter,
   parseTimestamp,
   recentEditActivity,
+  recentEditActivityCurve,
   reconcileTeacherNavigation,
   replayLocalDateInputValue,
   sessionPresenceTimestamp,
@@ -30,6 +31,7 @@ import {
 } from './public/edu/app-ui.js'
 
 const teacherAppHtml = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.html'), 'utf8')
+const eduLandingHtml = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'index.html'), 'utf8')
 const teacherStylesCss = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'styles.css'), 'utf8')
 const teacherAppJs = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.js'), 'utf8')
 
@@ -47,6 +49,9 @@ const assignments = [
 describe('teacher navigation', () => {
   it('renders class and assignment selection as separate top-level pages', () => {
     expect(teacherAppHtml).toContain('<a class="teacher-brand" href="https://edu.handtyped.app">Handtyped EDU</a>')
+    expect(teacherAppHtml).toContain('id="student-download-button"')
+    expect(teacherAppHtml).toContain('href="/downloads/Handtyped-EDU-Student-macos.dmg"')
+    expect(teacherAppHtml).toContain('download="Handtyped-EDU-Student-macos.dmg"')
     expect(teacherAppHtml).toContain('<section id="classes-view">')
     expect(teacherAppHtml).toContain('<section id="assignments-view" hidden>')
     expect(teacherAppHtml).toContain('<section class="review-layout" id="review-layout">')
@@ -61,8 +66,8 @@ describe('teacher navigation', () => {
     expect(teacherAppHtml).toContain('name="review-highlight-weekday"')
     expect(teacherAppHtml).toContain('id="review-highlight-preset-after-school"')
     expect(teacherAppHtml).toContain('id="review-highlight-all"')
-    expect(teacherAppHtml).toContain('id="review-realtime-debug"')
-    expect(teacherAppHtml).toContain('TODO remove later')
+    expect(teacherAppHtml).not.toContain('id="review-realtime-debug"')
+    expect(teacherAppHtml).not.toContain('TODO remove later')
     expect(teacherAppHtml).toContain('id="review-comment-mode"')
     expect(teacherAppHtml).not.toContain('id="review-suggest-mode"')
     expect(teacherAppHtml).not.toContain('id="review-composer-replacement"')
@@ -71,6 +76,8 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).toContain('async function publishCurrentReviewFeedback()')
     expect(teacherAppJs).toContain("publish_feedback: Boolean(publishFeedback || reviewState.feedbackStatus === 'published')")
     expect(teacherAppHtml).toContain('id="access-request-list"')
+    expect(teacherAppJs).toContain('data-dismiss-feedback-request')
+    expect(teacherAppJs).toContain("request(`/api/edu/assignments/${assignment.id}/feedback-requests/${encodeURIComponent(entry.student_name)}`")
     expect(teacherAppHtml).toContain('id="feedback-button"')
     expect(teacherAppHtml).toContain('id="feedback-modal"')
     expect(teacherAppHtml).toContain('support@handtyped.app')
@@ -81,6 +88,13 @@ describe('teacher navigation', () => {
     expect(teacherAppHtml.indexOf('<section id="assignments-view" hidden>')).toBeGreaterThan(
       teacherAppHtml.indexOf('</section>\n\n      <!-- Assignments View -->'),
     )
+  })
+
+  it('exposes the notarized student app download on the edu landing page', () => {
+    expect(eduLandingHtml).toContain('id="student-download-button"')
+    expect(eduLandingHtml).toContain('Download student app')
+    expect(eduLandingHtml).toContain('href="/downloads/Handtyped-EDU-Student-macos.dmg"')
+    expect(eduLandingHtml).toContain('download="Handtyped-EDU-Student-macos.dmg"')
   })
 
   it('temporarily exposes realtime diagnostics and keeps review draft spacing stable', () => {
@@ -94,7 +108,7 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).toContain('Monitoring: fallback refresh used')
     expect(teacherAppJs).toContain('Monitoring: realtime updates active')
     expect(teacherStylesCss).toContain('.monitoring-path-status[data-tone="fallback"]')
-    expect(teacherAppJs).toContain('TODO remove later:')
+    expect(teacherAppJs).not.toContain('TODO remove later:')
     expect(teacherAppJs).toContain('let reviewDraftSurfaceHtml')
     expect(teacherAppJs).toContain('if (reviewDraftSurfaceHtml !== nextHtml)')
     expect(teacherAppJs).toContain('function textWithPreservedParagraphSpacing')
@@ -150,6 +164,12 @@ describe('teacher navigation', () => {
     expect(teacherStylesCss).toContain('min-width: 0;')
   })
 
+  it('hides internal blank placeholder pages from recent browser URLs', () => {
+    expect(teacherAppJs).toContain('function isDisplayableBrowserUrl(url)')
+    expect(teacherAppJs).toContain("return normalized !== 'about:blank'")
+    expect(teacherAppJs).toContain('.filter((item) => isDisplayableBrowserUrl(item?.url))')
+  })
+
   it('shows reference document names instead of internal document URLs', () => {
     expect(teacherAppJs).toContain('function browserVisitDisplayLabel(item, assignment = getSelectedAssignment())')
     expect(teacherAppJs).toContain('handtyped:\\/\\/reference-document\\/')
@@ -164,18 +184,27 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).toContain('const DASHBOARD_REVIEW_REFRESH_MS = 5000')
     expect(teacherAppJs).toContain('const ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS = 5000')
     expect(teacherAppJs).toContain('const TEACHER_STATUS_TICK_MS = 1000')
+    expect(teacherAppJs).toContain('const REALTIME_EVENT_STALE_FALLBACK_MS = 7000')
     expect(teacherAppJs).toContain('function renderReviewWorkspaceMeta')
     expect(teacherAppJs).toContain('function refreshStudentCardLiveLabels')
     expect(teacherAppJs).toContain("const MISSING_SELECTED_REVIEW_SESSION = Symbol('missing-selected-review-session')")
     expect(teacherAppJs).toContain('scheduleDashboardRefresh()')
     expect(teacherAppJs).toContain('statusTickTimer = window.setInterval(() => {')
     expect(teacherAppJs).toContain('refreshStudentCardLiveLabels()')
+    expect(teacherAppJs).toContain('refreshStudentEditActivityGraphs()')
     expect(teacherAppJs).toContain('data-student-last-activity')
     expect(teacherAppJs).toContain('data-student-status-badge')
     expect(teacherAppJs).toContain('selectedAssignmentId = button.dataset.assignmentId\n      clearSelectedReviewSession()\n      showAssignmentView()')
     expect(teacherAppJs).toContain('await refreshDashboard()')
     expect(teacherAppJs).toContain('function syncRealtimeSubscriptions()')
     expect(teacherAppJs).toContain("new EventSource(url)")
+    expect(teacherAppJs).toContain('function shouldUseFallbackRefresh()')
+    expect(teacherAppJs).toContain('function realtimeStatusIsHealthy(label)')
+    expect(teacherAppJs).toContain('function realtimeHasRecentEvent(label, eventName)')
+    expect(teacherAppJs).toContain("return !realtimeHasRecentEvent('assignment', 'assignment') || !realtimeStatusIsHealthy('replay')")
+    expect(teacherAppJs).toContain("return !realtimeHasRecentEvent('assignment', 'assignment')")
+    expect(teacherAppJs).toContain("return !realtimeHasRecentEvent('teacher', 'dashboard')")
+    expect(teacherAppJs).toContain('if (!document.hidden && shouldUseFallbackRefresh())')
     expect(teacherAppJs).toContain("source.addEventListener('access-request'")
     expect(teacherAppJs).toContain('function handleRealtimeAccessRequest')
     expect(teacherAppJs).toContain('accessRequest: handleRealtimeAccessRequest')
@@ -607,6 +636,164 @@ describe('teacher navigation', () => {
     expect(activity.buckets).toEqual([1, 1, 1, 1, 1])
   })
 
+  it('keeps the full edit graph shape when refreshed sessions also carry recent edit counts', () => {
+    const activity = recentEditActivity(
+      {
+        recent_edit_count: 25,
+        document_history: [
+          { t: 100_000, pos: 0, del: '', ins: 'A' },
+          { t: 130_000, pos: 1, del: '', ins: 'B' },
+          { t: 190_000, pos: 2, del: '', ins: 'C' },
+        ],
+      },
+      {
+        windowMs: 120_000,
+        bucketMs: 30_000,
+      },
+    )
+
+    expect(activity.totalEdits).toBe(3)
+    expect(activity.buckets).toEqual([1, 1, 0, 1])
+  })
+
+  it('renders edit activity as binary 5-second edit windows', () => {
+    const activity = recentEditActivityCurve(
+      {
+        last_activity_at: new Date(120_000).toISOString(),
+        document_history: [
+          { t: 100_000, absolute_wall_ms: 100_000, pos: 0, del: '', ins: 'A' },
+          { t: 102_000, absolute_wall_ms: 102_000, pos: 1, del: '', ins: 'B' },
+          { t: 110_000, absolute_wall_ms: 110_000, pos: 1, del: '', ins: 'B' },
+        ],
+      },
+      {
+        windowMs: 20_000,
+        sampleMs: 5_000,
+        nowMs: 120_000,
+      },
+    )
+
+    expect(activity.totalEdits).toBe(3)
+    expect(activity.points).toEqual([1, 0, 1, 0])
+  })
+
+  it('anchors edit activity windows to clock intervals so bars do not flicker between renders', () => {
+    const session = {
+      document_history: [
+        { t: 1, absolute_wall_ms: 101_000, pos: 0, del: '', ins: 'A' },
+        { t: 2, absolute_wall_ms: 106_000, pos: 1, del: '', ins: 'B' },
+        { t: 3, absolute_wall_ms: 111_000, pos: 2, del: '', ins: 'C' },
+      ],
+    }
+    const first = recentEditActivityCurve(session, {
+      windowMs: 30_000,
+      sampleMs: 5_000,
+      nowMs: 113_000,
+    })
+    const second = recentEditActivityCurve(session, {
+      windowMs: 30_000,
+      sampleMs: 5_000,
+      nowMs: 114_500,
+    })
+    const nextInterval = recentEditActivityCurve(session, {
+      windowMs: 30_000,
+      sampleMs: 5_000,
+      nowMs: 115_500,
+    })
+
+    expect(first.points).toEqual(second.points)
+    expect(first.points).toEqual([0, 0, 0, 1, 1, 1])
+    expect(nextInterval.points).toEqual([0, 0, 1, 1, 1, 0])
+  })
+
+  it('uses per-entry absolute edit times even when older history entries only have relative times', () => {
+    const session = {
+      last_activity_at: new Date(115_000).toISOString(),
+      document_history: [
+        { t: 1, pos: 0, del: '', ins: 'old relative' },
+        { t: 2, absolute_wall_ms: 101_000, pos: 0, del: '', ins: 'A' },
+        { t: 3, absolute_wall_ms: 106_000, pos: 1, del: '', ins: 'B' },
+        { t: 4, absolute_wall_ms: 111_000, pos: 2, del: '', ins: 'C' },
+      ],
+    }
+
+    const activity = recentEditActivityCurve(session, {
+      windowMs: 30_000,
+      sampleMs: 5_000,
+      nowMs: 114_500,
+    })
+
+    expect(activity.points).toEqual([0, 0, 0, 1, 1, 1])
+  })
+
+  it('counts only text insertion, deletion, and formatting document history entries', () => {
+    const now = Date.parse('2026-05-04T15:00:00.000Z')
+    const activity = recentEditActivityCurve(
+      {
+        last_activity_at: new Date(now).toISOString(),
+        document_history: [
+          { t: 100, absolute_wall_ms: now - 18_000, selection: { from: 0, to: 0 } },
+          { t: 200, absolute_wall_ms: now - 14_000, pos: 0, del: '', ins: 'A' },
+          { t: 300, absolute_wall_ms: now - 9_000, pos: 1, del: 'A', ins: '' },
+          { t: 400, absolute_wall_ms: now - 4_000, pos: 1, del: '', ins: '', marks: { bold: true } },
+          { t: 500, absolute_wall_ms: now - 2_000, url: 'https://example.com' },
+        ],
+      },
+      {
+        windowMs: 20_000,
+        sampleMs: 5_000,
+        nowMs: now,
+      },
+    )
+
+    expect(activity.totalEdits).toBe(3)
+    expect(activity.points).toEqual([0, 1, 1, 1])
+  })
+
+  it('uses wall-clock time for edit activity so offline edits do not appear recent', () => {
+    const now = Date.parse('2026-05-04T15:00:00.000Z')
+    const activity = recentEditActivityCurve(
+      {
+        last_activity_at: new Date(now - 19 * 60_000).toISOString(),
+        document_history: [
+          { t: 100_000, pos: 0, del: '', ins: 'A' },
+          { t: 110_000, pos: 1, del: '', ins: 'B' },
+          { t: 140_000, pos: 2, del: '', ins: 'C' },
+        ],
+      },
+      {
+        windowMs: 5 * 60_000,
+        sampleMs: 5_000,
+        nowMs: now,
+      },
+    )
+
+    expect(activity.totalEdits).toBe(0)
+    expect(activity.points.every((point) => point === 0)).toBe(true)
+  })
+
+  it('uses explicit edit wall times when available for recent edit activity', () => {
+    const now = Date.parse('2026-05-04T15:00:00.000Z')
+    const activity = recentEditActivityCurve(
+      {
+        last_activity_at: new Date(now - 19 * 60_000).toISOString(),
+        document_history: [
+          { t: 100_000, absolute_wall_ms: now - 20_000, pos: 0, del: '', ins: 'A' },
+          { t: 110_000, absolute_wall_ms: now - 10_000, pos: 1, del: '', ins: 'B' },
+          { t: 140_000, absolute_wall_ms: now - 19 * 60_000, pos: 2, del: '', ins: 'old' },
+        ],
+      },
+      {
+        windowMs: 5 * 60_000,
+        sampleMs: 5_000,
+        nowMs: now,
+      },
+    )
+
+    expect(activity.totalEdits).toBe(2)
+    expect(Math.max(...activity.points)).toBeGreaterThan(0)
+  })
+
   it('aggregates recent edit activity across visible students', () => {
     const activity = aggregateRecentEditActivity([
       {
@@ -927,6 +1114,53 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).toContain('STUDENT_OVERRIDE_FONT_SIZE_OPTIONS')
     expect(teacherAppJs).toContain('reviewSessionHasAccess(')
     expect(teacherAppJs).toContain('handleReferenceDocumentUpload(')
+  })
+
+  it('wires edit-frequency controls globally and renders one graph per student card', () => {
+    expect(teacherAppHtml).toContain('id="assignment-edit-activity-panel"')
+    expect(teacherAppHtml).not.toContain('id="edit-activity-graph"')
+    expect(teacherAppHtml).toContain('data-edit-activity-window="5"')
+    expect(teacherAppHtml).toContain('data-edit-activity-window="60"')
+    expect(teacherAppHtml).not.toContain('id="edit-activity-custom-minutes"')
+    expect(teacherAppHtml).not.toContain('edit-activity-custom')
+    expect(teacherAppHtml).not.toContain('id="edit-activity-x-axis"')
+    expect(teacherAppHtml).not.toContain('id="edit-activity-y-axis"')
+    expect(teacherAppJs).toContain('renderStudentEditActivity(session)')
+    expect(teacherAppJs).toContain('${renderStudentEditActivity(session)}')
+    expect(teacherAppHtml).toContain('id="review-edit-activity"')
+    expect(teacherAppJs).toContain('renderReviewEditActivity(session)')
+    expect(teacherAppJs).toContain('recentEditActivityCurve,')
+    expect(teacherAppJs).toContain('nowMs: Date.now()')
+    expect(teacherAppJs).toContain('function refreshStudentEditActivityGraphs()')
+    expect(teacherAppJs).toContain("querySelectorAll('.student-card[data-review-session]')")
+    expect(teacherAppJs).toContain("activityBlock.outerHTML = renderStudentEditActivity(session)")
+    expect(teacherAppJs).toContain('return 2500')
+    expect(teacherAppJs).toContain('return 30000')
+    expect(teacherAppJs).toContain('windowMs <= 5 * 60_000')
+    expect(teacherAppJs).toContain('editActivitySampleLabel(sampleMs)')
+    expect(teacherAppJs).toContain('${editActivitySampleLabel(sampleMs)} edit/no-edit windows')
+    expect(teacherAppJs).toContain('function editActivityDensityClass(pointCount)')
+    expect(teacherAppJs).toContain('edit-activity-graph${editActivityDensityClass(activity.points.length)}')
+    expect(teacherAppJs).toContain('minmax(0, 1fr)')
+    expect(teacherAppJs).toContain('editActivityStartLabel()')
+    expect(teacherAppJs).not.toContain('editActivityCustomMinutes')
+    expect(teacherStylesCss).not.toContain('.edit-activity-custom')
+    expect(teacherStylesCss).toContain('.assignment-edit-activity-panel')
+    expect(teacherStylesCss).toContain('.student-card .edit-activity-block')
+    expect(teacherStylesCss).toContain('.review-edit-activity-card')
+  })
+
+  it('keeps the edit-frequency graph compact and shows zero-count samples as baseline marks', () => {
+    expect(teacherAppJs).toContain("count > 0 ? '100%' : '3px'")
+    expect(teacherAppJs).toContain("count === 0 ? ' is-zero' : ''")
+    expect(teacherStylesCss).toContain('grid-template-columns: 1fr;')
+    expect(teacherStylesCss).toContain('justify-content: space-between;')
+    expect(teacherStylesCss).not.toContain('writing-mode: vertical-rl;')
+    expect(teacherStylesCss).not.toContain('transform: rotate(180deg);')
+    expect(teacherStylesCss).toContain('.edit-activity-bar.is-zero')
+    expect(teacherStylesCss).not.toContain('.edit-activity-axis-y')
+    expect(teacherStylesCss).toContain('.edit-activity-graph.is-dense')
+    expect(teacherStylesCss).toContain('overflow: hidden;')
   })
 
   it('requests a full refresh when delta summary counts shrink below local merged state', () => {

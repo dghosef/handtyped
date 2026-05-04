@@ -8,6 +8,7 @@ import {
   formatWindowSummary,
   isSessionActive,
   localDateTimeInputValue,
+  recentEditActivityCurve,
   reconcileTeacherNavigation,
   sessionPresenceTimestamp,
   sessionStatusLabel,
@@ -24,6 +25,9 @@ const DASHBOARD_REVIEW_REFRESH_MS = 5000
 const ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS = 5000
 const ASSIGNMENT_VIEW_AUDIT_REFRESH_MS = 30000
 const TEACHER_STATUS_TICK_MS = 1000
+const REALTIME_EVENT_STALE_FALLBACK_MS = 7000
+const REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_INSERT_CHARS = 80
+const REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_DELETE_CHARS = 20
 const REVIEW_SYNC_RETRY_MS = 2000
 const COMMENT_CONTEXT_WINDOW = 24
 
@@ -39,6 +43,7 @@ let teacherSession = null
 let dashboardCursor = ''
 const pendingStudentAccessActions = new Map()
 const pendingAccessRequestApprovals = new Set()
+const pendingFeedbackRequestDismissals = new Set()
 let assignmentStudentOverrideDrafts = []
 let assignmentReferenceDocuments = []
 let selectedReviewSessionId = null
@@ -57,6 +62,7 @@ let lastAssignmentViewAuditRefreshAt = 0
 let teacherRealtime = null
 let assignmentRealtime = null
 let replayRealtime = null
+let editActivityWindowMinutes = 5
 let teacherRealtimeKey = ''
 let assignmentRealtimeKey = ''
 let replayRealtimeKey = ''
@@ -136,6 +142,9 @@ const elements = {
   modalCloseButtons: document.querySelectorAll('[data-close-modal]'),
   accessRequestList: document.getElementById('access-request-list'),
   feedbackRequestList: document.getElementById('feedback-request-list'),
+  assignmentEditActivityPanel: document.getElementById('assignment-edit-activity-panel'),
+  editActivitySummary: document.getElementById('edit-activity-summary'),
+  editActivityWindowButtons: [...document.querySelectorAll('[data-edit-activity-window]')],
   reviewWorkspace: document.getElementById('review-workspace'),
   reviewLayout: document.getElementById('review-layout'),
   reviewWorkspaceEmpty: document.getElementById('review-workspace-empty'),
@@ -144,6 +153,7 @@ const elements = {
   reviewWorkspaceMeta: document.getElementById('review-workspace-meta'),
   reviewActivityStatus: document.getElementById('review-activity-status'),
   reviewRealtimeDebug: document.getElementById('review-realtime-debug'),
+  reviewEditActivity: document.getElementById('review-edit-activity'),
   reviewSyncStatus: document.getElementById('review-sync-status'),
   reviewGradeLabel: document.getElementById('review-grade-label'),
   reviewGradeScore: document.getElementById('review-grade-score'),
@@ -683,22 +693,25 @@ function documentHistoryForReviewAttribution(replay = {}) {
   }
 
   return annotatedHistory.flatMap((entry, index) => {
+    const previousText = index > 0
+      ? latestTextFromHistory({ doc_history: annotatedHistory.slice(0, index), doc_text: '' })
+      : ''
+    const compactEntry = compactReviewReplacementEntry(entry, previousText)
     const entryText = String(entry?.ins ?? '')
     if (
       index === 0 ||
-      Number(entry?.pos) !== 0 ||
-      String(entry?.del ?? '') !== '' ||
+      Number(compactEntry?.pos) !== 0 ||
+      String(compactEntry?.del ?? '') !== '' ||
       !entryText
     ) {
-      return [entry]
+      return [compactEntry]
     }
-    const previousText = latestTextFromHistory({ doc_history: annotatedHistory.slice(0, index), doc_text: '' })
     if (previousText === entryText) {
       return []
     }
     if (entryText.length >= 8 && previousText) {
       return [{
-        ...entry,
+        ...compactEntry,
         op: 'snapshot',
         text: entryText,
         ins: '',
@@ -709,6 +722,48 @@ function documentHistoryForReviewAttribution(replay = {}) {
   })
 }
 
+function compactReviewReplacementEntry(entry = {}, previousText = '') {
+  if (
+    typeof entry?.del !== 'string' ||
+    typeof entry?.ins !== 'string' ||
+    !entry.del ||
+    !entry.ins
+  ) {
+    return entry
+  }
+  const pos = Number(entry.pos)
+  if (!Number.isInteger(pos) || pos < 0) {
+    return entry
+  }
+  const previousChars = Array.from(String(previousText || ''))
+  const delChars = Array.from(entry.del)
+  const insChars = Array.from(entry.ins)
+  if (previousChars.slice(pos, pos + delChars.length).join('') !== entry.del) {
+    return entry
+  }
+
+  let prefix = 0
+  while (prefix < delChars.length && prefix < insChars.length && delChars[prefix] === insChars[prefix]) {
+    prefix += 1
+  }
+  let delEnd = delChars.length
+  let insEnd = insChars.length
+  while (delEnd > prefix && insEnd > prefix && delChars[delEnd - 1] === insChars[insEnd - 1]) {
+    delEnd -= 1
+    insEnd -= 1
+  }
+  if (!prefix && delEnd === delChars.length && insEnd === insChars.length) {
+    return entry
+  }
+
+  return {
+    ...entry,
+    pos: pos + prefix,
+    del: delChars.slice(prefix, delEnd).join(''),
+    ins: insChars.slice(prefix, insEnd).join(''),
+  }
+}
+
 function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   const sessionHistory = Array.isArray(session?.document_history) ? session.document_history : []
   if (!sessionHistory.length) {
@@ -717,15 +772,108 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   const replayHistory = Array.isArray(replay?.document_history) ? replay.document_history : []
   const sessionText = String(session?.current_text || '')
   const replayText = String(replay?.current_text || '')
-  const sessionHasNewerHistory = sessionHistory.length > replayHistory.length
-  const sessionHasMatchingNewerText = sessionText && sessionText !== replayText && sessionHistory.length >= replayHistory.length
+  const reviewTimestampMs = (value) => {
+    const parsed = Date.parse(String(value || ''))
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+  const replayFreshness = Math.max(
+    reviewTimestampMs(replay?.last_activity_at),
+    reviewTimestampMs(replay?.updated_at),
+  )
+  const sessionFreshness = Math.max(
+    reviewTimestampMs(session?.last_activity_at),
+    reviewTimestampMs(session?.updated_at),
+  )
+  const sessionIsAtLeastAsFresh = !replayFreshness || sessionFreshness >= replayFreshness
+  const sessionHasNewerHistory = sessionHistory.length > replayHistory.length && sessionIsAtLeastAsFresh
+  const sessionHasMatchingNewerText =
+    sessionIsAtLeastAsFresh &&
+    sessionText &&
+    sessionText !== replayText &&
+    sessionHistory.length >= replayHistory.length
+  const replayCanUseSessionBaseHistory =
+    !sessionIsAtLeastAsFresh &&
+    sessionText &&
+    replayText &&
+    sessionText !== replayText &&
+    sessionHistory.length &&
+    replayHistory.length &&
+    Number(replayHistory[0]?.pos) === 0 &&
+    String(replayHistory[0]?.del ?? '') === sessionText
+  if (replayCanUseSessionBaseHistory) {
+    return {
+      ...replay,
+      document_history: [...sessionHistory, ...replayHistory],
+    }
+  }
   if (!sessionHasNewerHistory && !sessionHasMatchingNewerText) {
     return replay
+  }
+  const historyHasReliableTiming = (history = []) => {
+    const finiteTimes = history
+      .map((entry) => Number(entry?.absolute_wall_ms) || Number(entry?.t))
+      .filter((value) => Number.isFinite(value) && value > 0)
+    return new Set(finiteTimes).size > 1
+  }
+  const compactLiveAttributionEntry = (
+    fromText,
+    toText,
+    latestT,
+    {
+      maxInsertChars = REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_INSERT_CHARS,
+      maxDeleteChars = REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_DELETE_CHARS,
+    } = {},
+  ) => {
+    if (!toText || fromText === toText) {
+      return null
+    }
+    const syntheticEntry = compactReviewReplacementEntry(
+      {
+        t: latestT + 1,
+        absolute_wall_ms: sessionFreshness || undefined,
+        pos: 0,
+        del: fromText,
+        ins: toText,
+      },
+      fromText,
+    )
+    if (
+      Array.from(String(syntheticEntry.ins || '')).length <= maxInsertChars &&
+      Array.from(String(syntheticEntry.del || '')).length <= maxDeleteChars
+    ) {
+      return syntheticEntry
+    }
+    return null
+  }
+  let documentHistory = sessionHistory
+  if (sessionText) {
+    const historyText = latestTextFromHistory({ doc_history: sessionHistory, doc_text: '' })
+    if (historyText !== sessionText) {
+      const latestT = Math.max(0, ...sessionHistory.map((entry) => Number(entry?.t || 0) || 0))
+      const syntheticEntry = compactLiveAttributionEntry(historyText, sessionText, latestT)
+      if (syntheticEntry) {
+        documentHistory = [...sessionHistory, syntheticEntry]
+      } else if (replayText && replayText !== sessionText) {
+        const replayLatestT = Math.max(0, ...replayHistory.map((entry) => Number(entry?.t || 0) || 0))
+        const replayTimingIsReliable = historyHasReliableTiming(replayHistory)
+        const replaySyntheticEntry = compactLiveAttributionEntry(replayText, sessionText, replayLatestT, {
+          maxInsertChars: replayTimingIsReliable
+            ? Number.POSITIVE_INFINITY
+            : REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_INSERT_CHARS,
+          maxDeleteChars: replayTimingIsReliable
+            ? 200
+            : REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_DELETE_CHARS,
+        })
+        if (replaySyntheticEntry) {
+          documentHistory = [...replayHistory, replaySyntheticEntry]
+        }
+      }
+    }
   }
   return {
     ...replay,
     current_text: sessionText || replayText,
-    document_history: sessionHistory,
+    document_history: documentHistory,
     focus_events: Array.isArray(session?.focus_events) ? session.focus_events : replay?.focus_events,
     url_history: Array.isArray(session?.url_history) ? session.url_history : replay?.url_history,
     last_activity_at: session?.last_activity_at || replay?.last_activity_at,
@@ -896,7 +1044,6 @@ function renderRealtimeDebug() {
     return
   }
   elements.reviewRealtimeDebug.textContent = [
-    'TODO remove later:',
     `SSE teacher=${realtimeDebugState.teacher}`,
     `assignment=${realtimeDebugState.assignment}`,
     `replay=${realtimeDebugState.replay}`,
@@ -1063,6 +1210,33 @@ function retryRealtimeConnection(label, fallback) {
   }, 250)
 }
 
+function realtimeStatusIsHealthy(label) {
+  return realtimeDebugState[label] === 'ready' || realtimeDebugState[label] === 'event'
+}
+
+function realtimeHasRecentEvent(label, eventName) {
+  if (!realtimeStatusIsHealthy(label)) {
+    return false
+  }
+  if (realtimeDebugState.lastEvent !== `${label}:${eventName}`) {
+    return false
+  }
+  return Date.now() - Number(realtimeDebugState.lastEventAt || 0) <= REALTIME_EVENT_STALE_FALLBACK_MS
+}
+
+function shouldUseFallbackRefresh() {
+  if (!dashboardState) {
+    return true
+  }
+  if (currentView === 'assignment' && selectedAssignmentId) {
+    if (reviewWorkspaceOpen && selectedReviewSessionId) {
+      return !realtimeHasRecentEvent('assignment', 'assignment') || !realtimeStatusIsHealthy('replay')
+    }
+    return !realtimeHasRecentEvent('assignment', 'assignment')
+  }
+  return !realtimeHasRecentEvent('teacher', 'dashboard')
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -1183,6 +1357,16 @@ function mergeLiveSession(existing, incoming) {
   const existingFreshness = sessionFreshnessValue(existing)
   const incomingFreshness = sessionFreshnessValue(incoming)
   if (incomingFreshness < existingFreshness) {
+    if (
+      Array.isArray(incoming.document_history) &&
+      incoming.document_history.length &&
+      !Array.isArray(existing.document_history)
+    ) {
+      return {
+        ...existing,
+        document_history: incoming.document_history,
+      }
+    }
     return existing
   }
 
@@ -1232,6 +1416,11 @@ function preserveSelectedReviewSessionInSummaries(summaries = []) {
   }
   const incomingSelected = summaries.find((session) => session.id === selectedReviewSessionId) || null
   return mergeLiveSessions(summaries, [preferFresherSession(selectedSession, incomingSelected)])
+}
+
+function mergeAssignmentLiveSummaries(summaries = []) {
+  const existingById = new Map(getLiveSessions().map((session) => [session.id, session]))
+  return (summaries || []).map((summary) => mergeLiveSession(existingById.get(summary.id), summary))
 }
 
 function preserveSelectedReviewSessionInDashboardPayload(payload) {
@@ -2161,6 +2350,28 @@ async function approveAssignmentAccessRequest(assignment, requestEntry, { target
   })
 }
 
+async function dismissFeedbackRequest(assignment, entry) {
+  if (!assignment || !entry?.student_name) {
+    return null
+  }
+  const updated = await request(`/api/edu/assignments/${assignment.id}/feedback-requests/${encodeURIComponent(entry.student_name)}`, {
+    method: 'DELETE',
+  })
+  if (updated?.assignment) {
+    replaceAssignmentInDashboard(updated.assignment)
+    renderView()
+  } else {
+    const nextRequests = { ...(assignment.student_feedback_requests || {}) }
+    delete nextRequests[entry.key]
+    replaceAssignmentInDashboard({
+      ...assignment,
+      student_feedback_requests: nextRequests,
+    })
+    renderView()
+  }
+  return updated
+}
+
 async function extendSelectedAssignmentForStudentUntil(studentName, target) {
   const assignment = getSelectedAssignment()
   if (!assignment) {
@@ -2605,8 +2816,18 @@ function browserVisitDisplayLabel(item, assignment = getSelectedAssignment()) {
   return url
 }
 
+function isDisplayableBrowserUrl(url) {
+  const normalized = String(url || '').trim().toLowerCase()
+  if (!normalized) {
+    return false
+  }
+  return normalized !== 'about:blank'
+}
+
 function summarizeUrls(session, assignment = getSelectedAssignment()) {
-  const items = (session.url_history || []).slice(-4)
+  const items = (session.url_history || [])
+    .filter((item) => isDisplayableBrowserUrl(item?.url))
+    .slice(-4)
   if (!items.length) {
     return '<li>No recent browser visits.</li>'
   }
@@ -3526,6 +3747,31 @@ function reviewHighlightIndexSet(text, ranges, sourceMarkdown = '') {
   }
   const attributed = reviewState.replayData.attributedDocument
   const active = new Set()
+  const collectReplayHistoryIndexes = () => {
+    const replay = reviewState?.replayData?.replay || {}
+    const history = annotateReplayHistoryWithEventTimes(replay)
+    const finalChars = Array.from(String(text || ''))
+    history.forEach((entry) => {
+      if (!reviewTimestampEntryMatchesHighlight({ insertedAtMs: Number(entry?.absolute_wall_ms) })) {
+        return
+      }
+      const pos = Number(entry?.pos)
+      const inserted = String(entry?.ins || '')
+      if (!Number.isInteger(pos) || pos < 0 || !inserted) {
+        return
+      }
+      if (pos === 0 && !String(entry?.del || '') && Array.from(inserted).length >= 8) {
+        return
+      }
+      const insertedChars = Array.from(inserted)
+      if (finalChars.slice(pos, pos + insertedChars.length).join('') !== inserted) {
+        return
+      }
+      for (let index = pos; index < pos + insertedChars.length && index < finalChars.length; index += 1) {
+        active.add(index)
+      }
+    })
+  }
   const collectAttributedIndexes = (chars = attributed.chars) => {
     chars.forEach((entry, index) => {
       if (ranges.some((range) => range.custom ? reviewTimestampEntryMatchesHighlight(entry) : Number(entry?.insertedAtMs) >= range.startMs && Number(entry?.insertedAtMs) <= range.endMs)) {
@@ -3541,6 +3787,7 @@ function reviewHighlightIndexSet(text, ranges, sourceMarkdown = '') {
 
   if (attributed.text === String(text || '')) {
     collectAttributedIndexes()
+    collectReplayHistoryIndexes()
     if (suppressCoarseFullHighlight()) {
       return new Set()
     }
@@ -3607,6 +3854,7 @@ function markdownStyleKey(mark = {}) {
     mark.underline ? 'u' : '',
     mark.highlight ? 'h' : '',
     mark.heading || '',
+    mark.pageBreak ? 'page' : '',
   ].join('|')
 }
 
@@ -3619,6 +3867,7 @@ function copyMarkdownMarks(active, extra = {}) {
     underline: Boolean(active.underline),
     highlight: Boolean(active.highlight),
     heading: active.heading || '',
+    pageBreak: Boolean(active.pageBreak),
     ...extra,
   }
 }
@@ -3642,10 +3891,25 @@ function handtypedMarkdownDisplayModel(markdown = '') {
       heading = ''
     }
   }
+  const pushPageBreak = (sourceIndex) => {
+    chars.push({
+      char: '\n',
+      sourceIndex,
+      marks: copyMarkdownMarks(active, { heading: '', pageBreak: true }),
+    })
+    atLineStart = true
+    heading = ''
+  }
 
   while (index < raw.length) {
     const rest = raw.slice(index)
     if (atLineStart) {
+      const pageBreakMatch = rest.match(/^(?:-{3,}|\*{3,}|_{3,})[ \t]*(?:\n|$)/)
+      if (pageBreakMatch) {
+        pushPageBreak(index)
+        index += pageBreakMatch[0].length
+        continue
+      }
       const headingMatch = rest.match(/^(#{1,3})[ \t]+/)
       if (headingMatch) {
         heading = `h${headingMatch[1].length}`
@@ -3739,6 +4003,9 @@ function reviewDraftStyleForMarks(marks = {}) {
 }
 
 function renderWysiwygContent(content, marks = {}) {
+  if (marks.pageBreak) {
+    return '<span class="review-draft-page-break" role="separator" aria-label="Page break"></span>'
+  }
   let html = escapeHtml(content)
   if (marks.underline) {
     html = `<u>${html}</u>`
@@ -3965,7 +4232,7 @@ function handleRealtimeAssignment(payload) {
   }
   const preserveReviewInputs = Boolean(activeReviewEditorElement())
   if (Array.isArray(payload.live_sessions)) {
-    const nextAssignmentSessions = preserveSelectedReviewSessionInSummaries(payload.live_sessions)
+    const nextAssignmentSessions = mergeAssignmentLiveSummaries(preserveSelectedReviewSessionInSummaries(payload.live_sessions))
     const selectedSession =
       selectedReviewSessionId
         ? nextAssignmentSessions.find((session) => session.id === selectedReviewSessionId) || null
@@ -4335,6 +4602,7 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
   syncReviewReplayDataWithLiveSession(session)
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
+  renderReviewEditActivity(session)
   const reviewText = displaySessionText(session, reviewState.replayData)
   const reviewDisplayText = handtypedMarkdownDisplayText(reviewText)
   elements.reviewDraftMeta.textContent = reviewDisplayText
@@ -4362,6 +4630,7 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.assignmentView?.classList.toggle('is-review-open', reviewWorkspaceOpen)
   elements.reviewWorkspace.hidden = !reviewWorkspaceOpen
   if (!reviewWorkspaceOpen) {
+    renderReviewEditActivity(null)
     renderReviewActivityStatus(null)
     return
   }
@@ -4371,6 +4640,7 @@ function renderReviewWorkspace(selectedAssignment) {
     selectedAnnotationId = null
     elements.reviewWorkspaceEmpty.hidden = false
     elements.reviewWorkspaceContent.hidden = true
+    renderReviewEditActivity(null)
     renderReviewActivityStatus(null)
     renderReviewSyncStatus()
     return
@@ -4387,6 +4657,7 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.reviewWorkspaceContent.hidden = false
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
+  renderReviewEditActivity(session)
   if (reviewState.feedbackControlsClearedAfterPublish) {
     clearReviewFeedbackInputsAfterPublish()
   } else {
@@ -4465,7 +4736,7 @@ function scheduleDashboardRefresh() {
     clearTimeout(refreshTimer)
   }
   refreshTimer = window.setTimeout(async () => {
-    if (!document.hidden) {
+    if (!document.hidden && shouldUseFallbackRefresh()) {
       await refreshDashboard().catch(() => {})
     }
     scheduleDashboardRefresh()
@@ -4519,6 +4790,144 @@ async function closeReviewWorkspace() {
   })
 }
 
+function editActivityWindowMs() {
+  return Math.max(1, Number(editActivityWindowMinutes) || 5) * 60_000
+}
+
+function editActivitySampleMs(windowMs) {
+  if (windowMs <= 5 * 60_000) {
+    return 2500
+  }
+  return 30000
+}
+
+function editActivitySampleLabel(sampleMs) {
+  const seconds = Math.max(0.1, sampleMs / 1000)
+  if (seconds < 60) {
+    const label = Number.isInteger(seconds) ? String(seconds) : seconds.toFixed(1)
+    return `${label} sec samples`
+  }
+  return `${Math.max(1, Math.round(seconds / 60))} min samples`
+}
+
+function editActivityWindowLabel() {
+  const minutes = Math.max(1, Math.round(Number(editActivityWindowMinutes) || 5))
+  if (minutes < 60) {
+    return `Last ${minutes} min`
+  }
+  if (minutes === 60) {
+    return 'Last hour'
+  }
+  const hours = minutes / 60
+  return Number.isInteger(hours) ? `Last ${hours} hours` : `Last ${minutes} min`
+}
+
+function editActivityStartLabel() {
+  return editActivityWindowMinutes === 60 ? '1 hour ago' : `${editActivityWindowMinutes} min ago`
+}
+
+function editActivityBarHtml(activity) {
+  return activity.points.map((count, index) => {
+    const label = count > 0 ? 'Edits happened' : 'No edits'
+    const height = count > 0 ? '100%' : '3px'
+    const emptyClass = count === 0 ? ' is-zero' : ''
+    return `<span class="edit-activity-bar${emptyClass}" style="height:${height}" role="img" aria-label="Sample ${index + 1}: ${label}" title="${label}"></span>`
+  }).join('')
+}
+
+function editActivityDensityClass(pointCount) {
+  if (pointCount >= 240) {
+    return ' is-dense'
+  }
+  return ''
+}
+
+function renderStudentEditActivity(session) {
+  const windowMs = editActivityWindowMs()
+  const sampleMs = editActivitySampleMs(windowMs)
+  const activity = recentEditActivityCurve(session, { windowMs, sampleMs, nowMs: Date.now() })
+  const editLabel = activity.totalEdits === 1 ? 'edit' : 'edits'
+  const windowLabel = editActivityWindowLabel()
+
+  return `
+    <div class="edit-activity-block">
+      <div class="section-label">Edit frequency</div>
+      <div class="edit-activity-meta">${activity.totalEdits} ${editLabel} in ${windowLabel.toLowerCase()} • ${editActivitySampleLabel(sampleMs)} edit/no-edit windows</div>
+      <div class="edit-activity-chart">
+        <div class="edit-activity-graph${editActivityDensityClass(activity.points.length)}" style="grid-template-columns: repeat(${activity.points.length}, minmax(0, 1fr));" aria-label="${escapeHtml(session.student_name || 'Student')} edit frequency">
+          ${editActivityBarHtml(activity)}
+        </div>
+        <div class="edit-activity-axis-x">
+          <span>${editActivityStartLabel()}</span>
+          <span>now</span>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+function renderReviewEditActivity(session) {
+  if (!elements.reviewEditActivity) {
+    return
+  }
+  if (!reviewWorkspaceOpen || !session) {
+    elements.reviewEditActivity.hidden = true
+    elements.reviewEditActivity.innerHTML = ''
+    return
+  }
+  elements.reviewEditActivity.hidden = false
+  elements.reviewEditActivity.innerHTML = renderStudentEditActivity(session)
+}
+
+function refreshStudentEditActivityGraphs() {
+  if (!elements.sessionGrid || currentView !== 'assignment' || !selectedAssignmentId) {
+    return
+  }
+  const selectedClassroom = getSelectedClassroom()
+  const selectedAssignment = getSelectedAssignment()
+  if (!selectedClassroom || !selectedAssignment) {
+    return
+  }
+
+  const sessionsById = new Map(
+    sortSessionsForDisplay(sessionsForAssignment(getLiveSessions(), selectedClassroom.name, selectedAssignment.id))
+      .map((session) => [session.id, session]),
+  )
+
+  elements.sessionGrid.querySelectorAll('.student-card[data-review-session]').forEach((card) => {
+    const session = sessionsById.get(card.dataset.reviewSession)
+    const activityBlock = card.querySelector('.edit-activity-block')
+    if (session && activityBlock) {
+      activityBlock.outerHTML = renderStudentEditActivity(session)
+    }
+  })
+  if (reviewWorkspaceOpen && selectedReviewSessionId) {
+    renderReviewEditActivity(currentReviewSession())
+  }
+}
+
+function renderAssignmentEditActivity() {
+  if (!elements.assignmentEditActivityPanel) {
+    return
+  }
+
+  const selectedAssignment = getSelectedAssignment()
+  elements.assignmentEditActivityPanel.hidden = !selectedAssignment
+  if (!selectedAssignment) {
+    return
+  }
+
+  if (elements.editActivitySummary) {
+    elements.editActivitySummary.textContent = `Showing ${editActivityWindowLabel().toLowerCase()} on each student card.`
+  }
+
+  elements.editActivityWindowButtons?.forEach((button) => {
+    const minutes = Number(button.dataset.editActivityWindow)
+    button.classList.toggle('is-active', minutes === editActivityWindowMinutes)
+    button.setAttribute('aria-pressed', minutes === editActivityWindowMinutes ? 'true' : 'false')
+  })
+}
+
 function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   const selectedClassroom = getSelectedClassroom()
   const selectedAssignment = getSelectedAssignment()
@@ -4540,6 +4949,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   renderAccessRequests(selectedAssignment, matchingSessions)
   renderFeedbackRequests(selectedAssignment, matchingSessions)
   if (!selectedClassroom || !selectedAssignment) {
+    renderAssignmentEditActivity()
     elements.sessionGrid.innerHTML = `<div class="student-empty">Choose an assignment to see student work.</div>`
     if (!skipReviewWorkspace) {
       renderReviewWorkspace(selectedAssignment)
@@ -4552,6 +4962,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   }
 
   const visibleSessions = sortSessionsForDisplay(matchingSessions)
+  renderAssignmentEditActivity()
 
   if (!visibleSessions.length) {
     elements.sessionGrid.innerHTML = `<div class="student-empty">No student sessions match the current filter.</div>`
@@ -4615,6 +5026,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
               <div class="section-label">Recent browser URLs</div>
               <ul class="student-urls">${summarizeUrls(session, selectedAssignment)}</ul>
             </div>
+            ${renderStudentEditActivity(session)}
           </div>
           <div class="student-card-footer">
             ${closeAccessButton}
@@ -4882,6 +5294,7 @@ function renderFeedbackRequests(assignment, matchingSessions = []) {
     .map((entry) => {
       const requestTime = entry.requested_at ? timeAgoLabel(entry.requested_at) : 'just now'
       const linkedToLiveSession = sessionKeys.has(entry.key)
+      const dismissPending = pendingFeedbackRequestDismissals.has(entry.key)
       return `
         <article class="access-request-card">
           <div class="access-request-copy">
@@ -4892,10 +5305,38 @@ function renderFeedbackRequests(assignment, matchingSessions = []) {
             <div class="student-meta">Requested ${escapeHtml(requestTime)}${linkedToLiveSession ? ' • visible in student list' : ''}</div>
             ${entry.note ? `<p class="access-request-note">${escapeHtml(entry.note)}</p>` : ''}
           </div>
+          <div class="access-request-actions">
+            <button class="button button-secondary small-button" type="button" data-dismiss-feedback-request="${escapeHtml(entry.key)}" ${dismissPending ? 'disabled' : ''}>
+              ${dismissPending ? 'Dismissing…' : 'Dismiss'}
+            </button>
+          </div>
         </article>
       `
     })
     .join('')
+
+  elements.feedbackRequestList.querySelectorAll('[data-dismiss-feedback-request]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const requestKey = button.dataset.dismissFeedbackRequest || ''
+      const entry = requests.find((item) => item.key === requestKey)
+      if (!assignment || !entry || pendingFeedbackRequestDismissals.has(requestKey)) {
+        return
+      }
+      pendingFeedbackRequestDismissals.add(requestKey)
+      renderFeedbackRequests(assignment, matchingSessions)
+      try {
+        await dismissFeedbackRequest(assignment, entry)
+      } catch (error) {
+        window.alert(`Could not dismiss feedback request: ${error.message}`)
+      } finally {
+        pendingFeedbackRequestDismissals.delete(requestKey)
+        const nextAssignment = getSelectedAssignment()
+        if (nextAssignment) {
+          renderFeedbackRequests(nextAssignment, matchingSessions)
+        }
+      }
+    })
+  })
 }
 
 function mergeById(previous, incoming) {
@@ -5008,7 +5449,7 @@ async function refreshAssignmentViewData() {
     lastAssignmentViewSummaryRefreshAt = now
   }
   if (summariesPayload?.live_sessions) {
-    const nextAssignmentSessions = preserveSelectedReviewSessionInSummaries(summariesPayload.live_sessions)
+    const nextAssignmentSessions = mergeAssignmentLiveSummaries(preserveSelectedReviewSessionInSummaries(summariesPayload.live_sessions))
     dashboardState = {
       ...dashboardState,
       live_sessions: mergeLiveSessions(
@@ -5207,6 +5648,9 @@ function startDashboardRefresh() {
 	      }
       if (!document.hidden && dashboardState && !reviewWorkspaceOpen && !activeReviewEditorElement()) {
         refreshStudentCardLiveLabels()
+      }
+      if (!document.hidden && dashboardState && currentView === 'assignment' && selectedAssignmentId) {
+        refreshStudentEditActivityGraphs()
       }
     }, TEACHER_STATUS_TICK_MS)
   }
@@ -5477,6 +5921,17 @@ function wireModalButtons() {
     } finally {
       elements.quickExtendButton.disabled = !getSelectedAssignment()
     }
+  })
+
+  elements.editActivityWindowButtons?.forEach((button) => {
+    button.addEventListener('click', () => {
+      const minutes = Number(button.dataset.editActivityWindow)
+      if (!Number.isFinite(minutes) || minutes <= 0) {
+        return
+      }
+      editActivityWindowMinutes = minutes
+      renderStudentCards({ skipReviewWorkspace: true })
+    })
   })
 
   elements.modalCloseButtons.forEach((button) => {

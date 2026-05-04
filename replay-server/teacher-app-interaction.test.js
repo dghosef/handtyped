@@ -298,6 +298,8 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
 
   const factory = new Function(
     'aggregateRecentEditActivity',
+    'recentEditActivity',
+    'recentEditActivityCurve',
     'assignmentIsOpenNow',
     'assignmentViewMeta',
     'buildAfterSchoolRanges',
@@ -345,6 +347,8 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
 
   const app = factory(
     () => ({ totalEdits: 0, activeStudents: 0, buckets: [0] }),
+    () => ({ totalEdits: 0, buckets: [0] }),
+    () => ({ totalEdits: 0, points: [0] }),
     () => true,
     () => '',
     () => [],

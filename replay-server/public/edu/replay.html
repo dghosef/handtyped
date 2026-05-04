@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Handtyped EDU Replay</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -253,50 +254,6 @@
       padding: 0 0 14px;
     }
 
-    .event-jumps {
-      margin: 0 0 18px;
-      border: 1px solid var(--line);
-      background: var(--paper);
-      padding: 16px;
-    }
-
-    .event-jumps h2 {
-      font-size: 16px;
-      line-height: 1.3;
-      margin: 0 0 12px;
-    }
-
-    .event-jump-list {
-      display: grid;
-      gap: 8px;
-    }
-
-    .event-jump {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      width: 100%;
-      border: 1px solid var(--line);
-      background: var(--page);
-      padding: 10px 12px;
-      font: inherit;
-      color: inherit;
-      text-align: left;
-      cursor: pointer;
-    }
-
-    .event-jump strong {
-      display: block;
-      font-size: 14px;
-      line-height: 1.35;
-      margin-bottom: 2px;
-    }
-
-    .event-jump span {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
     .replay-stage-scroll {
       max-height: min(70vh, 840px);
       overflow: auto;
@@ -315,99 +272,8 @@
       word-break: break-word;
     }
 
-    #doc-content,
-    .doc-page.analysis-doc {
+    #doc-content {
       white-space: pre-wrap;
-    }
-
-    .analysis-panel {
-      margin: 18px 0 0;
-      border: 1px solid var(--line);
-      background: var(--paper);
-      padding: 16px;
-    }
-
-    .analysis-panel h2 {
-      font-size: 16px;
-      line-height: 1.3;
-      margin: 0 0 8px;
-    }
-
-    .analysis-copy {
-      margin: 0 0 14px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .analysis-controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: end;
-      gap: 10px 12px;
-      margin: 0 0 12px;
-    }
-
-    .analysis-field {
-      display: grid;
-      gap: 6px;
-      min-width: 220px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .analysis-field input {
-      border: 1px solid var(--line);
-      background: var(--paper);
-      color: var(--ink);
-      padding: 9px 10px;
-      font: inherit;
-    }
-
-    .analysis-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .analysis-presets {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 0 0 12px;
-    }
-
-    .analysis-btn {
-      appearance: none;
-      border: 1px solid var(--line);
-      background: var(--paper);
-      color: var(--ink);
-      padding: 10px 12px;
-      font: inherit;
-      cursor: pointer;
-    }
-
-    .analysis-btn.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    .analysis-summary {
-      margin: 0 0 12px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .doc-page.analysis-doc {
-      min-height: 240px;
-      max-height: 420px;
-      overflow: auto;
-    }
-
-    .insert-highlight {
-      background: #ffe58f;
-      color: inherit;
-      padding: 0;
     }
 
     .cursor-blink {
@@ -569,12 +435,6 @@
           </select>
         </div>
         <div class="replay-status" id="status-msg">Loading session…</div>
-        <section class="event-jumps">
-          <h2>Jump to key moments</h2>
-          <div class="event-jump-list" id="event-jump-list">
-            <div class="replay-status">Loading replay events…</div>
-          </div>
-        </section>
         <div class="replay-stage">
           <div class="replay-stage-scroll" id="replay-stage-scroll">
             <div class="doc-page">
@@ -583,30 +443,6 @@
             </div>
           </div>
         </div>
-        <section class="analysis-panel">
-          <h2>Highlight inserted text by time</h2>
-          <p class="analysis-copy">Pick a time window to mark the characters that were inserted during that slice and still remain in the final draft.</p>
-          <div class="analysis-controls">
-            <label class="analysis-field">
-              <span>Start</span>
-              <input type="datetime-local" id="highlight-start" />
-            </label>
-            <label class="analysis-field">
-              <span>End</span>
-              <input type="datetime-local" id="highlight-end" />
-            </label>
-            <div class="analysis-actions">
-              <button type="button" class="analysis-btn primary" id="highlight-apply">Highlight</button>
-              <button type="button" class="analysis-btn" id="highlight-clear">Clear</button>
-            </div>
-          </div>
-          <div class="analysis-presets">
-            <button type="button" class="analysis-btn" id="highlight-after-school">After school</button>
-            <button type="button" class="analysis-btn" id="highlight-outside-window">Outside writing window</button>
-          </div>
-          <div class="analysis-summary" id="highlight-summary">Loading inserted-text analysis…</div>
-          <div class="doc-page analysis-doc" id="highlight-doc"></div>
-        </section>
       </div>
     </div>
   </div>
@@ -622,15 +458,12 @@
       parseKeydowns,
       parseFocusEvents,
       buildInactiveSpans,
-      buildAttributedDocument,
       formatAbsoluteReplayTime,
       getFocusStateAtElapsedMs,
       compressedTimeForRawMs,
       getElapsedRawTime,
       getReplayOriginWallMs,
       renderMarkdownInto,
-      renderInsertedRangeHtml,
-      renderInsertedRangesHtml,
     } from '/replay-view.js'
 
     const sessionId = location.pathname.split('/').pop()
@@ -660,18 +493,7 @@
     const progressReadoutEl = document.getElementById('progress-readout')
     const progressTrackEl = document.getElementById('progress-track')
     const progressInactiveSpansEl = document.getElementById('progress-inactive-spans')
-    const eventJumpListEl = document.getElementById('event-jump-list')
     const speedSelectEl = document.getElementById('speed-select')
-    const highlightStartEl = document.getElementById('highlight-start')
-    const highlightEndEl = document.getElementById('highlight-end')
-    const highlightApplyEl = document.getElementById('highlight-apply')
-    const highlightClearEl = document.getElementById('highlight-clear')
-    const highlightAfterSchoolEl = document.getElementById('highlight-after-school')
-    const highlightOutsideWindowEl = document.getElementById('highlight-outside-window')
-    const highlightSummaryEl = document.getElementById('highlight-summary')
-    const highlightDocEl = document.getElementById('highlight-doc')
-    let attributedDocument = null
-    let activeHighlightMode = 'custom'
 
     function readSelectedSpeed() {
       const selectedSpeed = Number.parseFloat(speedSelectEl?.value)
@@ -696,169 +518,6 @@
     function getRawElapsedForCompressedElapsed(elapsedMs) {
       const idx = findHistoryIndex(history, elapsedMs)
       return idx >= 0 ? getElapsedRawTime(history, idx) : 0
-    }
-
-    function localDateTimeInputValue(ms) {
-      if (!Number.isFinite(ms)) {
-        return ''
-      }
-      const date = new Date(ms)
-      const pad = (value) => String(value).padStart(2, '0')
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-    }
-
-    function parseDateTimeInputMs(value) {
-      const parsed = Date.parse(String(value || ''))
-      return Number.isFinite(parsed) ? parsed : null
-    }
-
-    function dayKeyForDate(date) {
-      return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()]
-    }
-
-    function dateAtLocalClock(date, hour, minute) {
-      const next = new Date(date)
-      next.setHours(Number(hour) || 0, Number(minute) || 0, 0, 0)
-      return next.getTime()
-    }
-
-    function replayTimeBounds() {
-      const values = attributedDocument?.chars
-        ?.map((entry) => Number(entry.insertedAtMs))
-        .filter((value) => Number.isFinite(value)) || []
-      if (!values.length) {
-        return { startMs: null, endMs: null }
-      }
-      return {
-        startMs: Math.min(...values),
-        endMs: Math.max(...values),
-      }
-    }
-
-    function assignmentWindowForReplayDay() {
-      const assignmentWindow = session?.assignment?.windows?.[0]
-      const bounds = replayTimeBounds()
-      if (!assignmentWindow || !Number.isFinite(bounds.startMs)) {
-        return null
-      }
-      const replayDate = new Date(bounds.startMs)
-      const dayKey = dayKeyForDate(replayDate)
-      if (assignmentWindow.days && assignmentWindow.days[dayKey] === false) {
-        return null
-      }
-      return {
-        startMs: dateAtLocalClock(replayDate, assignmentWindow.start_hour, assignmentWindow.start_minute),
-        endMs: dateAtLocalClock(replayDate, assignmentWindow.end_hour, assignmentWindow.end_minute),
-        label: assignmentWindow.label || 'Writing window',
-      }
-    }
-
-    function customHighlightRanges() {
-      const startMs = parseDateTimeInputMs(highlightStartEl?.value)
-      const endMs = parseDateTimeInputMs(highlightEndEl?.value)
-      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
-        return []
-      }
-      return [{ startMs, endMs }]
-    }
-
-    function presetHighlightRanges(mode) {
-      const bounds = replayTimeBounds()
-      if (!Number.isFinite(bounds.startMs) || !Number.isFinite(bounds.endMs)) {
-        return []
-      }
-      const windowRange = assignmentWindowForReplayDay()
-
-      if (mode === 'after-school') {
-        const startMs = windowRange?.endMs ?? dateAtLocalClock(new Date(bounds.startMs), 15, 0)
-        return startMs <= bounds.endMs ? [{ startMs, endMs: bounds.endMs }] : []
-      }
-
-      if (mode === 'outside-window' && windowRange) {
-        const ranges = []
-        if (bounds.startMs < windowRange.startMs) {
-          ranges.push({ startMs: bounds.startMs, endMs: Math.min(bounds.endMs, windowRange.startMs) })
-        }
-        if (bounds.endMs > windowRange.endMs) {
-          ranges.push({ startMs: Math.max(bounds.startMs, windowRange.endMs), endMs: bounds.endMs })
-        }
-        return ranges
-      }
-
-      return []
-    }
-
-    function updateHighlightSummary(message) {
-      if (highlightSummaryEl) {
-        highlightSummaryEl.textContent = message
-      }
-    }
-
-    function renderHighlightAnalysis({ clear = false } = {}) {
-      if (!highlightDocEl || !attributedDocument) {
-        return
-      }
-
-      if (clear) {
-        highlightDocEl.textContent = attributedDocument.text || ''
-        updateHighlightSummary('Showing the final draft without a time filter.')
-        return
-      }
-
-      const ranges = activeHighlightMode === 'custom'
-        ? customHighlightRanges()
-        : presetHighlightRanges(activeHighlightMode)
-      if (!ranges.length) {
-        highlightDocEl.textContent = attributedDocument.text || ''
-        if (activeHighlightMode === 'outside-window' && !assignmentWindowForReplayDay()) {
-          updateHighlightSummary('No writing window is available for this replay day, so outside-window highlighting is unavailable.')
-        } else if (activeHighlightMode === 'custom') {
-          updateHighlightSummary('Pick both a start and end time to highlight inserted text.')
-        } else {
-          updateHighlightSummary('No surviving characters matched that preset.')
-        }
-        return
-      }
-
-      const matchedChars = attributedDocument.chars.filter((entry) => {
-        const insertedAtMs = Number(entry.insertedAtMs)
-        return Number.isFinite(insertedAtMs) && ranges.some((range) =>
-          insertedAtMs >= Math.min(range.startMs, range.endMs) &&
-          insertedAtMs <= Math.max(range.startMs, range.endMs),
-        )
-      }).length
-
-      highlightDocEl.innerHTML = activeHighlightMode === 'custom'
-        ? renderInsertedRangeHtml(attributedDocument, ranges[0].startMs, ranges[0].endMs)
-        : renderInsertedRangesHtml(attributedDocument, ranges)
-
-      const firstRange = ranges[0]
-      const lastRange = ranges[ranges.length - 1]
-      updateHighlightSummary(
-        matchedChars
-          ? `${matchedChars} surviving character${matchedChars === 1 ? '' : 's'} highlighted from ${new Date(firstRange.startMs).toLocaleString()} to ${new Date(lastRange.endMs).toLocaleString()}${ranges.length > 1 ? ' across multiple outside-window ranges' : ''}.`
-          : `No surviving characters were inserted between ${new Date(firstRange.startMs).toLocaleString()} and ${new Date(lastRange.endMs).toLocaleString()}.`,
-      )
-    }
-
-    function initializeHighlightAnalysis() {
-      attributedDocument = buildAttributedDocument({
-        doc_history: session.document_history || [],
-        doc_text: session.current_text || '',
-        start_wall_ns: session.start_wall_ns,
-        created_at: session.created_at,
-      })
-
-      if (highlightStartEl && highlightEndEl) {
-        highlightStartEl.value = localDateTimeInputValue(attributedDocument.firstInsertedAtMs)
-        highlightEndEl.value = localDateTimeInputValue(attributedDocument.lastInsertedAtMs)
-      }
-
-      activeHighlightMode = 'custom'
-      if (highlightOutsideWindowEl) {
-        highlightOutsideWindowEl.disabled = !assignmentWindowForReplayDay()
-      }
-      renderHighlightAnalysis()
     }
 
     function renderInactiveSpans() {
@@ -910,85 +569,6 @@
       playBtnEl.textContent = '▶'
       statusMsgEl.textContent = 'Press ▶ to replay'
       updateProgress(0)
-    }
-
-    function buildReplayHighlights() {
-      const highlights = []
-      for (const event of replayFocusEvents) {
-        const state = String(event.state || '').toLowerCase()
-        if (state && state !== 'focused' && state !== 'foreground') {
-          highlights.push({
-            t: event.t,
-            title: 'Focus changed',
-            detail: `Student became ${state.replaceAll('-', ' ')}`,
-          })
-        }
-      }
-
-      for (const visit of session?.url_history || []) {
-        if (!visit?.url) continue
-        highlights.push({
-          t: compressedTimeForRawMs(history, visit.t),
-          title: 'Browser navigation',
-          detail: visit.url,
-        })
-      }
-
-      for (const violation of session?.violations || []) {
-        highlights.push({
-          t: compressedTimeForRawMs(history, violation.t),
-          title: 'Violation',
-          detail: violation.detail || violation.kind || 'Policy event',
-        })
-      }
-
-      let previousTextLength = 0
-      for (const entry of history) {
-        const nextLength = (entry.text || '').length
-        const delta = Math.abs(nextLength - previousTextLength)
-        if (delta >= 120) {
-          highlights.push({
-            t: entry.t,
-            title: 'Large text jump',
-            detail: `Document changed by about ${delta} characters.`,
-          })
-        }
-        previousTextLength = nextLength
-      }
-
-      return highlights
-        .filter((item) => Number.isFinite(item.t))
-        .sort((a, b) => a.t - b.t)
-        .filter((item, index, items) => {
-          const previous = items[index - 1]
-          return !previous || Math.abs(previous.t - item.t) > 800 || previous.title !== item.title
-        })
-        .slice(0, 12)
-    }
-
-    function renderEventJumps() {
-      const highlights = buildReplayHighlights()
-      if (!highlights.length) {
-        eventJumpListEl.innerHTML = '<div class="replay-status">No focus, browser, or violation events were recorded.</div>'
-        return
-      }
-      eventJumpListEl.innerHTML = ''
-      for (const item of highlights) {
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.className = 'event-jump'
-        button.innerHTML = `
-          <div>
-            <strong>${item.title}</strong>
-            <span>${item.detail}</span>
-          </div>
-          <span>${formatTime(item.t)}</span>
-        `
-        button.addEventListener('click', () => {
-          seekTo(item.t)
-        })
-        eventJumpListEl.appendChild(button)
-      }
     }
 
     function updateProgress(elapsedMs) {
@@ -1090,8 +670,6 @@
         inactiveSpans = buildInactiveSpans(focusEvents, history, totalDuration)
 
         renderInactiveSpans()
-        renderEventJumps()
-        initializeHighlightAnalysis()
 
         renderBlankState()
         startPlay()
@@ -1161,28 +739,6 @@
       } catch {
         statusMsgEl.textContent = 'Copy link manually: ' + location.href
       }
-    })
-
-    highlightApplyEl?.addEventListener('click', () => {
-      activeHighlightMode = 'custom'
-      renderHighlightAnalysis()
-    })
-
-    highlightClearEl?.addEventListener('click', () => {
-      activeHighlightMode = 'custom'
-      if (highlightStartEl) highlightStartEl.value = ''
-      if (highlightEndEl) highlightEndEl.value = ''
-      renderHighlightAnalysis({ clear: true })
-    })
-
-    highlightAfterSchoolEl?.addEventListener('click', () => {
-      activeHighlightMode = 'after-school'
-      renderHighlightAnalysis()
-    })
-
-    highlightOutsideWindowEl?.addEventListener('click', () => {
-      activeHighlightMode = 'outside-window'
-      renderHighlightAnalysis()
     })
 
     loadSession()

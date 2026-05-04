@@ -150,9 +150,12 @@ export class EduRealtimeHub {
         continue
       }
       try {
-        await client.writer.write(frame)
         delivered += 1
+        client.writer.write(frame).catch(() => {
+          this.dropClient(client.id)
+        })
       } catch {
+        delivered -= 1
         this.dropClient(client.id)
       }
     }

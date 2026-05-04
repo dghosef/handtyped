@@ -165,6 +165,32 @@ function gradingHasStudentVisibleFeedback(grading = {}) {
   )
 }
 
+function studentFeedbackRequestsAfterFeedback(assignment, studentName) {
+  const key = String(studentName || '').trim().toLowerCase()
+  const requests = { ...(assignment?.student_feedback_requests || {}) }
+  if (key) {
+    delete requests[key]
+  }
+  return requests
+}
+
+function studentFeedbackRequestForStudent(assignment, studentName) {
+  const key = String(studentName || '').trim().toLowerCase()
+  const requests = assignment?.student_feedback_requests
+  return key && requests && typeof requests === 'object' ? requests[key] || null : null
+}
+
+function dateMsOrNull(value) {
+  const ms = Date.parse(String(value || ''))
+  return Number.isFinite(ms) ? ms : null
+}
+
+function liveSessionActivityIsAfterFeedbackRequest(session, feedbackRequest) {
+  const requestMs = dateMsOrNull(feedbackRequest?.requested_at)
+  const activityMs = dateMsOrNull(session?.last_activity_at || session?.updated_at)
+  return requestMs != null && activityMs != null && activityMs > requestMs
+}
+
 function rubricKeyAliases(value) {
   const normalized = String(value || '').trim().toLowerCase()
   if (!normalized) return []
@@ -1458,6 +1484,66 @@ export default {
       )
     }
 
+    if (
+      eduHost &&
+      request.method === 'DELETE' &&
+      /^\/api\/edu\/assignments\/[^/]+\/feedback-requests\/[^/]+$/.test(url.pathname)
+    ) {
+      const store = await prepareEduStore(getEduStore(env))
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const parts = url.pathname.split('/')
+      const assignmentId = pathSegment(url.pathname, 4)
+      const studentName = decodeURIComponent(parts[parts.length - 1] || '').trim()
+      const existing = assignmentId ? await store.getAssignment(assignmentId) : null
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      if (!studentName) {
+        return json({ error: 'Student name is required' }, { status: 400 })
+      }
+      const hadRequest = Boolean(studentFeedbackRequestForStudent(existing, studentName))
+      const updatedAssignment = hadRequest
+        ? buildAssignment({
+            ...existing,
+            student_feedback_requests: studentFeedbackRequestsAfterFeedback(existing, studentName),
+            updated_at: nowIso(),
+          })
+        : existing
+      if (hadRequest) {
+        await store.putAssignment(updatedAssignment)
+        await store.putAssignmentAudit(
+          buildAssignmentAuditRecord({
+            action: 'updated',
+            assignment: updatedAssignment,
+            previousAssignment: existing,
+            actor: session,
+          }),
+        )
+      }
+      const publishPromise = hadRequest
+        ? Promise.allSettled([
+            publishTeacherDashboard(env, updatedAssignment.tenant_id),
+            publishAssignmentSummary(env, updatedAssignment.id, updatedAssignment.tenant_id),
+            publishStudentAssignmentInvalidation(env, updatedAssignment),
+          ])
+        : Promise.resolve([])
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(publishPromise)
+      } else {
+        await publishPromise
+      }
+      return json({
+        assignment_id: updatedAssignment.id,
+        assignment: updatedAssignment,
+        dismissed: hadRequest,
+        student_name: studentName,
+        student_feedback_request: null,
+      })
+    }
+
     if (eduHost && request.method === 'PUT' && url.pathname.startsWith('/api/edu/assignments/')) {
       const store = await prepareEduStore(getEduStore(env))
       const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
@@ -1563,7 +1649,7 @@ export default {
         incoming.id ||
         `${incoming.student_name || 'student'}:${incoming.assignment_id || 'assignment'}`
       const existing = await store.getLiveSession(nextId)
-      const assignment = incoming.assignment_id ? await store.getAssignment(incoming.assignment_id) : null
+      let assignment = incoming.assignment_id ? await store.getAssignment(incoming.assignment_id) : null
       const draftMerge = mergeLiveSessionDraft(incoming || {}, existing || {})
       if (draftMerge.error) {
         return json(draftMerge.error.body, { status: draftMerge.error.status })
@@ -1582,12 +1668,26 @@ export default {
         updated_at: nowIso(),
       })
       await store.putLiveSession(session)
-      await publishAssignmentLiveSession(env, session).catch(() => {})
+      const feedbackRequest = studentFeedbackRequestForStudent(assignment, session.student_name)
+      let clearedFeedbackRequest = false
+      if (assignment && liveSessionActivityIsAfterFeedbackRequest(session, feedbackRequest)) {
+        assignment = buildAssignment({
+          ...assignment,
+          student_feedback_requests: studentFeedbackRequestsAfterFeedback(assignment, session.student_name),
+          updated_at: nowIso(),
+        })
+        await store.putAssignment(assignment)
+        clearedFeedbackRequest = true
+      }
       const backgroundPublish = (async () => {
+        await publishAssignmentLiveSession(env, session)
         if (shouldCaptureReplay) {
           await appendLiveReplayUpdate(store, session)
         }
         await publishTeacherDashboardLiveSession(env, session)
+        if (clearedFeedbackRequest && assignment) {
+          await publishTeacherDashboard(env, assignment.tenant_id)
+        }
         await publishAssignmentSummary(env, session.assignment_id, session.tenant_id, { includeAudits: false })
         if (shouldCaptureReplay) {
           await publishReplayUpdate(env, session.id, session.tenant_id)
@@ -1678,18 +1778,30 @@ export default {
       })
       await store.putLiveSession(updated)
       let assignmentForStudentPublish = assignment
-      if (assignment && grading.feedback_status === 'published') {
+      if (assignment && grading.feedback_status === 'published' && gradingHasStudentVisibleFeedback(grading)) {
         assignmentForStudentPublish = buildAssignment({
           ...assignment,
           student_feedback: grading,
+          student_feedback_requests: studentFeedbackRequestsAfterFeedback(assignment, updated.student_name),
           updated_at: nowIso(),
         })
         await store.putAssignment(assignmentForStudentPublish)
       }
-      await publishAssignmentSummary(env, updated.assignment_id, updated.tenant_id)
       const classroom = assignment?.classroom_id ? await store.getClassroom(assignment.classroom_id) : null
+      const publishTasks = [
+        publishAssignmentSummary(env, updated.assignment_id, updated.tenant_id),
+      ]
+      if (assignmentForStudentPublish && assignmentForStudentPublish !== assignment) {
+        publishTasks.push(publishTeacherDashboard(env, assignmentForStudentPublish.tenant_id))
+      }
       if (assignmentForStudentPublish && classroom && grading.feedback_status === 'published') {
-        await publishStudentAssignment(env, assignmentForStudentPublish, updated.student_name, classroom.join_code)
+        publishTasks.push(publishStudentAssignment(env, assignmentForStudentPublish, updated.student_name, classroom.join_code))
+      }
+      const publishPromise = Promise.allSettled(publishTasks)
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(publishPromise)
+      } else {
+        await publishPromise
       }
       return json(updated)
     }

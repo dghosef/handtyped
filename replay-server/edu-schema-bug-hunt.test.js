@@ -127,6 +127,23 @@ describe('edu schema bug hunt', () => {
     expect(summary.url_history).toHaveLength(4)
     expect(summary.violations).toHaveLength(4)
     expect(summary.focus_events).toHaveLength(8)
+    expect(summary.document_history).toHaveLength(40)
+  })
+
+  it('buildLiveSessionSummary includes enough recent edit history for live teacher graphs', () => {
+    const history = Array.from({ length: 500 }, (_, index) => ({
+      t: index * 5000,
+      absolute_wall_ms: 1_700_000_000_000 + index * 5000,
+      pos: index,
+      del: '',
+      ins: 'x',
+    }))
+    const summary = buildLiveSessionSummary({
+      current_text: 'Latest',
+      document_history: history,
+    })
+
+    expect(summary.document_history).toEqual(history)
   })
 
   it('buildLiveReplayHead falls back to safe counts and clamps invalid seq values', () => {
@@ -249,6 +266,30 @@ describe('edu schema bug hunt', () => {
       { t: 220, pos: 5, del: '', ins: ' world' },
     ])
     expect(merge.ack.used_checkpoint).toBe(true)
+  })
+
+  it('mergeLiveSessionDraft refreshes current text when a tail-contract publish has no new tail', () => {
+    const merge = mergeLiveSessionDraft(
+      {
+        history_base_count: 1,
+        history_base_t: 100,
+        document_history_tail: [],
+        current_text: 'Hello live',
+      },
+      {
+        current_text: 'Hello',
+        document_history: [{ t: 100, pos: 0, del: '', ins: 'Hello' }],
+      },
+    )
+
+    expect(merge.error).toBeUndefined()
+    expect(merge.session.current_text).toBe('Hello live')
+    expect(merge.session.document_history).toEqual([{ t: 100, pos: 0, del: '', ins: 'Hello' }])
+    expect(merge.ack).toMatchObject({
+      accepted_history_count: 1,
+      latest_history_t: 100,
+      needs_checkpoint: false,
+    })
   })
 
   it('assignment defaults are stable even when browser and editor policy payloads are nonsense', () => {

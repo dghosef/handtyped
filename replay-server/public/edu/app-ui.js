@@ -54,10 +54,65 @@ export function dashboardDeltaNeedsFullRefresh(currentState, delta) {
   )
 }
 
+function historyEntryIsDocumentEdit(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return false
+  }
+  if (typeof entry.ins === 'string' && entry.ins.length > 0) {
+    return true
+  }
+  if (typeof entry.del === 'string' && entry.del.length > 0) {
+    return true
+  }
+  if (Number.isFinite(Number(entry.del)) && Number(entry.del) > 0) {
+    return true
+  }
+  return Boolean(entry.marks || entry.formatting || entry.format || entry.style || entry.attrs)
+}
+
+function documentEditHistory(session) {
+  return (Array.isArray(session?.document_history) ? session.document_history : [])
+    .filter((entry) => historyEntryIsDocumentEdit(entry))
+}
+
 function numericHistoryTimes(session) {
-  return (session?.document_history || [])
+  return documentEditHistory(session)
     .map((entry) => Number(entry?.t))
     .filter((value) => Number.isFinite(value) && value >= 0)
+}
+
+function numericHistoryWallTimes(session) {
+  const history = documentEditHistory(session)
+  const relativeTimes = numericHistoryTimes(session)
+  if (!relativeTimes.length) {
+    return history
+      .map((entry) => Number(entry?.absolute_wall_ms))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  }
+  const latestRelativeT = Math.max(...relativeTimes)
+  const anchorWallMs = Math.max(
+    parseTimestamp(session?.last_activity_at) || 0,
+    parseTimestamp(session?.updated_at) || 0,
+  )
+  if (!anchorWallMs) {
+    return history
+      .map((entry) => Number(entry?.absolute_wall_ms))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  }
+
+  return history
+    .map((entry) => {
+      const absoluteWallMs = Number(entry?.absolute_wall_ms)
+      if (Number.isFinite(absoluteWallMs) && absoluteWallMs > 0) {
+        return absoluteWallMs
+      }
+      const relativeT = Number(entry?.t)
+      if (!Number.isFinite(relativeT) || relativeT < 0) {
+        return null
+      }
+      return anchorWallMs - (latestRelativeT - relativeT)
+    })
+    .filter((value) => Number.isFinite(value) && value > 0)
 }
 
 export function recentEditActivity(
@@ -67,7 +122,11 @@ export function recentEditActivity(
     bucketMs = RECENT_EDIT_BUCKET_MS,
   } = {},
 ) {
-  if (Number.isFinite(Number(session?.recent_edit_count))) {
+  const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
+  const buckets = Array.from({ length: bucketCount }, () => 0)
+  const times = numericHistoryTimes(session)
+
+  if (!times.length && Number.isFinite(Number(session?.recent_edit_count))) {
     const totalEdits = Math.max(0, Number(session.recent_edit_count))
     return {
       totalEdits,
@@ -75,9 +134,6 @@ export function recentEditActivity(
       latestT: totalEdits > 0 ? totalEdits : null,
     }
   }
-  const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
-  const buckets = Array.from({ length: bucketCount }, () => 0)
-  const times = numericHistoryTimes(session)
   if (!times.length) {
     return { totalEdits: 0, buckets, latestT: null }
   }
@@ -97,6 +153,52 @@ export function recentEditActivity(
   })
 
   return { totalEdits, buckets, latestT }
+}
+
+export function recentEditActivityCurve(
+  session,
+  {
+    windowMs = RECENT_EDIT_WINDOW_MS,
+    sampleMs = 5000,
+    nowMs = Date.now(),
+  } = {},
+) {
+  const sampleCount = Math.max(1, Math.ceil(windowMs / sampleMs))
+  const points = Array.from({ length: sampleCount }, () => 0)
+  const wallTimes = numericHistoryWallTimes(session)
+
+  if (!wallTimes.length && Number.isFinite(Number(session?.recent_edit_count))) {
+    const totalEdits = Math.max(0, Number(session.recent_edit_count))
+    points[points.length - 1] = totalEdits
+    return {
+      totalEdits,
+      points,
+      latestT: totalEdits > 0 ? totalEdits : null,
+    }
+  }
+  if (!wallTimes.length) {
+    return { totalEdits: 0, points, latestT: null }
+  }
+
+  const latestT = Math.max(...wallTimes)
+  const rawWindowEnd = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now()
+  const windowEnd = Math.ceil(rawWindowEnd / sampleMs) * sampleMs
+  const windowStart = windowEnd - windowMs
+  const recentTimes = wallTimes.filter((t) => t >= windowStart && t <= rawWindowEnd)
+
+  points.forEach((_, index) => {
+    const bucketStart = windowStart + (index * sampleMs)
+    const bucketEnd = index === points.length - 1 ? windowEnd : bucketStart + sampleMs
+    points[index] = recentTimes.some((t) => (
+      t >= bucketStart && (index === points.length - 1 ? t <= bucketEnd : t < bucketEnd)
+    )) ? 1 : 0
+  })
+
+  return {
+    totalEdits: recentTimes.length,
+    points,
+    latestT,
+  }
 }
 
 export function aggregateRecentEditActivity(

@@ -20,6 +20,7 @@ export function nowIso() {
 }
 
 export const DEFAULT_TENANT_ID = 'tenant_demo'
+const LIVE_SESSION_SUMMARY_HISTORY_LIMIT = 1000
 
 export const EDU_EDITOR_FONT_FAMILIES = Object.freeze([
   'arial',
@@ -643,9 +644,14 @@ export function mergeLiveSessionDraft(input = {}, existing = {}) {
   const appendableTail = baseMatches
     ? incomingTail || []
     : (incomingTail || []).filter((entry) => Number(entry.t) > existingLatestT)
+  const incomingCurrentText = Object.hasOwn(input || {}, 'current_text')
+    ? String(input?.current_text || '')
+    : null
   let currentText = usedCheckpoint
     ? incomingCheckpoint || (appendableTail.length ? incomingCheckpoint : existingText)
-    : existingText
+    : appendableTail.length
+      ? existingText
+      : incomingCurrentText ?? existingText
 
   if (!usedCheckpoint && appendableTail.length) {
     try {
@@ -684,6 +690,9 @@ export function buildLiveSessionSummary(input = {}) {
     : Array.isArray(session.document_history)
       ? Math.min(25, session.document_history.length)
       : 0
+  const documentHistory = Array.isArray(session.document_history)
+    ? session.document_history.slice(-LIVE_SESSION_SUMMARY_HISTORY_LIMIT)
+    : []
   return {
     id: session.id,
     tenant_id: session.tenant_id,
@@ -699,6 +708,7 @@ export function buildLiveSessionSummary(input = {}) {
     violation_count: session.violation_count,
     violations: Array.isArray(session.violations) ? session.violations.slice(-4) : [],
     focus_events: Array.isArray(session.focus_events) ? session.focus_events.slice(-8) : [],
+    document_history: documentHistory,
     recent_edit_count: recentEditCount,
     last_activity_at: session.last_activity_at,
     schedule_open: session.schedule_open,

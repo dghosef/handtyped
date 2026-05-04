@@ -67,6 +67,32 @@ function gradingHasStudentVisibleFeedback(grading = {}) {
   )
 }
 
+function studentFeedbackRequestsAfterFeedback(assignment, studentName) {
+  const key = String(studentName || '').trim().toLowerCase()
+  const requests = { ...(assignment?.student_feedback_requests || {}) }
+  if (key) {
+    delete requests[key]
+  }
+  return requests
+}
+
+function studentFeedbackRequestForStudent(assignment, studentName) {
+  const key = String(studentName || '').trim().toLowerCase()
+  const requests = assignment?.student_feedback_requests
+  return key && requests && typeof requests === 'object' ? requests[key] || null : null
+}
+
+function dateMsOrNull(value) {
+  const ms = Date.parse(String(value || ''))
+  return Number.isFinite(ms) ? ms : null
+}
+
+function liveSessionActivityIsAfterFeedbackRequest(session, feedbackRequest) {
+  const requestMs = dateMsOrNull(feedbackRequest?.requested_at)
+  const activityMs = dateMsOrNull(session?.last_activity_at || session?.updated_at)
+  return requestMs != null && activityMs != null && activityMs > requestMs
+}
+
 function rubricKeyAliases(value) {
   const normalized = String(value || '').trim().toLowerCase()
   if (!normalized) return []
@@ -871,6 +897,48 @@ export function createApp(sessionsDir, config = {}) {
     })
   })
 
+  app.delete('/api/edu/assignments/:id/feedback-requests/:studentName', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getAssignment(req.params.id)
+    if (!existing || existing.tenant_id !== teacherTenantId(session)) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+    const studentName = String(req.params.studentName || '').trim()
+    if (!studentName) {
+      return res.status(400).json({ error: 'Student name is required' })
+    }
+    const hadRequest = Boolean(studentFeedbackRequestForStudent(existing, studentName))
+    const updatedAssignment = hadRequest
+      ? buildAssignment({
+          ...existing,
+          student_feedback_requests: studentFeedbackRequestsAfterFeedback(existing, studentName),
+          updated_at: nowIso(),
+        })
+      : existing
+    if (hadRequest) {
+      await eduStore.putAssignment(updatedAssignment)
+      await eduStore.putAssignmentAudit(
+        buildAssignmentAuditRecord({
+          action: 'updated',
+          assignment: updatedAssignment,
+          previousAssignment: existing,
+          actor: session,
+        }),
+      )
+    }
+    res.json({
+      assignment_id: updatedAssignment.id,
+      assignment: updatedAssignment,
+      dismissed: hadRequest,
+      student_name: studentName,
+      student_feedback_request: null,
+    })
+  })
+
   app.put('/api/edu/assignments/:id', async (req, res) => {
     const session = await getTeacherSession(eduStore, req.headers.cookie)
     if (!session.authenticated) {
@@ -934,7 +1002,7 @@ export function createApp(sessionsDir, config = {}) {
       req.body?.id ||
       `${req.body?.student_name || 'student'}:${req.body?.assignment_id || 'assignment'}`
     const existing = await eduStore.getLiveSession(nextId)
-    const assignment = req.body?.assignment_id ? await eduStore.getAssignment(req.body.assignment_id) : null
+    let assignment = req.body?.assignment_id ? await eduStore.getAssignment(req.body.assignment_id) : null
     const draftMerge = mergeLiveSessionDraft(req.body || {}, existing || {})
     if (draftMerge.error) {
       return res.status(draftMerge.error.status).json(draftMerge.error.body)
@@ -953,6 +1021,15 @@ export function createApp(sessionsDir, config = {}) {
       updated_at: nowIso(),
     })
     await eduStore.putLiveSession(session)
+    const feedbackRequest = studentFeedbackRequestForStudent(assignment, session.student_name)
+    if (assignment && liveSessionActivityIsAfterFeedbackRequest(session, feedbackRequest)) {
+      assignment = buildAssignment({
+        ...assignment,
+        student_feedback_requests: studentFeedbackRequestsAfterFeedback(assignment, session.student_name),
+        updated_at: nowIso(),
+      })
+      await eduStore.putAssignment(assignment)
+    }
     await appendLiveReplayUpdate(eduStore, session)
     res.status(201).json({ ...session, ...draftMerge.ack })
   })
@@ -1082,6 +1159,22 @@ export function createApp(sessionsDir, config = {}) {
       updated_at: nowIso(),
     })
     await eduStore.putLiveSession(updated)
+    if (assignment && grading.feedback_status === 'published' && gradingHasStudentVisibleFeedback(grading)) {
+      const updatedAssignment = buildAssignment({
+        ...assignment,
+        student_feedback_requests: studentFeedbackRequestsAfterFeedback(assignment, updated.student_name),
+        updated_at: nowIso(),
+      })
+      await eduStore.putAssignment(updatedAssignment)
+      await eduStore.putAssignmentAudit(
+        buildAssignmentAuditRecord({
+          action: 'updated',
+          assignment: updatedAssignment,
+          previousAssignment: assignment,
+          actor: teacherSession,
+        }),
+      )
+    }
     res.json(updated)
   })
 

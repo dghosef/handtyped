@@ -1138,6 +1138,13 @@ textarea {
   border-radius: 3px;
 }
 
+.review-draft-page-break {
+  display: block;
+  height: 0;
+  margin: 28px 0;
+  border-top: 2px dashed #cbd5e1;
+}
+
 .review-realtime-debug {
   margin-top: 4px;
   color: #7c2d12;
@@ -1464,9 +1471,52 @@ textarea {
   min-width: 0;
 }
 
+.assignment-edit-activity-panel {
+  margin-bottom: var(--space-4);
+  display: block;
+}
+
+.edit-activity-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.edit-activity-controls {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edit-activity-controls .button.is-active {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.edit-activity-axis-x {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .edit-activity-block {
   display: grid;
   gap: 8px;
+}
+
+.student-card .edit-activity-block {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+
+.review-edit-activity-card {
+  padding: 14px 16px;
 }
 
 .edit-activity-meta {
@@ -1474,24 +1524,41 @@ textarea {
   font-size: 0.88rem;
 }
 
+.edit-activity-chart {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
 .edit-activity-graph {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: end;
-  gap: 6px;
-  height: 48px;
-  padding: 6px;
+  gap: 2px;
+  min-width: 0;
+  height: 56px;
+  padding: 10px 12px 8px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   background: var(--page);
+  overflow: hidden;
+}
+
+.edit-activity-graph.is-dense {
+  gap: 1px;
+  padding-inline: 8px;
 }
 
 .edit-activity-bar {
   display: block;
   width: 100%;
-  min-height: 8%;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
-  opacity: 0.95;
+  min-height: 0;
+  border-radius: 2px 2px 1px 1px;
+  background: linear-gradient(180deg, #8b949e 0%, #68727d 100%);
+}
+
+.edit-activity-bar.is-zero {
+  background: #c9ced4;
 }
 
 .student-text {

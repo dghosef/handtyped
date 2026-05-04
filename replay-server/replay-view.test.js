@@ -59,17 +59,25 @@ describe('replay history start state', () => {
     expect(eduAppJs).toContain('displaySessionText(session')
   })
 
-  it('adds teacher time-window controls for inserted-text highlighting', () => {
-    expect(eduReplayPageHtml).toContain('Highlight inserted text by time')
-    expect(eduReplayPageHtml).toContain('id="highlight-start"')
-    expect(eduReplayPageHtml).toContain('id="highlight-end"')
-    expect(eduReplayPageHtml).toContain('id="highlight-after-school"')
-    expect(eduReplayPageHtml).toContain('id="highlight-outside-window"')
-    expect(eduReplayPageHtml).toContain('buildAttributedDocument')
+  it('removes teacher time-window inserted-text highlighting from the replay page', () => {
+    expect(eduReplayPageHtml).not.toContain('Highlight inserted text by time')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-start"')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-end"')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-after-school"')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-outside-window"')
+    expect(eduReplayPageHtml).not.toContain('renderInsertedRangeHtml')
+    expect(eduReplayPageHtml).not.toContain('renderInsertedRangesHtml')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-doc"')
     expect(eduReplayPageHtml).toContain('buildCharacterReplayHistory')
-    expect(eduReplayPageHtml).toContain('renderInsertedRangeHtml')
-    expect(eduReplayPageHtml).toContain('renderInsertedRangesHtml')
-    expect(eduReplayPageHtml).toContain('id="highlight-doc"')
+  })
+
+  it('removes replay key moment jump controls from the EDU replay page', () => {
+    expect(eduReplayPageHtml).not.toContain('Jump to key moments')
+    expect(eduReplayPageHtml).not.toContain('class="event-jumps"')
+    expect(eduReplayPageHtml).not.toContain('id="event-jump-list"')
+    expect(eduReplayPageHtml).not.toContain('eventJumpListEl')
+    expect(eduReplayPageHtml).not.toContain('buildReplayHighlights')
+    expect(eduReplayPageHtml).not.toContain('renderEventJumps')
   })
 
   it('shows absolute replay time above both replay surfaces and removes gap markers', () => {
@@ -110,7 +118,7 @@ describe('replay history start state', () => {
   })
 
   it('keeps EDU replay preserved whitespace off the page wrapper so the first line is flush', () => {
-    expect(eduReplayPageHtml).toContain('#doc-content,\n    .doc-page.analysis-doc {\n      white-space: pre-wrap;')
+    expect(eduReplayPageHtml).toContain('#doc-content {\n      white-space: pre-wrap;')
     expect(eduReplayPageHtml).not.toMatch(/\\.doc-page \\{[\\s\\S]*?white-space: pre-wrap;[\\s\\S]*?\\}/)
   })
 
@@ -147,6 +155,7 @@ describe('replay history start state', () => {
   })
 
   it('keeps the EDU replay page on the formatted markdown render path', () => {
+    expect(eduReplayPageHtml).toContain('cdn.jsdelivr.net/npm/marked/marked.min.js')
     expect(eduReplayPageHtml).toContain('renderMarkdownInto,')
     expect(eduReplayPageHtml).toContain('renderMarkdownInto(docContentEl, text, {')
     expect(eduReplayPageHtml).not.toContain('docContentEl.textContent = text')

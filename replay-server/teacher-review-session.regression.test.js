@@ -61,12 +61,36 @@ function localNativeTimeValue(ms) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+function stripReviewHtml(html) {
+  return String(html || '')
+    .replace(/<[^>]*>/g, '')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+}
+
+function reviewTimeHighlightText(html) {
+  const parts = []
+  const pattern = /<span class="[^"]*\breview-highlight-time\b[^"]*"[^>]*>([\s\S]*?)<\/span>/g
+  let match
+  while ((match = pattern.exec(String(html || '')))) {
+    parts.push(stripReviewHtml(match[1]))
+  }
+  return parts.join('')
+}
+
 function teacherAppSource() {
   return fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.js'), 'utf8')
 }
 
 function teacherStylesSource() {
   return fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'styles.css'), 'utf8')
+}
+
+function readFixtureJson(name) {
+  return JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fixtures', name), 'utf8'))
 }
 
 it('wires immediate pressed feedback for all teacher button-like controls', () => {
@@ -89,6 +113,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
 
   const factory = new Function(
     'aggregateRecentEditActivity',
+    'recentEditActivity',
+    'recentEditActivityCurve',
     'assignmentIsOpenNow',
     'assignmentViewMeta',
     'buildAfterSchoolRanges',
@@ -234,6 +260,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
 
   return factory(
     () => ({ totalEdits: 0, activeStudents: 0, buckets: [0] }),
+    () => ({ totalEdits: 0, buckets: [0] }),
+    () => ({ totalEdits: 0, points: [0] }),
     () => true,
     () => '',
     () => [],
@@ -285,6 +313,181 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     setInterval,
     clearInterval,
   )
+}
+
+const JOE_HISTORY_TEST_CUTOFF_MS = Date.parse('2026-05-04T17:20:00Z')
+const JOE_HISTORY_TEST_BEFORE_120_TEXT = 'hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh red'
+const JOE_HISTORY_TEST_AFTER_120_TEXT = 'asdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test more tetsadfkasfdasdfkadsfh'
+const JOE_HISTORY_TEST_CURRENT_TEXT = `${JOE_HISTORY_TEST_BEFORE_120_TEXT}${JOE_HISTORY_TEST_AFTER_120_TEXT}`
+const JOE_HISTORY_TEST_CORRUPT_BEFORE_120_TEXT = `${JOE_HISTORY_TEST_BEFORE_120_TEXT} old snapshot tail that was later repaired`
+const JOE_HISTORY_TEST_AFTER_120_ENTRIES = [
+  { t: 8566487, absolute_wall_ms: 1777915356607, pos: 197, del: '', ins: 'asdkfhkj' },
+  { t: 8568176, absolute_wall_ms: 1777915358296, pos: 205, del: '', ins: 'h' },
+  { t: 8570125, absolute_wall_ms: 1777915360245, pos: 206, del: '', ins: 'kjhaksjdhfkjahs' },
+  { t: 8580081, absolute_wall_ms: 1777915370201, pos: 221, del: '', ins: '\n\nhello' },
+  { t: 8581650, absolute_wall_ms: 1777915371770, pos: 223, del: 'h', ins: 'H' },
+  { t: 8591132, absolute_wall_ms: 1777915381252, pos: 228, del: '', ins: ' m' },
+  { t: 8593181, absolute_wall_ms: 1777915383301, pos: 230, del: '', ins: 'y name' },
+  { t: 8627221, absolute_wall_ms: 1777915417341, pos: 236, del: '', ins: ' h' },
+  { t: 8629142, absolute_wall_ms: 1777915419261, pos: 237, del: 'h', ins: 'si' },
+  { t: 8641951, absolute_wall_ms: 1777915432071, pos: 239, del: '', ins: ' ' },
+  { t: 8643696, absolute_wall_ms: 1777915433815, pos: 240, del: '', ins: 'the ' },
+  { t: 8913277, absolute_wall_ms: 1777915703394, pos: 243, del: ' ', ins: ' goat' },
+  { t: 8931451, absolute_wall_ms: 1777915721567, pos: 248, del: '', ins: ' ' },
+  { t: 8936449, absolute_wall_ms: 1777915726566, pos: 248, del: ' ', ins: ' and' },
+  { t: 8948559, absolute_wall_ms: 1777915738676, pos: 252, del: '', ins: 'fsd' },
+  { t: 8955723, absolute_wall_ms: 1777915745839, pos: 255, del: '', ins: ' h' },
+  { t: 8957671, absolute_wall_ms: 1777915747788, pos: 257, del: '', ins: 'ello' },
+  { t: 9113715, absolute_wall_ms: 1777915903829, pos: 261, del: '', ins: ' te' },
+  { t: 9115386, absolute_wall_ms: 1777915905501, pos: 264, del: '', ins: 'st' },
+  { t: 9128262, absolute_wall_ms: 1777915918377, pos: 266, del: '', ins: ' mor' },
+  { t: 9129931, absolute_wall_ms: 1777915920046, pos: 270, del: '', ins: 'e' },
+  { t: 9132948, absolute_wall_ms: 1777915923062, pos: 271, del: '', ins: ' ' },
+  { t: 9134754, absolute_wall_ms: 1777915924868, pos: 271, del: ' ', ins: ' tet' },
+  { t: 9428683, absolute_wall_ms: 1777916218795, pos: 275, del: '', ins: 'sadfk' },
+  { t: 9443999, absolute_wall_ms: 1777916234111, pos: 280, del: '', ins: 'asfd' },
+  { t: 9447046, absolute_wall_ms: 1777916237157, pos: 284, del: '', ins: 'asdf' },
+  { t: 9469405, absolute_wall_ms: 1777916259517, pos: 288, del: '', ins: 'kadsfh' },
+]
+
+function applyTestHistoryEntry(text, entry) {
+  const chars = Array.from(String(text || ''))
+  const pos = Math.max(0, Math.min(chars.length, Number(entry?.pos) || 0))
+  const delCount = Array.from(String(entry?.del || '')).length
+  chars.splice(pos, delCount, ...Array.from(String(entry?.ins || '')))
+  return chars.join('')
+}
+
+function joeHistoryTestEvents() {
+  let text = JOE_HISTORY_TEST_BEFORE_120_TEXT
+  return JOE_HISTORY_TEST_AFTER_120_ENTRIES.map((entry, index) => {
+    text = applyTestHistoryEntry(text, entry)
+    return {
+      id: `Joe:assignment_29c33975ea644515:${String(index + 1).padStart(8, '0')}`,
+      live_session_id: 'Joe:assignment_29c33975ea644515',
+      replay_session_id: 'replay:Joe:assignment_29c33975ea644515',
+      assignment_id: 'assignment_29c33975ea644515',
+      student_name: 'Joe',
+      seq: index + 1,
+      current_text: text,
+      document_history_tail: [entry],
+      last_activity_at: new Date(entry.absolute_wall_ms).toISOString(),
+      created_at: new Date(entry.absolute_wall_ms + 1000).toISOString(),
+      updated_at: new Date(entry.absolute_wall_ms + 1000).toISOString(),
+    }
+  })
+}
+
+function joeHistoryTestReplay(overrides = {}) {
+  return {
+    id: 'Joe:assignment_29c33975ea644515',
+    replay_session_id: 'replay:Joe:assignment_29c33975ea644515',
+    live_session_id: 'Joe:assignment_29c33975ea644515',
+    assignment_id: 'assignment_29c33975ea644515',
+    assignment_title: 'test',
+    course: 'History',
+    current_text: JOE_HISTORY_TEST_CURRENT_TEXT,
+    created_at: new Date(JOE_HISTORY_TEST_CUTOFF_MS - 60_000).toISOString(),
+    updated_at: '2026-05-04T17:37:43.607Z',
+    last_activity_at: '2026-05-04T17:37:39.401Z',
+    document_history: [
+      {
+        t: 0,
+        absolute_wall_ms: JOE_HISTORY_TEST_CUTOFF_MS - 60_000,
+        pos: 0,
+        del: '',
+        ins: JOE_HISTORY_TEST_BEFORE_120_TEXT,
+      },
+      ...JOE_HISTORY_TEST_AFTER_120_ENTRIES,
+    ],
+    events: [],
+    ...overrides,
+  }
+}
+
+function joeHistoryTestProductionShapeReplay(overrides = {}) {
+  return joeHistoryTestReplay({
+    document_history: [
+      {
+        t: 0,
+        absolute_wall_ms: JOE_HISTORY_TEST_CUTOFF_MS - 60_000,
+        pos: 0,
+        del: '',
+        ins: JOE_HISTORY_TEST_CORRUPT_BEFORE_120_TEXT,
+      },
+      ...JOE_HISTORY_TEST_AFTER_120_ENTRIES,
+    ],
+    events: joeHistoryTestEvents(),
+    last_seq: JOE_HISTORY_TEST_AFTER_120_ENTRIES.length,
+    ...overrides,
+  })
+}
+
+function joeHistoryTestSession(overrides = {}) {
+  return {
+    id: 'Joe:assignment_29c33975ea644515',
+    assignment_id: 'assignment_29c33975ea644515',
+    assignment_title: 'test',
+    course: 'History',
+    classroom: 'History',
+    student_name: 'Joe',
+    current_text: JOE_HISTORY_TEST_CURRENT_TEXT,
+    document_history: joeHistoryTestReplay().document_history,
+    schedule_open: true,
+    focused: true,
+    last_activity_at: '2026-05-04T13:37:41.544381-04:00',
+    updated_at: '2026-05-04T17:39:42.866Z',
+    ...overrides,
+  }
+}
+
+function setupJoeHistoryReviewHarness(options = {}) {
+  const harness = loadTeacherAppHarness(options)
+  const assignment = {
+    id: 'assignment_29c33975ea644515',
+    classroom_id: 'classroom_cfe60fc29ac244f2',
+    title: 'test',
+    course: 'History',
+    classroom_name: 'History',
+  }
+  const session = joeHistoryTestSession()
+  harness.setDashboardState({
+    classrooms: [{ id: 'classroom_cfe60fc29ac244f2', name: 'History' }],
+    assignments: [assignment],
+    live_sessions: [session],
+    assignment_audits: [],
+    summary: {},
+  })
+  harness.setReviewSelection({
+    selectedClassroomId: 'classroom_cfe60fc29ac244f2',
+    selectedAssignmentId: assignment.id,
+    selectedReviewSessionId: session.id,
+    reviewWorkspaceOpen: true,
+    currentView: 'assignment',
+    selectedReviewSessionSnapshot: session,
+  })
+  harness.setReviewState({
+    sessionId: session.id,
+    highlightMode: 'custom',
+    highlightDate: '2026-05-04',
+    highlightDates: '',
+    highlightStartTime: '1:20 PM',
+    highlightEndTime: '',
+    highlightWeekdays: [],
+    replayData: null,
+    replayLoadState: 'idle',
+    replayError: '',
+    inlineAnnotations: [],
+    rubricScores: {},
+    gradeLabel: '',
+    gradeScore: '',
+    teacherComment: '',
+    returnedForRevision: false,
+    updatedBy: '',
+    selection: null,
+  })
+  harness.stubRenderStudentCards()
+  return { harness, assignment, session }
 }
 
 describe('teacher review session regression', () => {
@@ -927,7 +1130,7 @@ describe('teacher review session regression', () => {
 
   it('keeps live draft text updating while time-based highlighting is active', () => {
     const harness = loadTeacherAppHarness()
-    const replayOrigin = Date.parse('2026-04-29T20:00:00.000Z')
+    const replayOrigin = new Date(2026, 3, 29, 20, 0).getTime()
     const selectedSession = {
       id: 'live-selected',
       assignment_id: 'assignment-1',
@@ -939,7 +1142,7 @@ describe('teacher review session regression', () => {
       ],
       schedule_open: true,
       focused: true,
-      last_activity_at: '2026-04-29T20:00:00.000Z',
+      last_activity_at: new Date(replayOrigin).toISOString(),
     }
     harness.setDashboardState({
       classrooms: [],
@@ -980,9 +1183,9 @@ describe('teacher review session regression', () => {
     harness.handleRealtimeReplay({
       id: 'live-selected',
       current_text: 'Draft one',
-      created_at: '2026-04-29T20:00:00.000Z',
-      last_activity_at: '2026-04-29T20:00:00.000Z',
-      updated_at: '2026-04-29T20:00:00.000Z',
+      created_at: new Date(replayOrigin).toISOString(),
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
       document_history: [
         { t: 0, pos: 0, del: '', ins: 'Draft ' },
         { t: 1000, pos: 6, del: '', ins: 'one' },
@@ -1001,7 +1204,7 @@ describe('teacher review session regression', () => {
             { t: 0, pos: 0, del: '', ins: 'Draft one' },
             { t: 5000, pos: 9, del: '', ins: ' live' },
           ],
-          last_activity_at: '2026-04-29T20:00:05.000Z',
+          last_activity_at: new Date(replayOrigin + 5000).toISOString(),
         },
       ],
       assignment_audits: [],
@@ -1010,7 +1213,504 @@ describe('teacher review session regression', () => {
     expect(harness.getDashboardState().live_sessions.find((session) => session.id === 'live-selected').current_text).toBe('Draft one live')
     expect(harness.getElement('review-draft-meta').textContent).toContain('14 characters')
     expect(harness.getElement('review-draft-surface').innerHTML).toContain('live')
+    expect(harness.getElement('review-draft-surface').innerHTML).toContain('review-highlight-time')
     expect(harness.getReviewState().replayData.attributedDocument.text).toBe('Draft one live')
+  })
+
+  it('time-highlights fresher live text even when live history lags behind current text', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = new Date(2026, 3, 29, 13, 20).getTime()
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft one',
+      document_history: [
+        { t: 0, absolute_wall_ms: replayOrigin, pos: 0, del: '', ins: 'Draft one' },
+      ],
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+    }
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(replayOrigin + 120000),
+      highlightDates: '',
+      highlightStartTime: '1:22 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: null,
+      replayLoadState: 'idle',
+      replayError: '',
+      inlineAnnotations: [],
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      updatedBy: '',
+      selection: null,
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeReplay({
+      id: 'live-selected',
+      current_text: 'Draft one',
+      created_at: new Date(replayOrigin).toISOString(),
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+      document_history: [
+        { t: 0, absolute_wall_ms: replayOrigin, pos: 0, del: '', ins: 'Draft one' },
+      ],
+      events: [],
+      last_seq: 1,
+    })
+
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment-1' },
+      live_sessions: [
+        {
+          ...selectedSession,
+          current_text: 'Draft one with new words',
+          document_history: selectedSession.document_history,
+          last_activity_at: new Date(replayOrigin + 180000).toISOString(),
+          updated_at: new Date(replayOrigin + 180000).toISOString(),
+        },
+      ],
+      assignment_audits: [],
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('with new words')
+    expect(html).toContain('review-highlight-time')
+    expect(harness.getReviewState().replayData.attributedDocument.text).toBe('Draft one with new words')
+  })
+
+  it('does not time-highlight a large unattributed live-history gap as one fresh edit', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = new Date(2026, 3, 29, 13, 20).getTime()
+    const beforeText = 'hello darkness'
+    const afterText = `${beforeText} ${'new words '.repeat(30)}`
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: beforeText,
+      document_history: [
+        { t: 0, absolute_wall_ms: replayOrigin, pos: 0, del: '', ins: beforeText },
+      ],
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+    }
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(replayOrigin + 120000),
+      highlightDates: '',
+      highlightStartTime: '1:22 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: null,
+      replayLoadState: 'idle',
+      replayError: '',
+      inlineAnnotations: [],
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      updatedBy: '',
+      selection: null,
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeReplay({
+      id: 'live-selected',
+      current_text: beforeText,
+      created_at: new Date(replayOrigin).toISOString(),
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+      document_history: selectedSession.document_history,
+      events: [],
+      last_seq: 1,
+    })
+
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment-1' },
+      live_sessions: [
+        {
+          ...selectedSession,
+          current_text: afterText,
+          document_history: selectedSession.document_history,
+          last_activity_at: new Date(replayOrigin + 180000).toISOString(),
+          updated_at: new Date(replayOrigin + 180000).toISOString(),
+        },
+      ],
+      assignment_audits: [],
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('new words')
+    expect(html).not.toContain('review-highlight-time')
+  })
+
+  it('time-highlights small new live edits after skipping a large unattributed gap', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = new Date(2026, 3, 29, 13, 20).getTime()
+    const beforeText = 'hello darkness'
+    const largeGapText = `${beforeText} ${'new words '.repeat(30)}`
+    const nextText = `${largeGapText}tail`
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: beforeText,
+      document_history: [
+        { t: 0, absolute_wall_ms: replayOrigin, pos: 0, del: '', ins: beforeText },
+      ],
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+    }
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(replayOrigin + 240000),
+      highlightDates: '',
+      highlightStartTime: '1:24 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: null,
+      replayLoadState: 'idle',
+      replayError: '',
+      inlineAnnotations: [],
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      updatedBy: '',
+      selection: null,
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeReplay({
+      id: 'live-selected',
+      current_text: beforeText,
+      created_at: new Date(replayOrigin).toISOString(),
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+      document_history: selectedSession.document_history,
+      events: [],
+      last_seq: 1,
+    })
+
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment-1' },
+      live_sessions: [
+        {
+          ...selectedSession,
+          current_text: largeGapText,
+          document_history: selectedSession.document_history,
+          last_activity_at: new Date(replayOrigin + 180000).toISOString(),
+          updated_at: new Date(replayOrigin + 180000).toISOString(),
+        },
+      ],
+      assignment_audits: [],
+    })
+    expect(harness.getElement('review-draft-surface').innerHTML).not.toContain('review-highlight-time')
+
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment-1' },
+      live_sessions: [
+        {
+          ...selectedSession,
+          current_text: nextText,
+          document_history: selectedSession.document_history,
+          last_activity_at: new Date(replayOrigin + 300000).toISOString(),
+          updated_at: new Date(replayOrigin + 300000).toISOString(),
+        },
+      ],
+      assignment_audits: [],
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('tail')
+    expect(html).toContain('review-highlight-time')
+  })
+
+  it('time-highlights the current History test Joe draft edits after 1:20 PM', async () => {
+    const requests = []
+    const { harness, assignment } = setupJoeHistoryReviewHarness({
+      fetchImpl: async (input) => {
+        const url = String(input)
+        requests.push(url)
+        if (url.endsWith('/api/edu/live-replays/Joe%3Aassignment_29c33975ea644515')) {
+          return createJsonResponse(readFixtureJson('joe-history-test-live-replay.json'))
+        }
+        return createJsonResponse({})
+      },
+    })
+
+    harness.renderReviewWorkspace(assignment)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(requests).toContain('/api/edu/live-replays/Joe%3Aassignment_29c33975ea644515')
+    expect(stripReviewHtml(html)).toContain(JOE_HISTORY_TEST_CURRENT_TEXT)
+    expect(reviewTimeHighlightText(html)).toBe(JOE_HISTORY_TEST_AFTER_120_TEXT)
+    expect(reviewTimeHighlightText(html)).not.toContain('hello darkness my old friend')
+    expect(harness.getElement('review-highlight-meta').textContent).toContain('97 surviving characters highlighted')
+  })
+
+  it('time-highlights new Joe draft text that arrives after the 1:20 PM filter is active', () => {
+    const { harness, session } = setupJoeHistoryReviewHarness()
+    const liveText = `${JOE_HISTORY_TEST_CURRENT_TEXT} live now`
+    const replay = readFixtureJson('joe-history-test-live-replay.json')
+
+    harness.handleRealtimeReplay(replay)
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment_29c33975ea644515' },
+      live_sessions: [
+        joeHistoryTestSession({
+          ...session,
+          current_text: liveText,
+          document_history: replay.document_history,
+          last_activity_at: '2026-05-04T13:40:00.000000-04:00',
+          updated_at: '2026-05-04T17:40:00.000Z',
+        }),
+      ],
+      assignment_audits: [],
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(stripReviewHtml(html)).toContain(liveText)
+    expect(reviewTimeHighlightText(html)).toBe(`${JOE_HISTORY_TEST_AFTER_120_TEXT} live now`)
+    expect(harness.getElement('review-highlight-meta').textContent).toContain('106 surviving characters highlighted')
+  })
+
+  it('time-highlights new Joe draft text from replay realtime tail events after the 1:20 PM filter is active', () => {
+    const { harness } = setupJoeHistoryReviewHarness()
+    const replay = readFixtureJson('joe-history-test-live-replay.json')
+    const liveText = `${JOE_HISTORY_TEST_CURRENT_TEXT} live now`
+
+    harness.handleRealtimeReplay(replay)
+    harness.handleRealtimeReplay({
+      id: 'Joe:assignment_29c33975ea644515',
+      replay_session_id: 'replay:Joe:assignment_29c33975ea644515',
+      live_session_id: 'Joe:assignment_29c33975ea644515',
+      assignment_id: 'assignment_29c33975ea644515',
+      student_name: 'Joe',
+      seq: 57,
+      current_text: liveText,
+      document_history_tail: [
+        {
+          t: 9472000,
+          absolute_wall_ms: Date.parse('2026-05-04T17:40:00.000Z'),
+          pos: Array.from(JOE_HISTORY_TEST_CURRENT_TEXT).length,
+          del: '',
+          ins: ' live now',
+        },
+      ],
+      last_activity_at: '2026-05-04T17:40:00.000Z',
+      updated_at: '2026-05-04T17:40:00.000Z',
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(stripReviewHtml(html)).toContain(liveText)
+    expect(reviewTimeHighlightText(html)).toBe(`${JOE_HISTORY_TEST_AFTER_120_TEXT} live now`)
+  })
+
+  it('time-highlights a long new Joe live edit after the 1:20 PM filter is active', () => {
+    const { harness, session } = setupJoeHistoryReviewHarness()
+    const replay = readFixtureJson('joe-history-test-live-replay.json')
+    const longInsert = ' this is a longer live update that should still be highlighted because it arrived after the teacher set the time filter'
+    const liveText = `${JOE_HISTORY_TEST_CURRENT_TEXT}${longInsert}`
+
+    harness.handleRealtimeReplay(replay)
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment_29c33975ea644515' },
+      live_sessions: [
+        joeHistoryTestSession({
+          ...session,
+          current_text: liveText,
+          document_history: replay.document_history,
+          last_activity_at: '2026-05-04T13:41:00.000000-04:00',
+          updated_at: '2026-05-04T17:41:00.000Z',
+        }),
+      ],
+      assignment_audits: [],
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(stripReviewHtml(html)).toContain(liveText)
+    expect(reviewTimeHighlightText(html)).toContain(longInsert)
+  })
+
+  it('does not let a stale selected session overwrite fresher replay text in the review draft', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = new Date(2026, 3, 29, 20, 0).getTime()
+    const assignment = { id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }
+    const staleSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Old draft',
+      document_history: [
+        { t: 0, absolute_wall_ms: replayOrigin, pos: 0, del: '', ins: 'Old draft' },
+      ],
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date(replayOrigin).toISOString(),
+      updated_at: new Date(replayOrigin).toISOString(),
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [staleSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: staleSession.id,
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: staleSession,
+    })
+    harness.setReviewState({
+      sessionId: staleSession.id,
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(replayOrigin),
+      highlightDates: '',
+      highlightStartTime: '8:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: null,
+      replayLoadState: 'idle',
+      replayError: '',
+      inlineAnnotations: [],
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      updatedBy: '',
+      selection: null,
+    })
+
+    harness.handleRealtimeReplay({
+      id: staleSession.id,
+      current_text: 'Old draft plus live words',
+      created_at: new Date(replayOrigin).toISOString(),
+      last_activity_at: new Date(replayOrigin + 7000).toISOString(),
+      updated_at: new Date(replayOrigin + 7000).toISOString(),
+      document_history: [
+        {
+          t: 7000,
+          absolute_wall_ms: replayOrigin + 7000,
+          pos: 0,
+          del: 'Old draft',
+          ins: 'Old draft plus live words',
+        },
+      ],
+      events: [],
+      last_seq: 2,
+    })
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('plus live words')
+    expect(html).toContain('review-highlight-time')
+    expect(harness.getElement('review-draft-meta').textContent).toContain('25 characters')
+  })
+
+  it('renders student page breaks in the teacher draft review', () => {
+    const harness = loadTeacherAppHarness()
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'First page\n\n---\n\nSecond page',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date().toISOString(),
+      grading: { inline_annotations: [] },
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+
+    harness.renderReviewWorkspace(assignment)
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('First page')
+    expect(html).toContain('review-draft-page-break')
+    expect(html).toContain('Second page')
+    expect(html).not.toContain('---')
   })
 
   it('keeps existing time highlights visible when live text arrives before replay history', () => {
@@ -1416,6 +2116,119 @@ describe('teacher review session regression', () => {
     expect(harness.getDashboardState().live_sessions.map((session) => session.id)).toEqual(
       expect.arrayContaining(['live-selected']),
     )
+  })
+
+  it('preserves live edit history when assignment summaries refresh without document history', async () => {
+    const existingSession = {
+      id: 'live-ada',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft',
+      document_history: [
+        { t: 100_000, absolute_wall_ms: 1_700_000_000_000, pos: 0, del: '', ins: 'Draft' },
+        { t: 105_000, absolute_wall_ms: 1_700_000_005_000, pos: 5, del: '', ins: ' text' },
+      ],
+      schedule_open: true,
+      focused: true,
+      last_activity_at: '2026-04-29T20:00:00.000Z',
+      updated_at: '2026-04-29T20:00:00.000Z',
+    }
+    const harness = loadTeacherAppHarness({
+      fetchImpl: async (input) => {
+        const url = String(input)
+        if (url.endsWith('/api/edu/assignments/assignment-1')) {
+          return createJsonResponse({ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' })
+        }
+        if (url.endsWith('/api/edu/assignments/assignment-1/live-summaries')) {
+          return createJsonResponse({
+            assignment_id: 'assignment-1',
+            live_sessions: [{
+              id: 'live-ada',
+              assignment_id: 'assignment-1',
+              student_name: 'Ada Lovelace',
+              current_text: 'Draft text',
+              recent_edit_count: 2,
+              schedule_open: true,
+              focused: true,
+              last_activity_at: '2026-04-29T20:00:05.000Z',
+              updated_at: '2026-04-29T20:00:05.000Z',
+            }],
+            updated_at: '2026-04-29T20:00:05.000Z',
+          })
+        }
+        if (url.endsWith('/api/edu/assignments/assignment-1/audit')) {
+          return createJsonResponse([])
+        }
+        return createJsonResponse({})
+      },
+    })
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [existingSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      currentView: 'assignment',
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: 'assignment-1',
+      reviewWorkspaceOpen: false,
+    })
+    harness.stubRenderStudentCards()
+
+    await harness.refreshAssignmentViewData()
+
+    expect(harness.getDashboardState().live_sessions.find((session) => session.id === 'live-ada')).toMatchObject({
+      current_text: 'Draft text',
+      recent_edit_count: 2,
+      document_history: existingSession.document_history,
+    })
+  })
+
+  it('merges document history from a full realtime session even after a newer summary event arrives first', () => {
+    const summaryFirst = {
+      id: 'live-ada',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft text',
+      recent_edit_count: 1,
+      schedule_open: true,
+      focused: true,
+      last_activity_at: '2026-04-29T20:00:05.000Z',
+      updated_at: '2026-04-29T20:00:05.000Z',
+    }
+    const fullSession = {
+      ...summaryFirst,
+      document_history: [
+        { t: 100_000, absolute_wall_ms: 1_700_000_000_000, pos: 0, del: '', ins: 'Draft' },
+      ],
+      last_activity_at: '2026-04-29T20:00:04.000Z',
+      updated_at: '2026-04-29T20:00:04.000Z',
+    }
+    const harness = loadTeacherAppHarness()
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      currentView: 'assignment',
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: 'assignment-1',
+      reviewWorkspaceOpen: false,
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeAssignment({ live_sessions: [summaryFirst] })
+    harness.handleRealtimeAssignment({ live_sessions: [fullSession] })
+
+    expect(harness.getDashboardState().live_sessions.find((session) => session.id === 'live-ada')).toMatchObject({
+      current_text: 'Draft text',
+      document_history: fullSession.document_history,
+    })
   })
 
   it('keeps the selected review draft open from its pinned snapshot when summaries omit it and the direct live-session refresh returns not found', async () => {

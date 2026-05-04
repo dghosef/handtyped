@@ -701,6 +701,40 @@ function reconcileAttributedCharsWithFinalText(chars, finalText) {
     ]
   }
 
+  const knownChars = chars.map((entry) => entry.char)
+  if (knownChars.length * finalChars.length <= 2_000_000) {
+    const columns = finalChars.length + 1
+    const lengths = new Uint16Array((knownChars.length + 1) * columns)
+    for (let knownIndex = knownChars.length - 1; knownIndex >= 0; knownIndex -= 1) {
+      for (let finalIndex = finalChars.length - 1; finalIndex >= 0; finalIndex -= 1) {
+        const offset = knownIndex * columns + finalIndex
+        lengths[offset] = knownChars[knownIndex] === finalChars[finalIndex]
+          ? lengths[(knownIndex + 1) * columns + finalIndex + 1] + 1
+          : Math.max(lengths[(knownIndex + 1) * columns + finalIndex], lengths[knownIndex * columns + finalIndex + 1])
+      }
+    }
+
+    const reconciled = []
+    let knownIndex = 0
+    let finalIndex = 0
+    while (finalIndex < finalChars.length) {
+      if (knownIndex < knownChars.length && knownChars[knownIndex] === finalChars[finalIndex]) {
+        reconciled.push(chars[knownIndex])
+        knownIndex += 1
+        finalIndex += 1
+      } else if (
+        knownIndex < knownChars.length &&
+        lengths[(knownIndex + 1) * columns + finalIndex] >= lengths[knownIndex * columns + finalIndex + 1]
+      ) {
+        knownIndex += 1
+      } else {
+        reconciled.push({ char: finalChars[finalIndex], insertedAtMs: null })
+        finalIndex += 1
+      }
+    }
+    return reconciled
+  }
+
   const reconciled = []
   let knownCursor = 0
   for (const char of finalChars) {

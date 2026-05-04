@@ -14,6 +14,12 @@
     <header class="teacher-topbar">
       <a class="teacher-brand" href="https://edu.handtyped.app">Handtyped EDU</a>
       <div class="teacher-topbar-actions">
+        <a
+          class="button button-secondary"
+          id="student-download-button"
+          href="/downloads/Handtyped-EDU-Student-macos.dmg"
+          download="Handtyped-EDU-Student-macos.dmg"
+        >Download student app</a>
         <button class="button button-secondary" id="feedback-button" type="button">Send feedback</button>
         <a class="button button-secondary" href="/">Main site</a>
         <button class="button button-secondary" id="logout-button" type="button" hidden>Sign out</button>
@@ -99,6 +105,18 @@
           </div>
           <div id="feedback-request-list" class="access-request-list"></div>
         </section>
+        <section class="teacher-panel assignment-edit-activity-panel" id="assignment-edit-activity-panel" hidden>
+          <div class="edit-activity-header">
+            <div>
+              <div class="section-label">Edit frequency</div>
+              <div class="student-meta" id="edit-activity-summary">Per-student edit graphs use this window.</div>
+            </div>
+            <div class="edit-activity-controls" role="group" aria-label="Edit activity time window">
+              <button class="button button-secondary small-button" type="button" data-edit-activity-window="5">Last 5 min</button>
+              <button class="button button-secondary small-button" type="button" data-edit-activity-window="60">Last hour</button>
+            </div>
+          </div>
+        </section>
         <section class="review-layout" id="review-layout">
           <section class="student-grid" id="session-grid"></section>
           <aside class="teacher-panel review-workspace" id="review-workspace" hidden>
@@ -118,12 +136,13 @@
                 </div>
               </div>
 
+              <section class="review-card review-edit-activity-card" id="review-edit-activity" aria-label="Selected student edit frequency"></section>
+
               <section class="review-card">
                 <div class="review-card-header">
 	                  <div>
 	                    <div class="section-label">Teacher mode editor</div>
 	                    <div class="student-meta" id="review-draft-meta">Live draft updates appear here.</div>
-	                    <div class="review-realtime-debug" id="review-realtime-debug">TODO remove later: realtime diagnostics waiting.</div>
 	                  </div>
                   <div class="review-selection-count" id="review-selection-count">No text selected</div>
                 </div>

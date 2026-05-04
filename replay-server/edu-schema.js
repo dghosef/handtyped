@@ -21,6 +21,25 @@ export function nowIso() {
 
 export const DEFAULT_TENANT_ID = 'tenant_demo'
 
+export const EDU_EDITOR_FONT_FAMILIES = Object.freeze([
+  'arial',
+  'serif',
+  'sans',
+  'mono',
+  'georgia',
+  'times',
+  'garamond',
+  'palatino',
+  'baskerville',
+  'verdana',
+  'trebuchet',
+  'tahoma',
+  'helvetica',
+  'courier',
+  'comic-sans',
+  'lucida',
+])
+
 function normalizeStudentOverrideKey(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -55,6 +74,36 @@ function normalizeStudentAccessRequests(input = {}) {
   return normalized
 }
 
+function normalizeStudentFeedbackRequest(input = {}, fallbackKey = '') {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return null
+  }
+  const student_name = String(input.student_name || fallbackKey || '').trim()
+  const key = normalizeStudentOverrideKey(student_name || fallbackKey)
+  if (!key) {
+    return null
+  }
+  return {
+    student_name: student_name || fallbackKey,
+    requested_at: String(input.requested_at || nowIso()),
+    note: String(input.note || ''),
+  }
+}
+
+function normalizeStudentFeedbackRequests(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+  const normalized = {}
+  for (const [rawKey, rawValue] of Object.entries(input)) {
+    const request = normalizeStudentFeedbackRequest(rawValue, rawKey)
+    if (request) {
+      normalized[normalizeStudentOverrideKey(request.student_name)] = request
+    }
+  }
+  return normalized
+}
+
 function normalizeStudentPolicyOverride(input = {}) {
   const output = {}
   for (const key of [
@@ -77,7 +126,7 @@ function normalizeStudentPolicyOverride(input = {}) {
 
 function normalizeStudentEditorOverride(input = {}) {
   const output = {}
-  if (['arial', 'serif', 'sans', 'mono'].includes(input?.font_family)) {
+  if (EDU_EDITOR_FONT_FAMILIES.includes(input?.font_family)) {
     output.font_family = input.font_family
   }
   if (Number(input?.font_size) >= 10 && Number(input?.font_size) <= 100) {
@@ -276,7 +325,7 @@ function normalizeReferenceDocuments(input) {
   return input
     .map((item = {}) => {
       const dataUrl = String(item.data_url || '').trim()
-      if (!/^data:application\/pdf(;base64)?,/i.test(dataUrl)) {
+      if (!/^data:application\/pdf(?:;[^,]*)?,/i.test(dataUrl)) {
         return null
       }
       return {
@@ -323,7 +372,7 @@ export function buildAssignment(input = {}) {
       show_rubric_to_student: Boolean(input.policy?.show_rubric_to_student),
     },
     editor_policy: {
-      font_family: ['arial', 'serif', 'sans', 'mono'].includes(input.editor_policy?.font_family)
+      font_family: EDU_EDITOR_FONT_FAMILIES.includes(input.editor_policy?.font_family)
         ? input.editor_policy.font_family
         : 'arial',
       font_size:
@@ -337,11 +386,11 @@ export function buildAssignment(input = {}) {
     },
     browser_policy: {
       browser_enabled: input.browser_policy?.browser_enabled ?? true,
-      home_url: String(input.browser_policy?.home_url || 'https://www.gutenberg.org'),
+      home_url: String(input.browser_policy?.home_url || ''),
       mode: input.browser_policy?.mode === 'blacklist' ? 'blacklist' : 'whitelist',
       allowed_domains: Array.isArray(input.browser_policy?.allowed_domains)
         ? input.browser_policy.allowed_domains
-        : ['gutenberg.org'],
+        : [],
       log_all_navigation: input.browser_policy?.log_all_navigation ?? true,
     },
     assigned_students: assignedStudents,
@@ -352,6 +401,7 @@ export function buildAssignment(input = {}) {
       : [],
     student_feedback: normalizeStudentFeedback(input.student_feedback),
     student_access_requests: normalizeStudentAccessRequests(input.student_access_requests),
+    student_feedback_requests: normalizeStudentFeedbackRequests(input.student_feedback_requests),
     temporary_access_until: input.temporary_access_until ?? null,
     student_temporary_access_until:
       input.student_temporary_access_until && typeof input.student_temporary_access_until === 'object'
@@ -400,6 +450,9 @@ function normalizeInlineAnnotation(input = {}) {
     context_after: String(input.context_after || ''),
     created_at: createdAt,
     updated_at: String(input.updated_at || createdAt),
+    resolved_by_student: Boolean(input.resolved_by_student),
+    resolved_at: input.resolved_at || null,
+    resolved_by: input.resolved_by || null,
   }
 }
 
@@ -443,6 +496,8 @@ export function buildLiveSession(input = {}) {
                   .sort((a, b) => a.start - b.start || a.end - b.end)
               : [],
             updated_at: input.grading.updated_at || null,
+            feedback_status: input.grading.feedback_status === 'draft' ? 'draft' : 'published',
+            published_at: input.grading.published_at || null,
             actor_id: input.grading.actor_id ?? null,
             actor_name: input.grading.actor_name ?? null,
             actor_email: input.grading.actor_email ?? null,
@@ -460,6 +515,160 @@ export function buildLiveSession(input = {}) {
             actor_email: null,
           },
     updated_at: String(input.updated_at || nowIso()),
+  }
+}
+
+export function normalizeDocHistoryEntry(input = {}) {
+  const t = Number(input?.t)
+  const pos = Number(input?.pos)
+  if (!Number.isFinite(t) || t < 0 || !Number.isFinite(pos) || pos < 0) {
+    return null
+  }
+  if (typeof input?.del !== 'string' || typeof input?.ins !== 'string') {
+    return null
+  }
+  const normalized = {
+    t,
+    pos: Math.floor(pos),
+    del: input.del,
+    ins: input.ins,
+  }
+  const absoluteWallMs = Number(input?.absolute_wall_ms)
+  if (Number.isFinite(absoluteWallMs) && absoluteWallMs > 0) {
+    normalized.absolute_wall_ms = Math.floor(absoluteWallMs)
+  }
+  return normalized
+}
+
+export function docHistoryLatestT(history = []) {
+  return Array.isArray(history)
+    ? history.reduce((latest, entry) => {
+        const t = Number(entry?.t)
+        return Number.isFinite(t) && t > latest ? t : latest
+      }, 0)
+    : 0
+}
+
+export function applyDocHistoryEntry(text = '', entry = {}) {
+  const normalized = normalizeDocHistoryEntry(entry)
+  if (!normalized) {
+    throw new Error('Invalid document history entry')
+  }
+  const chars = Array.from(String(text || ''))
+  const delChars = Array.from(normalized.del)
+  const pos = Math.max(0, Math.min(normalized.pos, chars.length))
+  const actualDeleted = chars.slice(pos, pos + delChars.length).join('')
+  if (actualDeleted !== normalized.del) {
+    throw new Error('Document history entry does not match current text')
+  }
+  chars.splice(pos, delChars.length, ...Array.from(normalized.ins))
+  return chars.join('')
+}
+
+export function applyDocHistoryTail(text = '', entries = []) {
+  return entries.reduce((nextText, entry) => applyDocHistoryEntry(nextText, entry), String(text || ''))
+}
+
+export function liveSessionHistoryAck(session = {}, { needsCheckpoint = false, usedCheckpoint = false } = {}) {
+  const history = Array.isArray(session?.document_history) ? session.document_history : []
+  return {
+    accepted_history_count: history.length,
+    latest_history_t: docHistoryLatestT(history),
+    needs_checkpoint: Boolean(needsCheckpoint),
+    used_checkpoint: Boolean(usedCheckpoint),
+  }
+}
+
+export function mergeLiveSessionDraft(input = {}, existing = {}) {
+  const existingHistory = Array.isArray(existing?.document_history) ? existing.document_history : []
+  const existingText = String(existing?.current_text || '')
+  const incomingCheckpoint = Object.hasOwn(input || {}, 'current_text_checkpoint')
+    ? String(input?.current_text_checkpoint || '')
+    : null
+  const incomingTail = Array.isArray(input?.document_history_tail)
+    ? input.document_history_tail.map(normalizeDocHistoryEntry).filter(Boolean)
+    : null
+  const hasTailContract =
+    incomingTail != null ||
+    Object.hasOwn(input || {}, 'history_base_count') ||
+    Object.hasOwn(input || {}, 'history_base_t') ||
+    incomingCheckpoint != null
+
+  if (!hasTailContract) {
+    const incomingCurrentText = Object.hasOwn(input || {}, 'current_text')
+      ? String(input?.current_text || '')
+      : null
+    const incomingHistory = Array.isArray(input?.document_history) ? input.document_history : null
+    const session = {
+      current_text:
+        incomingCurrentText != null
+          ? incomingCurrentText || existingText
+          : existingText || input?.current_text || '',
+      document_history:
+        incomingHistory != null
+          ? incomingHistory.length
+            ? incomingHistory
+            : existingHistory
+          : existingHistory.length
+            ? existingHistory
+            : input?.document_history || [],
+    }
+    return { session, ack: liveSessionHistoryAck(session) }
+  }
+
+  const baseCount = Math.max(0, Number(input?.history_base_count ?? 0) || 0)
+  const baseT = Math.max(0, Number(input?.history_base_t ?? 0) || 0)
+  const existingLatestT = docHistoryLatestT(existingHistory)
+  const baseMatches = baseCount === existingHistory.length && baseT === existingLatestT
+  const usedCheckpoint = incomingCheckpoint != null
+
+  if (!baseMatches && !usedCheckpoint && incomingTail?.length) {
+    return {
+      error: {
+        status: 409,
+        body: {
+          error: 'checkpoint_required',
+          ...liveSessionHistoryAck(existing, { needsCheckpoint: true }),
+        },
+      },
+    }
+  }
+
+  let documentHistory = existingHistory.slice()
+  const appendableTail = baseMatches
+    ? incomingTail || []
+    : (incomingTail || []).filter((entry) => Number(entry.t) > existingLatestT)
+  let currentText = usedCheckpoint
+    ? incomingCheckpoint || (appendableTail.length ? incomingCheckpoint : existingText)
+    : existingText
+
+  if (!usedCheckpoint && appendableTail.length) {
+    try {
+      currentText = applyDocHistoryTail(currentText, appendableTail)
+    } catch {
+      return {
+        error: {
+          status: 409,
+          body: {
+            error: 'checkpoint_required',
+            ...liveSessionHistoryAck(existing, { needsCheckpoint: true }),
+          },
+        },
+      }
+    }
+  }
+
+  if (appendableTail.length) {
+    documentHistory = documentHistory.concat(appendableTail)
+  }
+
+  const session = {
+    current_text: currentText,
+    document_history: documentHistory,
+  }
+  return {
+    session,
+    ack: liveSessionHistoryAck(session, { usedCheckpoint }),
   }
 }
 

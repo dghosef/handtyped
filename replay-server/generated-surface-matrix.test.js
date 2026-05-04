@@ -12,6 +12,7 @@ import {
   buildTeacher,
   buildTeacherAuthSession,
   buildTeacherSessionRecord,
+  EDU_EDITOR_FONT_FAMILIES,
 } from "./edu-schema.js";
 import {
   buildAssignmentAuditRecord,
@@ -208,7 +209,7 @@ describe("generated edu schema matrix", () => {
           });
           expect(assignment.policy.allow_offline_editing).toBe(policy.allow_offline_editing);
           expect(assignment.policy.require_lockdown).toBe(policy.require_lockdown);
-          expect(["arial", "serif", "sans", "mono"]).toContain(assignment.editor_policy.font_family);
+          expect(EDU_EDITOR_FONT_FAMILIES).toContain(assignment.editor_policy.font_family);
           expect(assignment.editor_policy.font_size).toBeGreaterThanOrEqual(10);
           expect(assignment.editor_policy.font_size).toBeLessThanOrEqual(100);
           expect(["compact", "single", "relaxed", "one-half", "double"]).toContain(assignment.editor_policy.line_height);

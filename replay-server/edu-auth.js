@@ -1,7 +1,37 @@
-import { buildTeacher, buildTeacherAuthSession, buildTeacherSessionRecord, normalizeTeacherEmail } from './edu-schema.js'
+import {
+  DEFAULT_TENANT_ID,
+  buildTeacher,
+  buildTeacherAuthSession,
+  buildTeacherSessionRecord,
+  normalizeTeacherEmail,
+} from './edu-schema.js'
 import { verifyTeacherPassword } from './edu-password.js'
 
 export const EDU_SESSION_COOKIE = 'edu_teacher_session'
+
+function randomTenantId() {
+  if (globalThis.crypto?.randomUUID) {
+    return `tenant_${globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
+  }
+  return `tenant_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function isDemoTeacherAccount(teacher) {
+  return teacher?.id === 'teacher_default' || teacher?.email === 'teacher@edu.handtyped.app'
+}
+
+async function ensureTeacherHasPrivateTenant(store, teacher) {
+  if (!teacher || teacher.tenant_id !== DEFAULT_TENANT_ID || isDemoTeacherAccount(teacher)) {
+    return teacher
+  }
+  const updatedTeacher = buildTeacher({
+    ...teacher,
+    tenant_id: randomTenantId(),
+    updated_at: new Date().toISOString(),
+  })
+  await store.putTeacher(updatedTeacher)
+  return updatedTeacher
+}
 
 function cookieValue(rawCookieHeader, name) {
   const raw = String(rawCookieHeader || '')
@@ -34,14 +64,14 @@ export async function authenticateTeacher(store, { email, accessCode, password }
   }
 
   if (typeof password === 'string' && password.length > 0) {
-    return verifyTeacherPassword(teacher, password) ? teacher : null
+    return verifyTeacherPassword(teacher, password) ? ensureTeacherHasPrivateTenant(store, teacher) : null
   }
 
   if (teacher.access_code !== String(accessCode || '')) {
     return null
   }
 
-  return teacher
+  return ensureTeacherHasPrivateTenant(store, teacher)
 }
 
 export async function authenticateTeacherWithGoogle(store, profile) {
@@ -53,7 +83,16 @@ export async function authenticateTeacherWithGoogle(store, profile) {
 
   const teacher = await store.getTeacherByEmail(normalizedEmail)
   if (!teacher) {
-    return null
+    const nextTeacher = buildTeacher({
+      tenant_id: randomTenantId(),
+      name: String(profile?.name || '').trim() || normalizedEmail,
+      email: normalizedEmail,
+      google_subject: googleSubject,
+      password: `${googleSubject}:${normalizedEmail}:${Date.now()}`,
+      access_code: '',
+    })
+    await store.putTeacher(nextTeacher)
+    return nextTeacher
   }
 
   if (teacher.google_subject && teacher.google_subject !== googleSubject) {
@@ -67,10 +106,10 @@ export async function authenticateTeacherWithGoogle(store, profile) {
       updated_at: new Date().toISOString(),
     }
     await store.putTeacher(updatedTeacher)
-    return updatedTeacher
+    return ensureTeacherHasPrivateTenant(store, updatedTeacher)
   }
 
-  return teacher
+  return ensureTeacherHasPrivateTenant(store, teacher)
 }
 
 export async function createTeacherAccount(store, { name, email, password }) {
@@ -88,6 +127,7 @@ export async function createTeacherAccount(store, { name, email, password }) {
     throw new Error('A teacher account with that email already exists')
   }
   const teacher = buildTeacher({
+    tenant_id: randomTenantId(),
     name: normalizedName,
     email: normalizedEmail,
     password: normalizedPassword,
@@ -123,6 +163,38 @@ export async function getTeacherSession(store, rawCookieHeader) {
   if (Date.parse(record.expires_at) <= Date.now()) {
     await store.deleteTeacherSession(sessionId)
     return buildTeacherAuthSession({ authenticated: false })
+  }
+
+  let teacher = null
+  if (record.teacher_email) {
+    teacher = await store.getTeacherByEmail(record.teacher_email)
+  }
+  if (teacher && record.teacher_id && teacher.id !== record.teacher_id) {
+    teacher = null
+  }
+  if (teacher) {
+    teacher = await ensureTeacherHasPrivateTenant(store, teacher)
+    if (
+      teacher.tenant_id !== record.tenant_id ||
+      teacher.name !== record.teacher_name ||
+      teacher.email !== record.teacher_email
+    ) {
+      const updatedRecord = buildTeacherSessionRecord({
+        ...record,
+        tenant_id: teacher.tenant_id,
+        teacher_name: teacher.name,
+        teacher_email: teacher.email,
+      })
+      await store.putTeacherSession(updatedRecord)
+      return buildTeacherAuthSession({
+        authenticated: true,
+        tenant_id: updatedRecord.tenant_id || null,
+        teacher_id: updatedRecord.teacher_id,
+        teacher_name: updatedRecord.teacher_name,
+        teacher_email: updatedRecord.teacher_email,
+        provider: updatedRecord.provider,
+      })
+    }
   }
 
   return buildTeacherAuthSession({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { buildAttributedDocument, latestTextFromHistory } from './public/replay-view.js'
 
 function createStubElement() {
   return {
@@ -39,6 +40,20 @@ function createJsonResponse(body, { ok = true, status = 200 } = {}) {
   }
 }
 
+function localDateInputValue(ms) {
+  const date = new Date(ms)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function localNativeTimeValue(ms) {
+  const date = new Date(ms)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function teacherAppSource() {
+  return fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.js'), 'utf8')
+}
+
 function loadTeacherAppHarness({ fetchImpl } = {}) {
   const appPath = path.join(process.cwd(), 'public', 'edu', 'app.js')
   let source = fs.readFileSync(appPath, 'utf8')
@@ -54,12 +69,14 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     'buildAfterSchoolRanges',
     'dashboardDeltaNeedsFullRefresh',
     'deriveSessionRisk',
+    'formatClockTime',
     'formatWindowSummary',
     'isSessionActive',
     'localDateTimeInputValue',
     'nextLocalTimeAtOrAfter',
     'reconcileTeacherNavigation',
     'replayLocalDateInputValue',
+    'sessionPresenceTimestamp',
     'sessionStatusLabel',
     'sessionsForAssignment',
     'sortSessionsForDisplay',
@@ -86,13 +103,25 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
       handleRealtimeReplay,
       beginReviewComposer,
       addReviewAnnotation,
+      deleteReviewAnnotation,
       saveCurrentReview,
       flushReviewSave,
       selectReviewSession,
       renderReviewWorkspace,
+      buildReviewPayload,
       refreshAssignmentViewData,
       refreshSelectedReviewSessionData,
       refreshSelectedReviewReplayData,
+      parseReviewTimeInput,
+      reviewTimeValue,
+      replayTeacherDateInputValue,
+      reviewTimestampMatchesHighlight,
+      reviewHighlightIndexSet,
+      handtypedMarkdownDisplayText,
+      buildReviewReplayCacheEntry,
+      mergeReviewReplayWithLiveSession,
+      annotateReplayHistoryWithEventTimes,
+      attributedDocumentHasReliableInsertionTiming,
       renderDashboard,
       renderStudentCards,
       getElement(id) { return document.getElementById(id) },
@@ -166,6 +195,14 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
   const eventSourceStub = function EventSource() {
     return { addEventListener() {}, close() {} }
   }
+  const sessionPresenceTimestampStub = (session) => {
+    const updatedAt = Date.parse(String(session?.updated_at || ''))
+    const lastActivityAt = Date.parse(String(session?.last_activity_at || ''))
+    return Math.max(
+      Number.isFinite(updatedAt) ? updatedAt : 0,
+      Number.isFinite(lastActivityAt) ? lastActivityAt : 0,
+    ) || null
+  }
 
   return factory(
     () => ({ totalEdits: 0, activeStudents: 0, buckets: [0] }),
@@ -174,13 +211,20 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     () => [],
     () => false,
     () => ({ active: true, needsAttention: false, score: 0 }),
+    (hour = 0, minute = 0) => {
+      const normalizedHour = Math.max(0, Math.min(23, Number(hour) || 0))
+      const normalizedMinute = Math.max(0, Math.min(59, Number(minute) || 0))
+      const meridiem = normalizedHour >= 12 ? 'PM' : 'AM'
+      const displayHour = normalizedHour % 12 || 12
+      return `${displayHour}:${String(normalizedMinute).padStart(2, '0')} ${meridiem}`
+    },
     () => '',
     (session, now = Date.now()) => {
       if (!session?.schedule_open) {
         return false
       }
-      const parsed = Date.parse(String(session.last_activity_at || session.updated_at || ''))
-      return Number.isFinite(parsed) && now - parsed <= 6000
+      const parsed = sessionPresenceTimestampStub(session)
+      return Number.isFinite(parsed) && now - parsed <= 15000
     },
     () => '',
     () => new Date(),
@@ -192,14 +236,15 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
       currentView,
     }),
     () => '',
+    sessionPresenceTimestampStub,
     () => 'Focused',
     (sessions, _classroomName, assignmentId) => (sessions || []).filter((session) => session.assignment_id === assignmentId),
     (sessions) => sessions || [],
     () => 'just now',
     () => new Date(),
     () => new Date().toISOString(),
-    noop,
-    () => '',
+    buildAttributedDocument,
+    latestTextFromHistory,
     documentStub,
     windowStub,
     fetchImpl || (async () => ({ ok: true, json: async () => ({}) })),
@@ -215,6 +260,366 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
 }
 
 describe('teacher review session regression', () => {
+  it('accepts AM/PM replay highlight times without treating evening as morning', () => {
+    const harness = loadTeacherAppHarness()
+    const highlightedAt = Date.parse('2026-05-02T18:25:00Z')
+    const beforeHighlightedAt = highlightedAt - 60_000
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(highlightedAt),
+      highlightDates: '',
+      highlightStartTime: localNativeTimeValue(highlightedAt),
+      highlightEndTime: '',
+      highlightWeekdays: [],
+    })
+
+    expect(harness.parseReviewTimeInput('6:25 PM')).toBe(18 * 60 + 25)
+    expect(harness.parseReviewTimeInput('6:25pm')).toBe(18 * 60 + 25)
+    expect(harness.parseReviewTimeInput('6:25p')).toBe(18 * 60 + 25)
+    expect(harness.parseReviewTimeInput('18:25')).toBeNull()
+    expect(harness.parseReviewTimeInput('6:25')).toBeNull()
+    expect(harness.parseReviewTimeInput('12:00 AM')).toBe(0)
+    expect(harness.parseReviewTimeInput('12 PM')).toBe(12 * 60)
+    expect(harness.reviewTimeValue(18, 25)).toBe('6:25 PM')
+    expect(harness.reviewTimeValue(0, 5)).toBe('12:05 AM')
+    expect(harness.reviewTimestampMatchesHighlight(beforeHighlightedAt, 0)).toBe(false)
+    expect(harness.reviewTimestampMatchesHighlight(highlightedAt, 0)).toBe(true)
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(highlightedAt),
+      highlightDates: '',
+      highlightStartTime: localNativeTimeValue(highlightedAt),
+      highlightEndTime: '',
+      highlightWeekdays: [],
+    })
+    expect(harness.reviewTimestampMatchesHighlight(highlightedAt, 0)).toBe(true)
+  })
+
+  it('does not default replay highlight date to the Unix epoch when timing is missing', () => {
+    const harness = loadTeacherAppHarness()
+
+    expect(harness.replayTeacherDateInputValue(null)).toBe('')
+    expect(harness.replayTeacherDateInputValue(undefined)).toBe('')
+    expect(harness.replayTeacherDateInputValue(0)).toBe('')
+  })
+
+  it('uses per-entry replay times instead of batch upload times for highlight ranges', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = Date.parse('2026-05-02T18:00:00.000Z')
+    const uploadTime = '2026-05-02T18:30:00.000Z'
+    const replay = {
+      current_text: 'abc',
+      replay_origin_wall_ms: replayOrigin,
+      recorded_timezone_offset_minutes: 0,
+      document_history: [
+        { t: 60_000, pos: 0, del: '', ins: 'a' },
+        { t: 2_100_000, pos: 1, del: '', ins: 'b' },
+        { t: 2_200_000, pos: 2, del: '', ins: 'c' },
+      ],
+      events: [
+        {
+          seq: 1,
+          updated_at: uploadTime,
+          document_history_tail: [
+            { t: 60_000, pos: 0, del: '', ins: 'a' },
+            { t: 2_100_000, pos: 1, del: '', ins: 'b' },
+            { t: 2_200_000, pos: 2, del: '', ins: 'c' },
+          ],
+        },
+      ],
+    }
+
+    const annotated = harness.annotateReplayHistoryWithEventTimes(replay)
+    expect(annotated.every((entry) => entry.absolute_wall_ms == null)).toBe(true)
+
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(Date.parse(uploadTime)),
+      highlightDates: '',
+      highlightStartTime: localNativeTimeValue(Date.parse(uploadTime)),
+      highlightEndTime: localNativeTimeValue(replayOrigin + 2_200_000),
+      highlightWeekdays: [],
+    })
+
+    expect(harness.reviewTimestampMatchesHighlight(replayOrigin + 60_000, 0)).toBe(false)
+    expect(harness.reviewTimestampMatchesHighlight(replayOrigin + 2_100_000, 0)).toBe(true)
+    expect(harness.reviewTimestampMatchesHighlight(Date.parse(uploadTime), 0)).toBe(true)
+  })
+
+  it('spreads live replay batch timestamps from the event activity time instead of stamping every edit with upload time', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeNine = new Date(2026, 4, 2, 20, 30).getTime()
+    const afterNine = new Date(2026, 4, 2, 21, 5).getTime()
+    const history = [
+      { t: 0, pos: 0, del: '', ins: 'old' },
+      { t: afterNine - beforeNine, pos: 3, del: '', ins: ' new' },
+    ]
+    const annotated = harness.annotateReplayHistoryWithEventTimes({
+      document_history: history,
+      events: [
+        {
+          seq: 1,
+          updated_at: new Date(afterNine + 60_000).toISOString(),
+          last_activity_at: new Date(afterNine).toISOString(),
+          document_history_tail: history,
+        },
+      ],
+    })
+
+    expect(annotated.map((entry) => entry.absolute_wall_ms)).toEqual([beforeNine, afterNine])
+  })
+
+  it('keeps absolute student edit timestamps instead of replacing them with inferred fallback times', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeNine = new Date(2026, 4, 2, 20, 30).getTime()
+    const afterNine = new Date(2026, 4, 2, 21, 5).getTime()
+    const history = [
+      { t: 100, pos: 0, del: '', ins: 'old', absolute_wall_ms: beforeNine },
+      { t: 200, pos: 3, del: '', ins: ' new', absolute_wall_ms: afterNine },
+    ]
+    const annotated = harness.annotateReplayHistoryWithEventTimes({
+      updated_at: new Date(afterNine + 60_000).toISOString(),
+      last_activity_at: new Date(afterNine + 60_000).toISOString(),
+      document_history: history,
+      events: [],
+    })
+
+    expect(annotated.map((entry) => entry.absolute_wall_ms)).toEqual([beforeNine, afterNine])
+  })
+
+  it('uses live fallback activity time instead of replay created_at when no replay events are present', () => {
+    const harness = loadTeacherAppHarness()
+    const createdAfterNine = new Date(2026, 4, 2, 21, 15).getTime()
+    const beforeNine = new Date(2026, 4, 2, 20, 30).getTime()
+    const afterNine = new Date(2026, 4, 2, 21, 5).getTime()
+    const beforeText = 'Written before nine.'
+    const afterText = ' Written after nine.'
+    const replay = {
+      created_at: new Date(createdAfterNine).toISOString(),
+      updated_at: new Date(afterNine).toISOString(),
+      last_activity_at: new Date(afterNine).toISOString(),
+      current_text: `${beforeText}${afterText}`,
+      document_history: [
+        { t: 0, pos: 0, del: '', ins: beforeText },
+        { t: afterNine - beforeNine, pos: beforeText.length, del: '', ins: afterText },
+      ],
+      events: [],
+    }
+    const replayData = harness.buildReviewReplayCacheEntry(replay)
+
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterNine),
+      highlightDates: '',
+      highlightStartTime: '9:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData,
+    })
+
+    const indexes = harness.reviewHighlightIndexSet(
+      harness.handtypedMarkdownDisplayText(replay.current_text),
+      [{ custom: true }],
+      replay.current_text,
+    )
+
+    expect(replayData.attributedDocument.chars.slice(0, beforeText.length).every((entry) => entry.insertedAtMs < afterNine)).toBe(true)
+    expect(indexes.size).toBe(afterText.length)
+    expect([...Array(beforeText.length).keys()].some((index) => indexes.has(index))).toBe(false)
+    expect([...Array(afterText.length).keys()].every((offset) => indexes.has(beforeText.length + offset))).toBe(true)
+  })
+
+  it('uses live fallback activity time even when a live draft carries a misleading replay origin', () => {
+    const harness = loadTeacherAppHarness()
+    const badOriginAfterNine = new Date(2026, 4, 2, 21, 15).getTime()
+    const beforeNine = new Date(2026, 4, 2, 20, 30).getTime()
+    const afterNine = new Date(2026, 4, 2, 21, 5).getTime()
+    const beforeText = 'Written before nine.'
+    const afterText = ' Written after nine.'
+    const replay = {
+      replay_origin_wall_ms: badOriginAfterNine,
+      created_at: new Date(badOriginAfterNine).toISOString(),
+      updated_at: new Date(afterNine).toISOString(),
+      last_activity_at: new Date(afterNine).toISOString(),
+      current_text: `${beforeText}${afterText}`,
+      document_history: [
+        { t: 0, pos: 0, del: '', ins: beforeText },
+        { t: afterNine - beforeNine, pos: beforeText.length, del: '', ins: afterText },
+      ],
+      events: [],
+    }
+    const replayData = harness.buildReviewReplayCacheEntry(replay)
+
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterNine),
+      highlightDates: '',
+      highlightStartTime: '9:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData,
+    })
+
+    const indexes = harness.reviewHighlightIndexSet(
+      harness.handtypedMarkdownDisplayText(replay.current_text),
+      [{ custom: true }],
+      replay.current_text,
+    )
+
+    expect(replayData.attributedDocument.chars.slice(0, beforeText.length).every((entry) => entry.insertedAtMs < afterNine)).toBe(true)
+    expect(indexes.size).toBe(afterText.length)
+    expect([...Array(beforeText.length).keys()].some((index) => indexes.has(index))).toBe(false)
+    expect([...Array(afterText.length).keys()].every((offset) => indexes.has(beforeText.length + offset))).toBe(true)
+  })
+
+  it('highlights only surviving characters inserted inside the selected time range from replay history', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeNine = new Date(2026, 4, 2, 20, 55).getTime()
+    const afterNine = new Date(2026, 4, 2, 21, 5).getTime()
+    const beforeText = 'Written before nine.'
+    const afterText = ' Written after nine.'
+    const displayText = `${beforeText}${afterText}`
+    const replay = {
+      current_text: displayText,
+      document_history: [
+        { t: 1000, pos: 0, del: '', ins: beforeText },
+        { t: 2000, pos: beforeText.length, del: '', ins: afterText },
+      ],
+      events: [
+        {
+          seq: 1,
+          last_activity_at: new Date(beforeNine).toISOString(),
+          document_history_tail: [{ t: 1000, pos: 0, del: '', ins: beforeText }],
+        },
+        {
+          seq: 2,
+          last_activity_at: new Date(afterNine).toISOString(),
+          document_history_tail: [{ t: 2000, pos: beforeText.length, del: '', ins: afterText }],
+        },
+      ],
+    }
+    const replayData = harness.buildReviewReplayCacheEntry(replay)
+
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterNine),
+      highlightDates: '',
+      highlightStartTime: '9:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData,
+    })
+
+    const indexes = harness.reviewHighlightIndexSet(
+      harness.handtypedMarkdownDisplayText(displayText),
+      [{ custom: true }],
+      displayText,
+    )
+
+    expect(indexes.size).toBe(afterText.length)
+    expect([...Array(beforeText.length).keys()].some((index) => indexes.has(index))).toBe(false)
+    expect([...Array(afterText.length).keys()].every((offset) => indexes.has(beforeText.length + offset))).toBe(true)
+  })
+
+  it('uses fresher live-session history when replay head lags behind the displayed draft', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeFilter = new Date(2026, 4, 3, 19, 29, 37).getTime()
+    const afterFilter = new Date(2026, 4, 3, 19, 30, 13).getTime()
+    const baseText = 'Hello This is my essay'
+    const displayText = `${baseText} hihiH`
+    const replay = {
+      current_text: baseText,
+      document_history: [
+        { t: 19926, pos: 0, del: '', ins: 'Hello', absolute_wall_ms: beforeFilter - 90_000 },
+        { t: 25340, pos: 5, del: '', ins: ' This is my essay', absolute_wall_ms: beforeFilter - 60_000 },
+      ],
+    }
+    const liveSession = {
+      current_text: displayText,
+      last_activity_at: new Date(afterFilter).toISOString(),
+      document_history: [
+        ...replay.document_history,
+        { t: 113513, pos: baseText.length, del: '', ins: ' hihi', absolute_wall_ms: beforeFilter },
+        { t: 149308, pos: baseText.length + 5, del: '', ins: 'H', absolute_wall_ms: afterFilter },
+      ],
+    }
+    const replayData = harness.buildReviewReplayCacheEntry(
+      harness.mergeReviewReplayWithLiveSession(replay, liveSession),
+    )
+
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterFilter),
+      highlightDates: '',
+      highlightStartTime: '7:30 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData,
+    })
+
+    const indexes = harness.reviewHighlightIndexSet(
+      harness.handtypedMarkdownDisplayText(displayText),
+      [{ custom: true }],
+      displayText,
+    )
+
+    expect(replayData.attributedDocument.text).toBe(displayText)
+    expect(indexes.size).toBe(1)
+    expect(indexes.has(displayText.length - 1)).toBe(true)
+  })
+
+  it('treats one-timestamp draft attribution as unreliable for filtered highlights', () => {
+    const harness = loadTeacherAppHarness()
+
+    expect(
+      harness.attributedDocumentHasReliableInsertionTiming({
+        text: 'abc',
+        chars: [
+          { char: 'a', insertedAtMs: 1000 },
+          { char: 'b', insertedAtMs: 1000 },
+          { char: 'c', insertedAtMs: 1000 },
+        ],
+      }),
+    ).toBe(false)
+
+    expect(
+      harness.attributedDocumentHasReliableInsertionTiming({
+        text: 'abc',
+        chars: [
+          { char: 'a', insertedAtMs: 1000 },
+          { char: 'b', insertedAtMs: 1100 },
+          { char: 'c', insertedAtMs: 1100 },
+        ],
+      }),
+    ).toBe(true)
+  })
+
+  it('does not show the precise timing unavailable blocker for coarse highlight timing', () => {
+    const harness = loadTeacherAppHarness()
+    const highlightedAt = new Date(2026, 4, 2, 21, 5).getTime()
+    const replayData = {
+      attributedDocument: {
+        text: 'abc',
+        chars: [
+          { char: 'a', insertedAtMs: highlightedAt },
+          { char: 'b', insertedAtMs: highlightedAt },
+          { char: 'c', insertedAtMs: highlightedAt },
+        ],
+      },
+    }
+    harness.setReviewState({
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(highlightedAt),
+      highlightDates: '',
+      highlightStartTime: '9:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData,
+    })
+
+    expect(harness.reviewHighlightIndexSet('abc', [{ custom: true }], 'abc').size).toBe(0)
+  })
+
   it('keeps the selected review draft session when assignment realtime summaries omit it', () => {
     const harness = loadTeacherAppHarness()
     const selectedSession = {
@@ -817,7 +1222,7 @@ describe('teacher review session regression', () => {
 
     expect(requests).toContain('/api/edu/live-replays/live-selected')
     expect(requests).toContain('/api/edu/replays/replay-selected')
-    expect(harness.getElement('review-highlight-meta').textContent).toContain('Pick a day')
+    expect(harness.getElement('review-highlight-meta').textContent).toContain('Pick dates, weekdays, or a time range')
     expect(harness.getElement('review-draft-meta').textContent).toContain('Live draft is 28 characters')
   })
 
@@ -1274,6 +1679,119 @@ describe('teacher review session regression', () => {
     ])
   })
 
+  it('persists deleting the only inline comment instead of letting the server restore it', async () => {
+    const savedPayloads = []
+    const harness = loadTeacherAppHarness({
+      fetchImpl: async (_url, options = {}) => {
+        const payload = JSON.parse(String(options.body || '{}'))
+        if (!String(_url).includes('/grading')) {
+          return createJsonResponse({})
+        }
+        savedPayloads.push(payload)
+        return createJsonResponse({
+          id: 'live-selected',
+          grading: {
+            ...payload,
+            updated_at: '2026-05-02T17:00:00.000Z',
+          },
+        })
+      },
+    })
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Selected draft',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date().toISOString(),
+      grading: {
+        feedback_status: 'published',
+        inline_annotations: [
+          {
+            id: 'annotation-delete-me',
+            type: 'comment',
+            start: 0,
+            end: 8,
+            original_start: 0,
+            original_end: 8,
+            quote: 'Selected',
+            note: 'Remove me.',
+          },
+        ],
+      },
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+    harness.renderReviewWorkspace(assignment)
+
+    await harness.deleteReviewAnnotation('annotation-delete-me')
+
+    expect(harness.getReviewState().inlineAnnotations).toEqual([])
+    expect(savedPayloads).toHaveLength(1)
+    expect(savedPayloads[0]).toMatchObject({
+      inline_annotations: [],
+      allow_empty_feedback: true,
+      publish_feedback: true,
+    })
+    expect(harness.getReviewState().dirty).toBe(false)
+  })
+
+  it('keeps autosaves published after feedback has already been published once', () => {
+    const harness = loadTeacherAppHarness()
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [
+        {
+          id: 'live-selected',
+          assignment_id: 'assignment-1',
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft',
+        },
+      ],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      feedbackStatus: 'published',
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: 'Updated visible feedback',
+      returnedForRevision: false,
+      inlineAnnotations: [],
+      replayData: null,
+      selection: null,
+    })
+
+    expect(harness.buildReviewPayload().publish_feedback).toBe(true)
+  })
+
   it('shows retrying instead of failed while review feedback is still queued to sync', async () => {
     let saveAttempts = 0
     const harness = loadTeacherAppHarness({
@@ -1345,10 +1863,11 @@ describe('teacher review session regression', () => {
     await harness.saveCurrentReview()
 
     expect(saveAttempts).toBe(2)
-    expect(harness.getElement('review-sync-status').textContent).toBe('Saved just now')
+    expect(harness.getElement('review-sync-status').textContent).toBe('Saved just now • published')
     expect(harness.getReviewState()).toMatchObject({
       dirty: false,
       saveState: 'saved',
+      feedbackStatus: 'published',
     })
   })
 
@@ -1450,6 +1969,21 @@ describe('teacher review session regression', () => {
     expect(harness.getReviewSelection().reviewWorkspaceOpen).toBe(true)
     expect(assignmentRefreshes).toBe(1)
     expect(replayRefreshes).toBe(1)
+  })
+
+  it('opens the review workspace before waiting on pending review saves or network refreshes', () => {
+    const source = teacherAppSource()
+    const selectReviewSessionSource = source.match(
+      /async function selectReviewSession\(sessionId\) \{[\s\S]*?\n\}/,
+    )?.[0] || ''
+
+    expect(selectReviewSessionSource).toContain('const previousSave = saveReviewSnapshotBeforeSwitch()')
+    expect(selectReviewSessionSource).not.toContain('await flushReviewSave()')
+    expect(selectReviewSessionSource.indexOf('renderStudentCards()')).toBeGreaterThan(-1)
+    expect(selectReviewSessionSource.indexOf('await Promise.all([')).toBeGreaterThan(-1)
+    expect(selectReviewSessionSource.indexOf('renderStudentCards()')).toBeLessThan(
+      selectReviewSessionSource.indexOf('await Promise.all(['),
+    )
   })
 
   it('opens review sessions with a direct fresh live-session fetch before broader refreshes settle', async () => {
@@ -1586,5 +2120,236 @@ describe('teacher review session regression', () => {
       current_text: 'Fresh direct text',
       updated_at: '2026-04-29T20:00:10.000Z',
     })
+  })
+
+  it('does not roll the selected live draft back to a shorter realtime summary with the same freshness', () => {
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const fullSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Claim here. Evidence matters. Conclusion lands.',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: '2026-04-29T20:00:10.000Z',
+      updated_at: '2026-04-29T20:00:10.000Z',
+      grading: { inline_annotations: [] },
+    }
+    const partialSummary = {
+      ...fullSession,
+      current_text: 'Claim here. Evidence',
+    }
+    const harness = loadTeacherAppHarness()
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [fullSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: fullSession.id,
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: fullSession,
+    })
+    harness.setReviewState({
+      sessionId: fullSession.id,
+      inlineAnnotations: [],
+      selection: null,
+      replayData: null,
+      dirty: false,
+      saveState: 'saved',
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeAssignment({
+      assignment,
+      live_sessions: [partialSummary],
+      updated_at: '2026-04-29T20:00:10.000Z',
+    })
+
+    expect(
+      harness.getDashboardState().live_sessions.find((session) => session.id === fullSession.id),
+    ).toMatchObject({
+      current_text: fullSession.current_text,
+      updated_at: '2026-04-29T20:00:10.000Z',
+    })
+    expect(harness.getReviewSelection().selectedReviewSessionSnapshot).toMatchObject({
+      current_text: fullSession.current_text,
+    })
+  })
+
+  it('does not roll the selected live draft back to a slightly newer shorter prefix while typing', () => {
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const fullSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Claim here. Evidence matters. Conclusion lands.',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: '2026-04-29T20:00:10.000Z',
+      updated_at: '2026-04-29T20:00:10.000Z',
+      grading: { inline_annotations: [] },
+    }
+    const partialSummary = {
+      ...fullSession,
+      current_text: 'Claim here. Evidence',
+      last_activity_at: '2026-04-29T20:00:11.500Z',
+      updated_at: '2026-04-29T20:00:11.500Z',
+    }
+    const harness = loadTeacherAppHarness()
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [fullSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: fullSession.id,
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: fullSession,
+    })
+    harness.setReviewState({
+      sessionId: fullSession.id,
+      inlineAnnotations: [],
+      selection: null,
+      replayData: null,
+      dirty: false,
+      saveState: 'saved',
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeAssignment({
+      assignment,
+      live_sessions: [partialSummary],
+      updated_at: '2026-04-29T20:00:11.500Z',
+    })
+
+    expect(
+      harness.getDashboardState().live_sessions.find((session) => session.id === fullSession.id),
+    ).toMatchObject({
+      current_text: fullSession.current_text,
+      updated_at: '2026-04-29T20:00:11.500Z',
+    })
+  })
+
+  it('renders live Handtyped markdown as WYSIWYG in the teacher draft view', () => {
+    const harness = loadTeacherAppHarness()
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: '# Heading\n\n[size=20]Large claim[/size] and **bold** text',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date().toISOString(),
+      grading: { inline_annotations: [] },
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+
+    harness.renderReviewWorkspace(assignment)
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('review-draft-heading-h1')
+    expect(html).toContain('font-size:20px')
+    expect(html).toContain('<strong>bold</strong>')
+    expect(html).not.toContain('[size=20]')
+    expect(html).not.toContain('# Heading')
+    expect(harness.getElement('review-draft-meta').textContent).toContain('Live draft is 34 characters')
+  })
+
+  it('hides inline comments resolved by the student from the teacher review workspace', () => {
+    const harness = loadTeacherAppHarness()
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Opening claim needs support.',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date().toISOString(),
+      grading: {
+        inline_annotations: [
+          {
+            id: 'resolved-1',
+            type: 'comment',
+            start: 0,
+            end: 7,
+            quote: 'Opening',
+            note: 'Already handled.',
+            resolved_by_student: true,
+            resolved_by: 'Ada Lovelace',
+          },
+          {
+            id: 'open-1',
+            type: 'comment',
+            start: 14,
+            end: 19,
+            quote: 'needs',
+            note: 'Still visible.',
+          },
+        ],
+      },
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+
+    harness.renderReviewWorkspace(assignment)
+
+    expect(harness.getElement('review-draft-surface').innerHTML).not.toContain('resolved-1')
+    expect(harness.getElement('review-draft-surface').innerHTML).toContain('open-1')
+    expect(harness.getElement('review-annotation-list').innerHTML).not.toContain('Already handled.')
+    expect(harness.getElement('review-annotation-list').innerHTML).toContain('Still visible.')
   })
 })

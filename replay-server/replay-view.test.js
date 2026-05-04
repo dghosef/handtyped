@@ -106,6 +106,11 @@ describe('replay history start state', () => {
     expect(replayPageHtml).not.toContain('stat-words')
   })
 
+  it('keeps EDU replay preserved whitespace off the page wrapper so the first line is flush', () => {
+    expect(eduReplayPageHtml).toContain('#doc-content,\n    .doc-page.analysis-doc {\n      white-space: pre-wrap;')
+    expect(eduReplayPageHtml).not.toMatch(/\\.doc-page \\{[\\s\\S]*?white-space: pre-wrap;[\\s\\S]*?\\}/)
+  })
+
   it('initializes replay speed from the restored speed dropdown value', () => {
     for (const html of [replayPageHtml, eduReplayPageHtml]) {
       expect(html).toContain("const speedSelectEl = document.getElementById('speed-select')")
@@ -251,6 +256,26 @@ describe('replay history start state', () => {
       attributed.originWallMs + 1000,
     ])
     expect(html).toBe('a<mark class="insert-highlight">x</mark>c')
+  })
+
+  it('does not attribute unreplayed surrounding text to the latest live tail edit', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'Existing draft plus new',
+      doc_history: [
+        { t: 5000, pos: 19, del: '', ins: ' new' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      attributed.originWallMs + 4500,
+      attributed.originWallMs + 5500,
+    )
+
+    expect(attributed.text).toBe('Existing draft plus new')
+    expect(attributed.chars.filter((entry) => Number.isFinite(entry.insertedAtMs)).map((entry) => entry.char).join('')).toBe(' new')
+    expect(html).toBe('Existing draft plus<mark class="insert-highlight"> new</mark>')
   })
 
   it('treats snapshot replacements as newly inserted characters in the selected range', () => {
@@ -666,16 +691,30 @@ describe('replay history start state', () => {
     ])
   })
 
-  it('formats absolute replay times from explicit replay origin and timezone offset', () => {
+  it('formats absolute replay times in the teacher local timezone', () => {
     const session = {
       replay_origin_wall_ms: Date.UTC(2026, 3, 22, 21, 0, 0),
       recorded_timezone: 'AST',
       recorded_timezone_offset_minutes: -240,
     }
+    const local = new Date(Date.UTC(2026, 3, 22, 21, 1, 30))
+    const offsetMinutes = -local.getTimezoneOffset()
+    const offsetSign = offsetMinutes >= 0 ? '+' : '-'
+    const absoluteOffset = Math.abs(offsetMinutes)
+    const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
+    const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
+    const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const timezone = localTimezone
+      ? `${localTimezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
+      : `UTC${offsetSign}${offsetHours}:${offsetMins}`
+    const hours = local.getHours() % 12 || 12
+    const minutes = String(local.getMinutes()).padStart(2, '0')
+    const seconds = String(local.getSeconds()).padStart(2, '0')
+    const meridiem = local.getHours() >= 12 ? 'PM' : 'AM'
 
     expect(getReplayOriginWallMs(session)).toBe(Date.UTC(2026, 3, 22, 21, 0, 0))
     expect(formatAbsoluteReplayTime(session, 90_000)).toBe(
-      'Apr 22, 2026, 5:01:30 PM AST (UTC-04:00)',
+      `${local.toLocaleString('en-US', { month: 'short' })} ${local.getDate()}, ${local.getFullYear()}, ${hours}:${minutes}:${seconds} ${meridiem} ${timezone}`,
     )
   })
 
@@ -683,6 +722,24 @@ describe('replay history start state', () => {
     expect(getReplayOriginWallMs({ start_wall_ns: 1_700_000_000_000_000_000 })).toBe(
       1_700_000_000_000,
     )
+  })
+
+  it('uses absolute wall timestamps on live replay history entries for character attribution', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'abc',
+      doc_history: [
+        { t: 0, pos: 0, del: '', ins: 'a' },
+        { t: 60_000, pos: 1, del: '', ins: 'b', absolute_wall_ms: 1_700_000_010_000 },
+        { t: 120_000, pos: 2, del: '', ins: 'c' },
+      ],
+    })
+
+    expect(attributed.chars.map((entry) => entry.insertedAtMs)).toEqual([
+      1_700_000_000_000,
+      1_700_000_010_000,
+      1_700_000_120_000,
+    ])
   })
 
   it('falls back to created_at when explicit replay origin metadata is missing', () => {

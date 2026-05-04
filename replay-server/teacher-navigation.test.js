@@ -10,6 +10,7 @@ import {
   buildAfterSchoolRanges,
   dashboardDeltaNeedsFullRefresh,
   deriveSessionRisk,
+  formatClockTime,
   formatWindowSummary,
   isSessionActive,
   localDateTimeInputValue,
@@ -18,12 +19,14 @@ import {
   recentEditActivity,
   reconcileTeacherNavigation,
   replayLocalDateInputValue,
+  sessionPresenceTimestamp,
   sessionStatusLabel,
   sessionsForAssignment,
   sortSessionsForDisplay,
   timeAgoLabel,
   todayAtLocalTime,
   todayAtLocalTimeIso,
+  wholeClassExtensionLabel,
 } from './public/edu/app-ui.js'
 
 const teacherAppHtml = fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.html'), 'utf8')
@@ -43,6 +46,7 @@ const assignments = [
 
 describe('teacher navigation', () => {
   it('renders class and assignment selection as separate top-level pages', () => {
+    expect(teacherAppHtml).toContain('<a class="teacher-brand" href="https://edu.handtyped.app">Handtyped EDU</a>')
     expect(teacherAppHtml).toContain('<section id="classes-view">')
     expect(teacherAppHtml).toContain('<section id="assignments-view" hidden>')
     expect(teacherAppHtml).toContain('<section class="review-layout" id="review-layout">')
@@ -51,11 +55,21 @@ describe('teacher navigation', () => {
     expect(teacherAppHtml).toContain('id="review-back-button"')
     expect(teacherAppHtml).not.toContain('data-filter="violations"')
     expect(teacherAppHtml).toContain('id="review-highlight-date"')
-    expect(teacherAppHtml).toContain('id="review-highlight-after-school-day"')
-    expect(teacherAppHtml).toContain('id="review-highlight-after-school-all"')
+    expect(teacherAppHtml).toContain('id="review-highlight-dates"')
+    expect(teacherAppHtml).toContain('id="review-highlight-start-time"')
+    expect(teacherAppHtml).toContain('id="review-highlight-end-time"')
+    expect(teacherAppHtml).toContain('name="review-highlight-weekday"')
+    expect(teacherAppHtml).toContain('id="review-highlight-preset-after-school"')
+    expect(teacherAppHtml).toContain('id="review-highlight-all"')
+    expect(teacherAppHtml).toContain('id="review-realtime-debug"')
+    expect(teacherAppHtml).toContain('TODO remove later')
     expect(teacherAppHtml).toContain('id="review-comment-mode"')
     expect(teacherAppHtml).not.toContain('id="review-suggest-mode"')
     expect(teacherAppHtml).not.toContain('id="review-composer-replacement"')
+    expect(teacherAppHtml).toContain('id="review-publish-feedback"')
+    expect(teacherAppHtml).toContain('Publish feedback')
+    expect(teacherAppJs).toContain('async function publishCurrentReviewFeedback()')
+    expect(teacherAppJs).toContain("publish_feedback: Boolean(publishFeedback || reviewState.feedbackStatus === 'published')")
     expect(teacherAppHtml).toContain('id="access-request-list"')
     expect(teacherAppHtml).toContain('id="feedback-button"')
     expect(teacherAppHtml).toContain('id="feedback-modal"')
@@ -69,6 +83,47 @@ describe('teacher navigation', () => {
     )
   })
 
+  it('temporarily exposes realtime diagnostics and keeps review draft spacing stable', () => {
+    expect(teacherAppJs).toContain('function renderRealtimeDebug')
+    expect(teacherAppJs).toContain('function markRealtimeEvent')
+    expect(teacherAppJs).toContain("markFallbackRefresh('assignment-view')")
+    expect(teacherAppHtml).toContain('id="assignment-monitoring-status"')
+    expect(teacherAppJs).toContain('function renderAssignmentMonitoringStatus')
+    expect(teacherAppJs).toContain('function retryRealtimeConnection')
+    expect(teacherAppJs).toContain("teacherSession?.tenant_id || 'default'")
+    expect(teacherAppJs).toContain('Monitoring: fallback refresh used')
+    expect(teacherAppJs).toContain('Monitoring: realtime updates active')
+    expect(teacherStylesCss).toContain('.monitoring-path-status[data-tone="fallback"]')
+    expect(teacherAppJs).toContain('TODO remove later:')
+    expect(teacherAppJs).toContain('let reviewDraftSurfaceHtml')
+    expect(teacherAppJs).toContain('if (reviewDraftSurfaceHtml !== nextHtml)')
+    expect(teacherAppJs).toContain('function textWithPreservedParagraphSpacing')
+    expect(teacherAppJs).toContain('function handtypedMarkdownDisplayModel')
+    expect(teacherAppJs).toContain("replace(/\\n{2,}/g, '\\n')")
+    expect(teacherStylesCss).toContain('.review-draft-surface .review-highlight')
+    expect(teacherStylesCss).toContain('.review-draft-heading-h1')
+    expect(teacherStylesCss).toContain('line-height: inherit;')
+  })
+
+  it('supports flexible replay highlight filters for dates, time ranges, and weekdays', () => {
+    expect(teacherAppJs).toContain('function reviewTimestampMatchesHighlight')
+    expect(teacherAppJs).toContain('function reviewHighlightFilterForState')
+    expect(teacherAppJs).toContain('function applyReviewHighlightPreset')
+    expect(teacherAppJs).toContain("reviewState.highlightMode = hasDates || hasWeekdays || hasTime ? 'custom' : 'none'")
+    expect(teacherAppJs).toContain("applyReviewHighlightPreset('weekdays')")
+    expect(teacherAppJs).toContain("applyReviewHighlightPreset('all')")
+    expect(teacherAppJs).toContain('minute >= filter.startMinute || minute <= filter.endMinute')
+    expect(teacherAppHtml).toContain('id="review-highlight-start-time" type="time"')
+    expect(teacherAppHtml).toContain('id="review-highlight-end-time" type="time"')
+    expect(teacherStylesCss).toContain('.review-time-field-compact')
+    expect(teacherAppJs).toContain('function syncReviewHighlightInputValue')
+    expect(teacherAppJs).toContain('sourceIndex')
+    expect(teacherAppJs).toContain('function replayTeacherDateInputValue')
+    expect(teacherAppJs).toContain('function annotateReplayHistoryWithEventTimes')
+    expect(teacherAppJs).toContain("const noReplay = reviewState.replayLoadState === 'missing' && !reviewState.replayError")
+    expect(teacherAppJs).toContain('const disablePresets = loading')
+  })
+
   it('forces hidden review workspaces to stay fully collapsed', () => {
     expect(teacherStylesCss).toContain('.review-workspace[hidden]')
     expect(teacherStylesCss).toContain('display: none !important;')
@@ -79,6 +134,8 @@ describe('teacher navigation', () => {
     expect(teacherStylesCss).toContain('repeat(auto-fit, minmax(280px, 1fr))')
     expect(teacherStylesCss).toContain('.review-layout.is-review-open')
     expect(teacherStylesCss).toContain('#assignment-view.is-review-open #session-grid')
+    expect(teacherStylesCss).toContain('#assignment-view.is-review-open #back-to-assignments-button')
+    expect(teacherStylesCss).toContain('display: none;')
     expect(teacherStylesCss).toContain('.student-card-footer > .button')
     expect(teacherStylesCss).toContain('flex-wrap: wrap;')
     expect(teacherStylesCss).toContain('.review-highlight-pending')
@@ -87,14 +144,23 @@ describe('teacher navigation', () => {
   it('refreshes the dashboard promptly by default and faster when a review opens', () => {
     expect(teacherAppJs).toContain('const DASHBOARD_IDLE_REFRESH_MS = 15000')
     expect(teacherAppJs).toContain('const DASHBOARD_REVIEW_REFRESH_MS = 5000')
+    expect(teacherAppJs).toContain('const ASSIGNMENT_VIEW_SUMMARY_REFRESH_MS = 5000')
     expect(teacherAppJs).toContain('const TEACHER_STATUS_TICK_MS = 1000')
     expect(teacherAppJs).toContain('function renderReviewWorkspaceMeta')
+    expect(teacherAppJs).toContain('function refreshStudentCardLiveLabels')
     expect(teacherAppJs).toContain("const MISSING_SELECTED_REVIEW_SESSION = Symbol('missing-selected-review-session')")
     expect(teacherAppJs).toContain('scheduleDashboardRefresh()')
     expect(teacherAppJs).toContain('statusTickTimer = window.setInterval(() => {')
+    expect(teacherAppJs).toContain('refreshStudentCardLiveLabels()')
+    expect(teacherAppJs).toContain('data-student-last-activity')
+    expect(teacherAppJs).toContain('data-student-status-badge')
+    expect(teacherAppJs).toContain('selectedAssignmentId = button.dataset.assignmentId\n      clearSelectedReviewSession()\n      showAssignmentView()')
     expect(teacherAppJs).toContain('await refreshDashboard()')
     expect(teacherAppJs).toContain('function syncRealtimeSubscriptions()')
     expect(teacherAppJs).toContain("new EventSource(url)")
+    expect(teacherAppJs).toContain("source.addEventListener('access-request'")
+    expect(teacherAppJs).toContain('function handleRealtimeAccessRequest')
+    expect(teacherAppJs).toContain('accessRequest: handleRealtimeAccessRequest')
     expect(teacherAppJs).toContain('function activeReviewEditorElement()')
     expect(teacherAppJs).toContain('/api/edu/live-replays/')
     expect(teacherAppJs).toContain('function isFullDashboardPayload(payload)')
@@ -133,6 +199,14 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).not.toContain('form.title.value')
   })
 
+  it('loads the selected assignment before opening the edit modal when state is stale', () => {
+    expect(teacherAppJs).toContain('async function selectedAssignmentForEditing()')
+    expect(teacherAppJs).toContain("request(`/api/edu/assignments/${encodeURIComponent(selectedAssignmentId)}`)")
+    expect(teacherAppJs).toContain('upsertAssignmentInState(fetched)')
+    expect(teacherAppJs).toContain('const assignment = await selectedAssignmentForEditing()')
+    expect(teacherAppJs).toContain('Could not load assignment:')
+  })
+
   it('uses extend for reopening instead of offering an indefinite reopen button', () => {
     expect(teacherAppJs).toContain('data-close-student-access')
     expect(teacherAppJs).toContain("const closeAccessButton = accessRevoked")
@@ -164,7 +238,7 @@ describe('teacher navigation', () => {
             {
               seq: 2,
               current_text: 'Draft one\n\nDraft two',
-              document_history_tail: [{ t: 300, pos: 9, del: '', ins: '\n\nDraft two' }],
+              document_history_tail: [{ t: 300, pos: 9, del: '', ins: '\n\nDraft two', absolute_wall_ms: 1_700_000_000_300 }],
               url_history_tail: [{ t: 320, url: 'https://example.com', allowed: true }],
             },
             {
@@ -181,7 +255,7 @@ describe('teacher navigation', () => {
       last_seq: 3,
       document_history: [
         { t: 100, pos: 0, del: '', ins: 'Draft one' },
-        { t: 300, pos: 9, del: '', ins: '\n\nDraft two' },
+        { t: 300, pos: 9, del: '', ins: '\n\nDraft two', absolute_wall_ms: 1_700_000_000_300 },
         { t: 450, pos: 18, del: '', ins: ' revised' },
       ],
       url_history: [{ t: 320, url: 'https://example.com', allowed: true }],
@@ -278,6 +352,18 @@ describe('teacher navigation', () => {
 
     expect(localDateTimeInputValue(target)).toBe('2026-04-27T14:30')
     expect(todayAtLocalTimeIso(14, 30, now)).toBe(target.toISOString())
+    expect(teacherAppHtml).toContain('id="quick-extend-date" type="date"')
+    expect(teacherAppHtml).toContain('id="quick-extend-time" type="time"')
+    expect(teacherAppJs).toContain('function defaultAccessExtensionTarget')
+    expect(teacherAppJs).toContain('now.getTime() + 60 * 60 * 1000')
+    expect(teacherAppJs).toContain('function selectedExtensionTarget')
+    expect(teacherAppJs).toContain('data-access-request-date')
+    expect(teacherAppJs).toContain('Choose an extension date and time after the current time.')
+  })
+
+  it('formats saved ISO temporary access timestamps for assignment edit forms', () => {
+    expect(localDateTimeInputValue('2026-04-27T18:45:00.000Z')).toMatch(/^2026-04-27T\d{2}:45$/)
+    expect(localDateTimeInputValue('not-a-date')).toBe('')
   })
 
   it('rolls a student quick extension forward to tomorrow when today has already passed', () => {
@@ -452,6 +538,25 @@ describe('teacher navigation', () => {
     ).toBe(true)
   })
 
+  it('indicates active whole-class extensions on assignment cards and assignment meta', () => {
+    const now = new Date(2026, 3, 27, 12, 15)
+    const extendedAssignment = {
+      id: 'extended-assignment',
+      classroom_id: 'english-11',
+      title: 'Extended essay',
+      course: 'English 11',
+      temporary_access_until: new Date(2026, 3, 27, 13, 0).toISOString(),
+    }
+
+    expect(wholeClassExtensionLabel(extendedAssignment, now)).toBe('Class extended until 1:00 PM')
+    expect(assignmentViewMeta(extendedAssignment, classrooms[0], [], now.getTime())).toContain(
+      'Class extended until 1:00 PM',
+    )
+    expect(teacherAppJs).toContain('function wholeClassExtensionBadge')
+    expect(teacherAppJs).toContain('assignment-card-badges')
+    expect(teacherStylesCss).toContain('.assignment-card-badges')
+  })
+
   it('derives recent edit activity buckets from relative document-history timestamps', () => {
     const activity = recentEditActivity({
       document_history: [
@@ -494,27 +599,29 @@ describe('teacher navigation', () => {
     expect(activity.buckets).toEqual([2, 0, 1, 1, 2])
   })
 
-  it('treats only schedule-open, fresh sessions as active and labels focus state accordingly', () => {
+  it('treats only schedule-open, fresh presence heartbeats as active and labels focus state accordingly', () => {
     const now = Date.UTC(2026, 3, 28, 12, 0, 0)
     const activeFocused = {
       schedule_open: true,
       focused: true,
-      last_activity_at: new Date(now - 5_000).toISOString(),
+      updated_at: new Date(now - 5_000).toISOString(),
+      last_activity_at: new Date(now - 60_000).toISOString(),
     }
     const activeUnfocused = {
       schedule_open: true,
       focused: false,
-      last_activity_at: new Date(now - 3_000).toISOString(),
+      updated_at: new Date(now - 3_000).toISOString(),
+      last_activity_at: new Date(now - 60_000).toISOString(),
     }
     const stale = {
       schedule_open: true,
       focused: true,
-      last_activity_at: new Date(now - 7_000).toISOString(),
+      updated_at: new Date(now - 16_000).toISOString(),
     }
     const closed = {
       schedule_open: false,
       focused: true,
-      last_activity_at: new Date(now - 1_000).toISOString(),
+      updated_at: new Date(now - 1_000).toISOString(),
     }
 
     expect(isSessionActive(activeFocused, now)).toBe(true)
@@ -531,17 +638,45 @@ describe('teacher navigation', () => {
     const thresholdActive = {
       schedule_open: true,
       focused: true,
-      updated_at: new Date(now - 6_000).toISOString(),
+      updated_at: new Date(now - 15_000).toISOString(),
     }
     const thresholdStale = {
       schedule_open: true,
       focused: true,
-      updated_at: new Date(now - 6_001).toISOString(),
+      updated_at: new Date(now - 15_001).toISOString(),
     }
 
     expect(isSessionActive(thresholdActive, now)).toBe(true)
     expect(isSessionActive(thresholdStale, now)).toBe(false)
     expect(sessionStatusLabel(thresholdActive, now)).toBe('Focused')
+  })
+
+  it('falls back to last edit time only when no presence heartbeat exists', () => {
+    const now = Date.UTC(2026, 3, 28, 12, 0, 0)
+    expect(
+      isSessionActive(
+        {
+          schedule_open: true,
+          focused: true,
+          last_activity_at: new Date(now - 5_000).toISOString(),
+        },
+        now,
+      ),
+    ).toBe(true)
+  })
+
+  it('uses the freshest presence timestamp to avoid active-status flicker', () => {
+    const now = Date.UTC(2026, 3, 28, 12, 0, 0)
+    const session = {
+      schedule_open: true,
+      focused: true,
+      updated_at: new Date(now - 20_000).toISOString(),
+      last_activity_at: new Date(now - 1_000).toISOString(),
+    }
+
+    expect(sessionPresenceTimestamp(session)).toBe(now - 1_000)
+    expect(isSessionActive(session, now)).toBe(true)
+    expect(sessionStatusLabel(session, now)).toBe('Focused')
   })
 
   it('filters sessions by both assignment id and classroom name', () => {
@@ -723,10 +858,11 @@ describe('teacher navigation', () => {
   })
 
   it('keeps monitoring and assignment settings controls wired into the dashboard shell', () => {
-    expect(teacherAppHtml).toContain('id="session-filter-bar"')
-    expect(teacherAppHtml).toContain('data-filter="offline"')
-    expect(teacherAppHtml).toContain('id="session-search-input"')
-    expect(teacherAppHtml).toContain('id="overview-edits"')
+    expect(teacherAppHtml).not.toContain('id="session-filter-bar"')
+    expect(teacherAppHtml).not.toContain('data-filter="offline"')
+    expect(teacherAppHtml).not.toContain('id="session-search-input"')
+    expect(teacherAppHtml).not.toContain('id="monitoring-overview"')
+    expect(teacherAppHtml).not.toContain('id="overview-edits"')
     expect(teacherAppHtml).toContain('id="assignment-assigned-options"')
     expect(teacherAppHtml).not.toContain('id="assignment-assigned-extra"')
     expect(teacherAppHtml).toContain('id="assignment-student-override-list"')
@@ -739,9 +875,21 @@ describe('teacher navigation', () => {
     expect(teacherAppHtml).toContain('name="allow_dictation"')
     expect(teacherAppHtml).toContain('name="require_lockdown" checked')
     expect(teacherAppHtml).toContain('name="browser_allowed_domains"')
+    expect(teacherAppHtml).not.toContain('name="browser_home_url"')
+    expect(teacherAppHtml).not.toContain('Home URL')
+    expect(teacherAppJs).not.toContain('data-override-home-enabled')
+    expect(teacherAppJs).not.toContain('normalizeHttpUrlInput')
+    expect(teacherAppJs).not.toContain('placeholder="https://example.com"')
     expect(teacherAppHtml).toContain('name="editor_font_size"')
     expect(teacherAppHtml).toContain('name="starter_document"')
+    expect(teacherAppHtml).toContain('id="starter-document-toolbar"')
+    expect(teacherAppHtml).toContain('data-starter-command="bold" aria-pressed="false"')
+    expect(teacherAppHtml).not.toContain('data-starter-command="clear"')
     expect(teacherAppJs).toContain('function populateAssignmentFontSizeOptions()')
+    expect(teacherAppJs).toContain('function updateStarterDocumentToolbarState()')
+    expect(teacherAppJs).toContain("button.setAttribute('aria-pressed', isActive ? 'true' : 'false')")
+    expect(teacherAppJs).toContain("button.addEventListener('mousedown', (event) => {")
+    expect(teacherStylesCss).toContain('.teacher-editor-toolbar .button[aria-pressed="true"]')
     expect(teacherAppJs).toContain('STUDENT_OVERRIDE_FONT_SIZE_OPTIONS')
     expect(teacherAppJs).toContain('reviewSessionHasAccess(')
     expect(teacherAppJs).toContain('handleReferenceDocumentUpload(')
@@ -823,7 +971,10 @@ describe('teacher navigation', () => {
           },
         ],
       }),
-    ).toBe('mon, tue, thu • 08:05–14:30 until 2026-05-01')
+    ).toBe('mon, tue, thu • 8:05 AM–2:30 PM until 2026-05-01')
+    expect(formatClockTime(0, 5)).toBe('12:05 AM')
+    expect(formatClockTime(12, 0)).toBe('12:00 PM')
+    expect(formatClockTime(23, 59)).toBe('11:59 PM')
     expect(formatWindowSummary({ windows: [] })).toBe('No writing window configured.')
   })
 

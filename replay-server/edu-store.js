@@ -50,6 +50,7 @@ const D1_SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS edu_records_join_code ON edu_records(kind, join_code)',
   'CREATE INDEX IF NOT EXISTS edu_records_classroom_id ON edu_records(kind, classroom_id)',
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_join_code ON edu_records(tenant_id, kind, join_code)',
+  "CREATE UNIQUE INDEX IF NOT EXISTS edu_records_classroom_join_code_unique ON edu_records(kind, join_code) WHERE kind = 'classroom' AND join_code IS NOT NULL",
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_classroom_id ON edu_records(tenant_id, kind, classroom_id, updated_at DESC)',
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_parent_id ON edu_records(tenant_id, kind, parent_id, updated_at DESC)',
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_student_key ON edu_records(tenant_id, kind, student_key, updated_at DESC)',
@@ -150,6 +151,16 @@ function laterDate(left, right) {
   return left >= right ? left : right
 }
 
+function studentVisibleFeedback(grading) {
+  if (!grading || typeof grading !== 'object') {
+    return null
+  }
+  if (grading.feedback_status === 'draft') {
+    return null
+  }
+  return grading
+}
+
 function assignmentWindowContainsNow(window, now = new Date()) {
   if (!window) {
     return false
@@ -197,7 +208,7 @@ function assignmentWindowDeadline(window, now = new Date()) {
 
 export function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
   const normalized = buildAssignment(assignment)
-  if (normalized.access_revoked) {
+  if (assignment?.access_revoked || normalized.access_revoked || studentAccessRevokedForAssignment(normalized, studentName)) {
     return { schedule_open: false, session_end_at: null }
   }
   const temporaryUntil = parseDateOrNull(effectiveStudentTemporaryAccessUntil(normalized, studentName))
@@ -314,6 +325,19 @@ function studentAccessRequestForAssignment(assignment, studentName) {
   return request && typeof request === 'object' ? request : null
 }
 
+function studentFeedbackRequestForAssignment(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return null
+  }
+  const requests = assignment?.student_feedback_requests
+  if (!requests || typeof requests !== 'object') {
+    return null
+  }
+  const request = requests[key]
+  return request && typeof request === 'object' ? request : null
+}
+
 function assignmentForStudentConfig(assignment, studentName) {
   const normalized = buildAssignment(assignment)
   const override = effectiveStudentSettingsOverride(normalized, studentName)
@@ -338,7 +362,9 @@ function assignmentForStudentConfig(assignment, studentName) {
     },
     student_feedback: normalized.student_feedback || null,
     student_access_request: studentAccessRequestForAssignment(normalized, studentName),
+    student_feedback_request: studentFeedbackRequestForAssignment(normalized, studentName),
     student_access_requests: {},
+    student_feedback_requests: {},
     student_access_revoked: {},
     student_temporary_access_until: {},
     student_overrides: {},
@@ -444,6 +470,9 @@ export function createNodeEduStore(baseDir) {
   }
 
   function filterByTenant(items, tenantId = DEFAULT_TENANT_ID) {
+    if (tenantId == null) {
+      return items
+    }
     const normalizedTenant = normalizeTenantId(tenantId)
     return items.filter((item) => normalizeTenantId(item?.tenant_id) === normalizedTenant)
   }
@@ -499,8 +528,10 @@ export function createNodeEduStore(baseDir) {
       next.push(teacher)
       writeCollection('teachers', next)
     },
-    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
-      return filterByTenant(readCollection('teachers'), tenantId).find((item) => item.email === email) || null
+    async getTeacherByEmail(email, tenantId = null) {
+      const teachers = readCollection('teachers')
+      const scoped = tenantId ? filterByTenant(teachers, tenantId) : teachers
+      return scoped.find((item) => item.email === email) || null
     },
     async putTeacherSession(session) {
       const sessions = readCollection('teacher_sessions')
@@ -672,6 +703,9 @@ export function createKvEduStore(kv) {
   }
 
   function filterByTenant(items, tenantId = DEFAULT_TENANT_ID) {
+    if (tenantId == null) {
+      return items
+    }
     const normalizedTenant = normalizeTenantId(tenantId)
     return items.filter((item) => normalizeTenantId(item?.tenant_id) === normalizedTenant)
   }
@@ -712,9 +746,10 @@ export function createKvEduStore(kv) {
       teacher = buildTeacher(teacher)
       await kv.put(`${TEACHER_PREFIX}${teacher.id}`, JSON.stringify(teacher))
     },
-    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
-      const teachers = filterByTenant(await listByPrefix(TEACHER_PREFIX), tenantId)
-      return teachers.find((item) => item.email === email) || null
+    async getTeacherByEmail(email, tenantId = null) {
+      const teachers = await listByPrefix(TEACHER_PREFIX)
+      const scoped = tenantId ? filterByTenant(teachers, tenantId) : teachers
+      return scoped.find((item) => item.email === email) || null
     },
     async putTeacherSession(session) {
       await kv.put(`${TEACHER_SESSION_PREFIX}${session.id}`, JSON.stringify(session))
@@ -917,6 +952,15 @@ export function createD1EduStore(db) {
 
   async function listKind(kind, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
+    if (tenantId == null) {
+      const response = await db
+        .prepare(
+          'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? ORDER BY updated_at DESC, id DESC',
+        )
+        .bind(kind)
+        .all()
+      return (response.results || []).map((row) => hydrateRow(row))
+    }
     const response = await db
       .prepare(
         'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC, id DESC',
@@ -1099,8 +1143,15 @@ export function createD1EduStore(db) {
         email: normalizeEmail(teacher.email),
       })
     },
-    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
+    async getTeacherByEmail(email, tenantId = null) {
       await ensureSchema()
+      if (!tenantId) {
+        const row = await db
+          .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND email = ? LIMIT 1')
+          .bind('teacher', normalizeEmail(email))
+          .first()
+        return row ? hydrateRow(row) : null
+      }
       const row = await db
         .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
         .bind(normalizeTenantId(tenantId), 'teacher', normalizeEmail(email))
@@ -1278,8 +1329,8 @@ export async function ensureEduSeedData(store) {
     instructions: 'Use only this computer. Build your argument from memory and class notes.',
     browser_policy: {
       browser_enabled: true,
-      home_url: 'https://www.gutenberg.org',
-      allowed_domains: ['gutenberg.org'],
+      home_url: '',
+      allowed_domains: [],
       log_all_navigation: true,
     },
   })
@@ -1453,6 +1504,7 @@ export function buildAssignmentAuditRecord({
     )
     pushChange('Blocked students', previousSnapshot.student_access_revoked, nextSnapshot.student_access_revoked)
     pushChange('Access requests', previousSnapshot.student_access_requests, nextSnapshot.student_access_requests)
+    pushChange('Feedback requests', previousSnapshot.student_feedback_requests, nextSnapshot.student_feedback_requests)
     pushChange('Student setting overrides', previousSnapshot.student_overrides, nextSnapshot.student_overrides)
     pushChange('Assigned students', previousSnapshot.assigned_students, nextSnapshot.assigned_students)
     pushChange('Rules', previousSnapshot.policy, nextSnapshot.policy)
@@ -1500,7 +1552,7 @@ export async function buildStudentConfig(store, { joinCode, studentName } = {}) 
       return assignmentForStudentConfig(
         {
           ...item,
-          student_feedback: liveSession?.grading || item?.student_feedback || null,
+          student_feedback: studentVisibleFeedback(liveSession?.grading) || item?.student_feedback || null,
         },
         studentName,
       )
@@ -1546,7 +1598,7 @@ export async function buildStudentAssignmentConfig(
     assignment: assignmentForStudentConfig(
       {
         ...assignment,
-        student_feedback: liveSession?.grading || assignment?.student_feedback || null,
+        student_feedback: studentVisibleFeedback(liveSession?.grading) || assignment?.student_feedback || null,
       },
       studentName,
     ),

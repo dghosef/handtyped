@@ -214,6 +214,15 @@ beforeAll(async () => {
     googleClientId: 'test-google-client-id',
     googleTokenVerifier: async (credential) => {
       if (credential !== 'valid-google-credential') {
+        if (credential === 'new-google-teacher-credential') {
+          return {
+            sub: 'google-new-teacher',
+            email: 'new-google-teacher@edu.handtyped.app',
+            email_verified: true,
+            aud: 'test-google-client-id',
+            name: 'New Google Teacher',
+          }
+        }
         if (credential !== 'valid-google-credential-2') {
           throw new Error('invalid google credential')
         }
@@ -303,12 +312,99 @@ describe('teacher auth', () => {
     const body = await res.json()
 
     expect(res.status).toBe(201)
-    expect(res.headers.get('set-cookie') || '').toContain('edu_teacher_session=')
+    const cookie = res.headers.get('set-cookie') || ''
+    expect(cookie).toContain('edu_teacher_session=')
     expect(body).toMatchObject({
       authenticated: true,
       teacher_email: 'signup-teacher@edu.handtyped.app',
       provider: 'password',
     })
+    expect(body.tenant_id).toMatch(/^tenant_/)
+    expect(body.tenant_id).not.toBe('tenant_demo')
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, { Cookie: cookie })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body).toMatchObject({
+      classrooms: [],
+      assignments: [],
+    })
+
+    const classrooms = await request('GET', '/api/edu/classrooms', undefined, { Cookie: cookie })
+    expect(classrooms.status).toBe(200)
+    expect(classrooms.body).toEqual([])
+  })
+
+  it('rejects duplicate classroom join codes across teacher accounts', async () => {
+    const firstSignup = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'First Teacher',
+        email: `first-${shortId(6).toLowerCase()}@edu.handtyped.app`,
+        password: 'longenoughpassword',
+      }),
+    })
+    expect(firstSignup.status).toBe(201)
+    const firstCookie = firstSignup.headers.get('set-cookie') || ''
+
+    const secondSignup = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Second Teacher',
+        email: `second-${shortId(6).toLowerCase()}@edu.handtyped.app`,
+        password: 'longenoughpassword',
+      }),
+    })
+    expect(secondSignup.status).toBe(201)
+    const secondCookie = secondSignup.headers.get('set-cookie') || ''
+
+    const joinCode = `GLB${shortId(5)}`
+    const firstClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: 'First Global Join Code', join_code: joinCode },
+      { Cookie: firstCookie },
+    )
+    expect(firstClassroom.status).toBe(201)
+
+    const duplicateClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: 'Second Global Join Code', join_code: joinCode.toLowerCase() },
+      { Cookie: secondCookie },
+    )
+    expect(duplicateClassroom.status).toBe(409)
+    expect(duplicateClassroom.body).toMatchObject({
+      error: 'Join code already in use',
+      join_code: joinCode.toUpperCase(),
+    })
+  })
+
+  it('generates unused classroom join codes when teachers leave them blank', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const firstClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: `Generated Code ${shortId(6)}` },
+      { Cookie: login.cookie },
+    )
+    expect(firstClassroom.status).toBe(201)
+    expect(firstClassroom.body.join_code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(firstClassroom.body.join_code).not.toBe('JOINME')
+
+    const secondClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: `Generated Blank Code ${shortId(6)}`, join_code: '   ' },
+      { Cookie: login.cookie },
+    )
+    expect(secondClassroom.status).toBe(201)
+    expect(secondClassroom.body.join_code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(secondClassroom.body.join_code).not.toBe(firstClassroom.body.join_code)
+    expect(secondClassroom.body.join_code).not.toBe('JOINME')
   })
 
   it('rejects duplicate teacher signup emails', async () => {
@@ -346,6 +442,37 @@ describe('teacher auth', () => {
       authenticated: true,
       teacher_email: 'teacher@edu.handtyped.app',
       provider: 'google',
+    })
+  })
+
+  it('creates a private teacher account from a verified Google login when no teacher exists yet', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'google',
+        credential: 'new-google-teacher-credential',
+      }),
+    })
+    const body = await res.json()
+    const cookie = res.headers.get('set-cookie') || ''
+
+    expect(res.status).toBe(200)
+    expect(cookie).toContain('edu_teacher_session=')
+    expect(body).toMatchObject({
+      authenticated: true,
+      teacher_email: 'new-google-teacher@edu.handtyped.app',
+      teacher_name: 'New Google Teacher',
+      provider: 'google',
+    })
+    expect(body.tenant_id).toMatch(/^tenant_/)
+    expect(body.tenant_id).not.toBe('tenant_demo')
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, { Cookie: cookie })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body).toMatchObject({
+      classrooms: [],
+      assignments: [],
     })
   })
 
@@ -1283,6 +1410,7 @@ describe('edu teacher and student flow', () => {
         grade_score: 79,
         inline_annotations: [
           {
+            id: 'comment-1',
             type: 'comment',
             start: 0,
             end: 9,
@@ -1290,6 +1418,7 @@ describe('edu teacher and student flow', () => {
             note: 'Open with the actual argument instead.',
           },
           {
+            id: 'suggestion-1',
             type: 'suggestion',
             start: 27,
             end: 41,
@@ -1302,6 +1431,17 @@ describe('edu teacher and student flow', () => {
       { Cookie: login.cookie },
     )
     expect(grading.status).toBe(200)
+
+    const resolution = await request(
+      'POST',
+      `/api/edu/student/assignments/${assignment.body.id}/feedback-resolutions`,
+      {
+        join_code: joinCode,
+        student_name: 'Ada Lovelace',
+        annotation_key: 'id:comment-1',
+      },
+    )
+    expect(resolution.status).toBe(200)
 
     const adaConfig = await request(
       'GET',
@@ -1320,11 +1460,15 @@ describe('edu teacher and student flow', () => {
             grade_score: '79',
             inline_annotations: expect.arrayContaining([
               expect.objectContaining({
+                id: 'comment-1',
                 type: 'comment',
                 quote: 'The draft',
                 note: 'Open with the actual argument instead.',
+                resolved_by_student: true,
+                resolved_by: 'Ada Lovelace',
               }),
               expect.objectContaining({
+                id: 'suggestion-1',
                 type: 'suggestion',
                 quote: 'stronger claim',
                 replacement: 'clear thesis',
@@ -1813,6 +1957,92 @@ describe('edu teacher and student flow', () => {
         }),
       ]),
     )
+  })
+
+  it('returns the latest linked assignment draft in student assignment payloads', async () => {
+    const joinCode = `LNK${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Linked Drafts',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const priorAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Test Suggestions',
+        course: 'Linked Literature',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Write your first draft.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(priorAssignment.status).toBe(201)
+
+    const linkedAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Revision',
+        course: 'Linked Literature',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Revise with access to the latest draft.',
+        linked_assignment_ids: [priorAssignment.body.id],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(linkedAssignment.status).toBe(201)
+
+    const latestDraft = 'The linked draft now has the newest saved claim.'
+    expect(
+      await request('POST', '/api/edu/live-sessions', {
+        id: 'linked-latest:ada',
+        assignment_id: priorAssignment.body.id,
+        assignment_title: priorAssignment.body.title,
+        course: priorAssignment.body.course,
+        classroom: classroom.body.name,
+        student_name: 'Ada Lovelace',
+        current_text: latestDraft,
+        document_history: [{ op: 'insert', text: latestDraft }],
+        current_url: null,
+        current_url_title: null,
+        url_history: [],
+        violation_count: 0,
+        violations: [],
+        last_activity_at: '2026-04-28T12:02:00Z',
+        schedule_open: true,
+        focused: true,
+        hid_active: true,
+      }),
+    ).toMatchObject({ status: 201 })
+
+    const payload = await request(
+      'GET',
+      `/api/edu/student/assignments/${linkedAssignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+
+    expect(payload.status).toBe(200)
+    expect(payload.body.linked_references).toEqual([
+      expect.objectContaining({
+        assignment_id: priorAssignment.body.id,
+        title: 'Test Suggestions',
+        available: true,
+        markdown: latestDraft,
+        word_count: 9,
+      }),
+    ])
   })
 
   it('allows creating assignments without an essay prompt', async () => {
@@ -2399,6 +2629,35 @@ describe('per-student assignment extensions', () => {
       ]),
     )
 
+    const feedbackRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'Please check my thesis.',
+      },
+    )
+    expect(feedbackRequest.status).toBe(201)
+    expect(feedbackRequest.body.student_feedback_request).toMatchObject({
+      student_name: 'Ada Lovelace',
+      note: 'Please check my thesis.',
+    })
+
+    const feedbackDashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(feedbackDashboard.status).toBe(200)
+    expect(feedbackDashboard.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback_requests: expect.objectContaining({
+            'ada lovelace': expect.objectContaining({ student_name: 'Ada Lovelace' }),
+          }),
+        }),
+      ]),
+    )
+
     const approvedUntil = '2026-04-28T18:30:00.000Z'
     const approvedAssignment = await request(
       'PUT',
@@ -2500,6 +2759,138 @@ describe('per-student assignment extensions', () => {
         }),
       ]),
     )
+  })
+
+  it('requires teacher approval before a student can rejoin after leaving a protected assignment', async () => {
+    const joinCode = `REJ${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Protected Rejoin',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const openUntil = '2099-01-01T23:59:59.000Z'
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Protected draft',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        assigned_students: ['Ada Lovelace'],
+        temporary_access_until: openUntil,
+        policy: {
+          require_lockdown: true,
+          require_permission_to_rejoin: true,
+        },
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const beforeLeave = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(beforeLeave.status).toBe(200)
+    expect(beforeLeave.body).toMatchObject({
+      schedule_open: true,
+      assignment: {
+        access_revoked: false,
+        policy: { require_permission_to_rejoin: true },
+      },
+    })
+
+    const close = await request(
+      'POST',
+      `/api/edu/student/assignments/${assignment.body.id}/close`,
+      {
+        join_code: joinCode,
+        student_name: 'Ada Lovelace',
+      },
+    )
+    expect(close.status).toBe(201)
+    expect(close.body).toMatchObject({
+      recorded: true,
+      access_revoked: true,
+      student_name: 'Ada Lovelace',
+    })
+
+    const blockedRejoin = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(blockedRejoin.status).toBe(200)
+    expect(blockedRejoin.body).toMatchObject({
+      schedule_open: false,
+      session_end_at: null,
+      assignment: {
+        access_revoked: true,
+        policy: { require_permission_to_rejoin: true },
+      },
+    })
+
+    const accessRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/access-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'I accidentally left Handtyped.',
+      },
+    )
+    expect(accessRequest.status).toBe(201)
+
+    const waitingForApproval = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(waitingForApproval.status).toBe(200)
+    expect(waitingForApproval.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          access_revoked: true,
+          student_access_request: expect.objectContaining({
+            student_name: 'Ada Lovelace',
+            note: 'I accidentally left Handtyped.',
+          }),
+        }),
+      ]),
+    )
+
+    const approved = await request(
+      'PUT',
+      `/api/edu/assignments/${assignment.body.id}`,
+      {
+        student_access_revoked: {},
+        student_access_requests: {},
+      },
+      { Cookie: login.cookie },
+    )
+    expect(approved.status).toBe(200)
+
+    const afterApproval = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(afterApproval.status).toBe(200)
+    expect(afterApproval.body).toMatchObject({
+      schedule_open: true,
+      assignment: {
+        access_revoked: false,
+        student_access_request: null,
+      },
+    })
   })
 
   it('surfaces per-student instant access revocation in student config', async () => {

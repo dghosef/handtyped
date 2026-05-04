@@ -134,6 +134,7 @@ async function publishLiveSession({
   focused = true,
   hidActive = true,
   replaySessionId = null,
+  extra = {},
 }) {
   return request('POST', '/api/edu/live-sessions', {
     id: liveSessionId,
@@ -154,6 +155,7 @@ async function publishLiveSession({
     focused,
     hid_active: hidActive,
     replay_session_id: replaySessionId,
+    ...extra,
   })
 }
 
@@ -450,6 +452,86 @@ describe('feature workflow matrix almost end-to-end', () => {
       expect(noOpPoll.body.events).toEqual([])
     })
   }
+
+  it('live replay tail checkpoint workflow reconstructs server current text without full draft uploads', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+    const code = joinCode('TAIL', 0)
+    const classroom = await createClassroom(login, 'Tail sync', code)
+    const assignment = await createAssignment(login, classroom, {
+      title: 'Tail sync draft',
+      assigned_students: ['Ada Lovelace'],
+    })
+    const liveSessionId = `tail-sync:${randomUUID()}`
+    const firstText = 'Hello'
+    const secondText = 'Hello world'
+
+    const checkpoint = await publishLiveSession({
+      liveSessionId,
+      assignment,
+      classroom,
+      currentText: '',
+      documentHistory: [],
+      minute: 1,
+      extra: {
+        current_text: undefined,
+        document_history: undefined,
+        current_text_checkpoint: firstText,
+        history_base_count: 0,
+        history_base_t: 0,
+        document_history_tail: [{ t: 100, pos: 0, del: '', ins: firstText }],
+      },
+    })
+    expect(checkpoint.status).toBe(201)
+    expect(checkpoint.body.current_text).toBe(firstText)
+    expect(checkpoint.body.accepted_history_count).toBe(1)
+    expect(checkpoint.body.latest_history_t).toBe(100)
+    expect(checkpoint.body.used_checkpoint).toBe(true)
+
+    const tail = await publishLiveSession({
+      liveSessionId,
+      assignment,
+      classroom,
+      currentText: '',
+      documentHistory: [],
+      minute: 2,
+      extra: {
+        current_text: undefined,
+        document_history: undefined,
+        history_base_count: 1,
+        history_base_t: 100,
+        document_history_tail: [{ t: 220, pos: firstText.length, del: '', ins: ' world' }],
+      },
+    })
+    expect(tail.status).toBe(201)
+    expect(tail.body.current_text).toBe(secondText)
+    expect(tail.body.document_history).toHaveLength(2)
+    expect(tail.body.accepted_history_count).toBe(2)
+    expect(tail.body.latest_history_t).toBe(220)
+
+    const stale = await publishLiveSession({
+      liveSessionId,
+      assignment,
+      classroom,
+      currentText: '',
+      documentHistory: [],
+      minute: 3,
+      extra: {
+        current_text: undefined,
+        document_history: undefined,
+        history_base_count: 0,
+        history_base_t: 0,
+        document_history_tail: [{ t: 340, pos: secondText.length, del: '', ins: '!' }],
+      },
+    })
+    expect(stale.status).toBe(409)
+    expect(stale.body).toMatchObject({
+      error: 'checkpoint_required',
+      accepted_history_count: 2,
+      latest_history_t: 220,
+      needs_checkpoint: true,
+    })
+  })
 
   const browserPolicyCases = Array.from({ length: 6 }, (_, index) => ({
     browserEnabled: index % 2 === 0,
@@ -1522,7 +1604,7 @@ describe('feature workflow matrix almost end-to-end', () => {
         expect(detail.body.assignment.browser_policy.home_url || '').toBe(updatedHome)
       } else {
         expect(typeof detail.body.assignment.browser_policy.home_url).toBe('string')
-        expect(detail.body.assignment.browser_policy.home_url).toBeTruthy()
+        expect(detail.body.assignment.browser_policy.home_url).toBe('')
       }
 
       const teacherLiveBeforeRepublish = await request(

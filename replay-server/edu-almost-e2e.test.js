@@ -2935,7 +2935,7 @@ describe('teacher almost end-to-end workflow', () => {
     })
     expect(afterStrip.body.assignment.browser_policy).toMatchObject({
       browser_enabled: false,
-      home_url: 'https://www.gutenberg.org',
+      home_url: '',
       mode: 'blacklist',
     })
     expect(afterStrip.body.assignment.browser_policy.blocked_domains || []).toEqual([])
@@ -5421,7 +5421,7 @@ describe('teacher almost end-to-end workflow', () => {
           require_permission_to_rejoin: false,
         },
         editor_policy: {
-          font_family: 'comic-sans',
+          font_family: 'totally-made-up-font',
           font_size: 18,
           line_height: 'single',
           font_locked: true,

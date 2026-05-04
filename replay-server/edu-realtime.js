@@ -62,6 +62,10 @@ export function buildStudentAssignmentGroupChannel({ tenantId, classroomId, assi
   ).trim()}`
 }
 
+export function buildStudentBootstrapChannel({ tenantId, classroomId }) {
+  return `student-bootstrap:${String(tenantId || '').trim()}:${String(classroomId || '').trim()}`
+}
+
 async function publishToRealtimeHub(env, { channels = [], event = 'message', payload = {} } = {}) {
   const normalizedChannels = parseChannels(channels)
   if (!env?.EDU_REALTIME || !normalizedChannels.length) {

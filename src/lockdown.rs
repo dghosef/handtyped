@@ -7,6 +7,16 @@ fn shared_application() -> *mut Object {
     unsafe { msg_send!(class!(NSApplication), sharedApplication) }
 }
 
+#[cfg(target_os = "macos")]
+fn reset_cursor_state() {
+    unsafe {
+        let cursor: *mut Object = msg_send!(class!(NSCursor), arrowCursor);
+        if !cursor.is_null() {
+            let _: () = msg_send!(cursor, set);
+        }
+    }
+}
+
 pub fn enter_lockdown_mode() {
     let nsapp: *mut Object = shared_application();
     if nsapp.is_null() {
@@ -32,12 +42,15 @@ pub fn enter_lockdown_mode() {
 pub fn exit_lockdown_mode() {
     let nsapp: *mut Object = shared_application();
     if nsapp.is_null() {
+        reset_cursor_state();
         return;
     }
 
     unsafe {
         let _: () = msg_send!(nsapp, setPresentationOptions: 0);
+        let _: () = msg_send!(nsapp, setWindowsNeedUpdate: true);
     }
+    reset_cursor_state();
 }
 
 pub fn is_in_lockdown_mode() -> bool {

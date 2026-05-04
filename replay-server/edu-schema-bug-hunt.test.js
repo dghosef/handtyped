@@ -6,6 +6,7 @@ import {
   buildLiveReplayHead,
   buildLiveSession,
   buildLiveSessionSummary,
+  mergeLiveSessionDraft,
 } from './edu-schema.js'
 
 describe('edu schema bug hunt', () => {
@@ -15,6 +16,7 @@ describe('edu schema bug hunt', () => {
       assigned_students: [' Ada Lovelace ', '', 'Ada Lovelace', 'Grace Hopper'],
       reference_documents: [
         { data_url: 'data:application/pdf;base64,AAAA', title: '  Reader  ' },
+        { data_url: 'data:application/pdf;charset=utf-8;base64,CCCC', title: 'Packet' },
         { data_url: 'data:text/plain;base64,BBBB', title: 'Bad ref' },
       ],
       student_overrides: {
@@ -33,6 +35,10 @@ describe('edu schema bug hunt', () => {
     expect(assignment.reference_documents).toEqual([
       expect.objectContaining({
         title: 'Reader',
+        mime_type: 'application/pdf',
+      }),
+      expect.objectContaining({
+        title: 'Packet',
         mime_type: 'application/pdf',
       }),
     ])
@@ -149,6 +155,102 @@ describe('edu schema bug hunt', () => {
     expect(replay.violations).toEqual([])
   })
 
+  it('mergeLiveSessionDraft appends matching tails and reconstructs current text', () => {
+    const merge = mergeLiveSessionDraft(
+      {
+        history_base_count: 1,
+        history_base_t: 100,
+        document_history_tail: [{ t: 220, pos: 5, del: '', ins: ' world' }],
+      },
+      {
+        current_text: 'Hello',
+        document_history: [{ t: 100, pos: 0, del: '', ins: 'Hello' }],
+      },
+    )
+
+    expect(merge.error).toBeUndefined()
+    expect(merge.session.current_text).toBe('Hello world')
+    expect(merge.session.document_history).toHaveLength(2)
+    expect(merge.ack).toMatchObject({
+      accepted_history_count: 2,
+      latest_history_t: 220,
+      needs_checkpoint: false,
+    })
+  })
+
+  it('mergeLiveSessionDraft preserves absolute wall-clock edit timestamps on tails', () => {
+    const merge = mergeLiveSessionDraft(
+      {
+        history_base_count: 1,
+        history_base_t: 100,
+        document_history_tail: [
+          { t: 220, pos: 5, del: '', ins: ' world', absolute_wall_ms: 1_700_000_000_220 },
+        ],
+      },
+      {
+        current_text: 'Hello',
+        document_history: [{ t: 100, pos: 0, del: '', ins: 'Hello' }],
+      },
+    )
+
+    expect(merge.error).toBeUndefined()
+    expect(merge.session.document_history[1]).toEqual({
+      t: 220,
+      pos: 5,
+      del: '',
+      ins: ' world',
+      absolute_wall_ms: 1_700_000_000_220,
+    })
+  })
+
+  it('mergeLiveSessionDraft rejects stale tails without a checkpoint', () => {
+    const merge = mergeLiveSessionDraft(
+      {
+        history_base_count: 0,
+        history_base_t: 0,
+        document_history_tail: [{ t: 220, pos: 5, del: '', ins: ' world' }],
+      },
+      {
+        current_text: 'Hello',
+        document_history: [{ t: 100, pos: 0, del: '', ins: 'Hello' }],
+      },
+    )
+
+    expect(merge.error.status).toBe(409)
+    expect(merge.error.body).toMatchObject({
+      error: 'checkpoint_required',
+      accepted_history_count: 1,
+      latest_history_t: 100,
+      needs_checkpoint: true,
+    })
+  })
+
+  it('mergeLiveSessionDraft accepts checkpoints and avoids duplicate stale tail entries', () => {
+    const merge = mergeLiveSessionDraft(
+      {
+        history_base_count: 0,
+        history_base_t: 0,
+        current_text_checkpoint: 'Hello world',
+        document_history_tail: [
+          { t: 100, pos: 0, del: '', ins: 'Hello' },
+          { t: 220, pos: 5, del: '', ins: ' world' },
+        ],
+      },
+      {
+        current_text: 'Hello',
+        document_history: [{ t: 100, pos: 0, del: '', ins: 'Hello' }],
+      },
+    )
+
+    expect(merge.error).toBeUndefined()
+    expect(merge.session.current_text).toBe('Hello world')
+    expect(merge.session.document_history).toEqual([
+      { t: 100, pos: 0, del: '', ins: 'Hello' },
+      { t: 220, pos: 5, del: '', ins: ' world' },
+    ])
+    expect(merge.ack.used_checkpoint).toBe(true)
+  })
+
   it('assignment defaults are stable even when browser and editor policy payloads are nonsense', () => {
     const assignment = buildAssignment({
       browser_policy: {
@@ -156,7 +258,7 @@ describe('edu schema bug hunt', () => {
         allowed_domains: 'example.org',
       },
       editor_policy: {
-        font_family: 'comic-sans',
+        font_family: 'totally-made-up-font',
         font_size: 1000,
         line_height: 'triple',
       },
@@ -164,8 +266,8 @@ describe('edu schema bug hunt', () => {
 
     expect(assignment.browser_policy).toMatchObject({
       browser_enabled: 'yes',
-      home_url: 'https://www.gutenberg.org',
-      allowed_domains: ['gutenberg.org'],
+      home_url: '',
+      allowed_domains: [],
     })
     expect(assignment.editor_policy).toMatchObject({
       font_family: 'arial',

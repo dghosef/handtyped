@@ -1,23 +1,21 @@
 import {
   applyLiveReplayUpdates,
-  aggregateRecentEditActivity,
   assignmentIsOpenNow,
   assignmentViewMeta,
-  buildAfterSchoolRanges,
   dashboardDeltaNeedsFullRefresh,
   deriveSessionRisk,
+  formatClockTime,
   formatWindowSummary,
   isSessionActive,
   localDateTimeInputValue,
-  nextLocalTimeAtOrAfter,
   reconcileTeacherNavigation,
-  replayLocalDateInputValue,
+  sessionPresenceTimestamp,
   sessionStatusLabel,
   sessionsForAssignment,
   sortSessionsForDisplay,
   timeAgoLabel,
   todayAtLocalTime,
-  todayAtLocalTimeIso,
+  wholeClassExtensionLabel,
 } from './app-ui.js'
 import { buildAttributedDocument, latestTextFromHistory } from '../replay-view.js'
 
@@ -39,8 +37,6 @@ let selectedAssignmentId = null
 let currentView = 'classes'
 let teacherSession = null
 let dashboardCursor = ''
-let sessionFilter = 'all'
-let sessionSearch = ''
 const pendingStudentAccessActions = new Map()
 const pendingAccessRequestApprovals = new Set()
 let assignmentStudentOverrideDrafts = []
@@ -65,6 +61,20 @@ let teacherRealtimeKey = ''
 let assignmentRealtimeKey = ''
 let replayRealtimeKey = ''
 let assignmentFormSubmitting = false
+let assignmentFormToastTimer = null
+let reviewDraftSurfaceHtml = ''
+
+const realtimeDebugState = {
+  teacher: 'idle',
+  assignment: 'idle',
+  replay: 'idle',
+  lastEventAt: 0,
+  lastEvent: '',
+  lastFallbackAt: 0,
+  lastFallback: '',
+  lastErrorAt: 0,
+  lastError: '',
+}
 
 const elements = {
   authPanel: document.getElementById('auth-panel'),
@@ -80,14 +90,14 @@ const elements = {
   assignmentStageMeta: document.getElementById('assignment-stage-meta'),
   assignmentGrid: document.getElementById('assignment-grid'),
   sessionGrid: document.getElementById('session-grid'),
-  sessionFilterBar: document.getElementById('session-filter-bar'),
-  sessionSearchInput: document.getElementById('session-search-input'),
+  assignmentMonitoringStatus: document.getElementById('assignment-monitoring-status'),
   newClassroomButton: document.getElementById('new-classroom-button'),
   deleteClassroomButton: document.getElementById('delete-classroom-button'),
   newAssignmentButton: document.getElementById('new-assignment-button'),
   editAssignmentButton: document.getElementById('edit-assignment-button'),
   deleteAssignmentButton: document.getElementById('delete-assignment-button'),
   quickExtendButton: document.getElementById('quick-extend-button'),
+  quickExtendDate: document.getElementById('quick-extend-date'),
   quickExtendTime: document.getElementById('quick-extend-time'),
   quickExtendStatus: document.getElementById('quick-extend-status'),
   classroomForm: document.getElementById('classroom-form'),
@@ -97,6 +107,9 @@ const elements = {
   assignmentModalTitle: document.getElementById('assignment-modal-title'),
   assignmentFormSubmit: document.getElementById('assignment-form-submit'),
   assignmentFormCancel: document.getElementById('assignment-form-cancel'),
+  assignmentFormToast: document.getElementById('assignment-form-toast'),
+  assignmentFormErrors: document.getElementById('assignment-form-errors'),
+  assignmentFormWarnings: document.getElementById('assignment-form-warnings'),
   assignmentAssignedOptions: document.getElementById('assignment-assigned-options'),
   assignmentStudentOverrideList: document.getElementById('assignment-student-override-list'),
   assignmentAddStudentOverride: document.getElementById('assignment-add-student-override'),
@@ -114,17 +127,8 @@ const elements = {
   feedbackForm: document.getElementById('feedback-form'),
   feedbackFormCancel: document.getElementById('feedback-form-cancel'),
   modalCloseButtons: document.querySelectorAll('[data-close-modal]'),
-  overviewStudents: document.getElementById('overview-students'),
-  overviewStudentsMeta: document.getElementById('overview-students-meta'),
-  overviewAttention: document.getElementById('overview-attention'),
-  overviewAttentionMeta: document.getElementById('overview-attention-meta'),
-  overviewUnfocused: document.getElementById('overview-unfocused'),
-  overviewUnfocusedMeta: document.getElementById('overview-unfocused-meta'),
-  overviewOffline: document.getElementById('overview-offline'),
-  overviewOfflineMeta: document.getElementById('overview-offline-meta'),
-  overviewEdits: document.getElementById('overview-edits'),
-  overviewEditsMeta: document.getElementById('overview-edits-meta'),
   accessRequestList: document.getElementById('access-request-list'),
+  feedbackRequestList: document.getElementById('feedback-request-list'),
   reviewWorkspace: document.getElementById('review-workspace'),
   reviewLayout: document.getElementById('review-layout'),
   reviewWorkspaceEmpty: document.getElementById('review-workspace-empty'),
@@ -132,6 +136,7 @@ const elements = {
   reviewWorkspaceTitle: document.getElementById('review-workspace-title'),
   reviewWorkspaceMeta: document.getElementById('review-workspace-meta'),
   reviewActivityStatus: document.getElementById('review-activity-status'),
+  reviewRealtimeDebug: document.getElementById('review-realtime-debug'),
   reviewSyncStatus: document.getElementById('review-sync-status'),
   reviewGradeLabel: document.getElementById('review-grade-label'),
   reviewGradeScore: document.getElementById('review-grade-score'),
@@ -139,14 +144,22 @@ const elements = {
   reviewRubricList: document.getElementById('review-rubric-list'),
   reviewTeacherComment: document.getElementById('review-teacher-comment'),
   reviewReturned: document.getElementById('review-returned'),
+  reviewPublishFeedback: document.getElementById('review-publish-feedback'),
   reviewDraftMeta: document.getElementById('review-draft-meta'),
   reviewDraftSurface: document.getElementById('review-draft-surface'),
   reviewSelectionCount: document.getElementById('review-selection-count'),
   reviewSelectionPanel: document.getElementById('review-selection-panel'),
   reviewSelectionQuote: document.getElementById('review-selection-quote'),
   reviewHighlightDate: document.getElementById('review-highlight-date'),
-  reviewHighlightAfterSchoolDay: document.getElementById('review-highlight-after-school-day'),
-  reviewHighlightAfterSchoolAll: document.getElementById('review-highlight-after-school-all'),
+  reviewHighlightDates: document.getElementById('review-highlight-dates'),
+  reviewHighlightStartTime: document.getElementById('review-highlight-start-time'),
+  reviewHighlightEndTime: document.getElementById('review-highlight-end-time'),
+  reviewHighlightWeekdays: [...document.querySelectorAll('input[name="review-highlight-weekday"]')],
+  reviewHighlightPresetWindow: document.getElementById('review-highlight-preset-window'),
+  reviewHighlightPresetAfterSchool: document.getElementById('review-highlight-preset-after-school'),
+  reviewHighlightPresetEvening: document.getElementById('review-highlight-preset-evening'),
+  reviewHighlightPresetWeekdays: document.getElementById('review-highlight-preset-weekdays'),
+  reviewHighlightAll: document.getElementById('review-highlight-all'),
   reviewHighlightClear: document.getElementById('review-highlight-clear'),
   reviewHighlightMeta: document.getElementById('review-highlight-meta'),
   reviewCommentMode: document.getElementById('review-comment-mode'),
@@ -178,6 +191,18 @@ const STUDENT_OVERRIDE_FONT_OPTIONS = [
   ['serif', 'Serif'],
   ['sans', 'Sans'],
   ['mono', 'Mono'],
+  ['georgia', 'Georgia'],
+  ['times', 'Times New Roman'],
+  ['garamond', 'Garamond'],
+  ['palatino', 'Palatino'],
+  ['baskerville', 'Baskerville'],
+  ['verdana', 'Verdana'],
+  ['trebuchet', 'Trebuchet'],
+  ['tahoma', 'Tahoma'],
+  ['helvetica', 'Helvetica'],
+  ['courier', 'Courier New'],
+  ['comic-sans', 'Comic Sans'],
+  ['lucida', 'Lucida Sans'],
 ]
 
 const STUDENT_OVERRIDE_FONT_SIZE_OPTIONS = Array.from({ length: 91 }, (_, index) => String(index + 10))
@@ -213,9 +238,10 @@ function escapeInlineHtml(value = '') {
 function renderStarterInlineMarkdown(value = '') {
   return escapeInlineHtml(value)
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>')
+    .replace(/\[u\]([\s\S]+?)\[\/u\]/g, '<u>$1</u>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/__([^_]+)__/g, '<u>$1</u>')
+    .replace(/__([\s\S]+?)__/g, '<u>$1</u>')
 }
 
 function starterMarkdownToHtml(markdown = '') {
@@ -300,6 +326,10 @@ function starterInlineHtmlToMarkdown(node) {
   }
   const tag = node.tagName.toLowerCase()
   const childText = Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('')
+  const textDecoration = typeof node.style?.textDecoration === 'string' ? node.style.textDecoration.toLowerCase() : ''
+  if ((tag === 'span' || tag === 'font') && textDecoration.includes('underline')) {
+    return `[u]${childText}[/u]`
+  }
   if (tag === 'strong' || tag === 'b') {
     return `**${childText}**`
   }
@@ -307,7 +337,7 @@ function starterInlineHtmlToMarkdown(node) {
     return `*${childText}*`
   }
   if (tag === 'u') {
-    return `__${childText}__`
+    return `[u]${childText}[/u]`
   }
   if (tag === 'a') {
     const href = node.getAttribute('href') || ''
@@ -317,6 +347,23 @@ function starterInlineHtmlToMarkdown(node) {
     return '\n'
   }
   return childText
+}
+
+function starterNodeContainsBlock(node) {
+  if (!(node instanceof Element)) {
+    return false
+  }
+  return Array.from(node.children).some((child) =>
+    ['P', 'DIV', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3'].includes(child.tagName),
+  )
+}
+
+function starterChildBlocksToMarkdown(node) {
+  return Array.from(node.childNodes)
+    .map((child) => starterBlockHtmlToMarkdown(child))
+    .filter(Boolean)
+    .join('\n\n')
+    .trim()
 }
 
 function starterBlockHtmlToMarkdown(node) {
@@ -346,6 +393,15 @@ function starterBlockHtmlToMarkdown(node) {
       )
       .join('\n')
   }
+  if (tag === 'div') {
+    if (!node.textContent.trim() && !node.querySelector('br')) {
+      return ''
+    }
+    if (starterNodeContainsBlock(node)) {
+      return starterChildBlocksToMarkdown(node)
+    }
+    return Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()
+  }
   if (tag === 'ul') {
     return Array.from(node.children)
       .filter((child) => child.tagName?.toLowerCase() === 'li')
@@ -357,6 +413,19 @@ function starterBlockHtmlToMarkdown(node) {
       .filter((child) => child.tagName?.toLowerCase() === 'li')
       .map((child, index) => `${index + 1}. ${Array.from(child.childNodes).map((nested) => starterInlineHtmlToMarkdown(nested)).join('').trim()}`)
       .join('\n')
+  }
+  if (tag === 'li') {
+    if (starterNodeContainsBlock(node)) {
+      return Array.from(node.childNodes)
+        .map((child) => starterInlineHtmlToMarkdown(child))
+        .join('')
+        .replace(/\n+/g, ' ')
+        .trim()
+    }
+    return Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()
+  }
+  if (['strong', 'b', 'em', 'i', 'u', 'span', 'font', 'a', 'br'].includes(tag)) {
+    return starterInlineHtmlToMarkdown(node).trim()
   }
   return Array.from(node.childNodes).map((child) => starterInlineHtmlToMarkdown(child)).join('').trim()
 }
@@ -380,6 +449,78 @@ function setStarterDocumentMarkdown(markdown = '') {
   }
   elements.starterDocumentField.value = String(markdown || '')
   elements.starterDocumentEditor.innerHTML = starterMarkdownToHtml(markdown)
+  updateStarterDocumentToolbarState()
+}
+
+function starterDocumentSelectionInsideEditor() {
+  if (!elements.starterDocumentEditor) {
+    return false
+  }
+  const selection = window.getSelection()
+  if (!selection || !selection.rangeCount) {
+    return false
+  }
+  const anchorNode = selection.anchorNode
+  if (!anchorNode) {
+    return false
+  }
+  const anchorElement = anchorNode.nodeType === Node.ELEMENT_NODE ? anchorNode : anchorNode.parentElement
+  return anchorElement ? elements.starterDocumentEditor.contains(anchorElement) : false
+}
+
+function starterDocumentActiveBlockTag() {
+  if (!starterDocumentSelectionInsideEditor()) {
+    return ''
+  }
+  const selection = window.getSelection()
+  const anchorNode = selection?.anchorNode
+  const anchorElement = anchorNode?.nodeType === Node.ELEMENT_NODE ? anchorNode : anchorNode?.parentElement
+  const blockElement = anchorElement?.closest?.('h1, h2, blockquote, li, p, div')
+  if (!blockElement) {
+    return ''
+  }
+  const tag = blockElement.tagName.toLowerCase()
+  if (tag === 'li') {
+    return blockElement.closest('ol') ? 'ol' : 'ul'
+  }
+  return tag
+}
+
+function starterDocumentCommandIsActive(command) {
+  if (!starterDocumentSelectionInsideEditor()) {
+    return false
+  }
+  try {
+    switch (command) {
+      case 'bold':
+        return document.queryCommandState('bold')
+      case 'italic':
+        return document.queryCommandState('italic')
+      case 'underline':
+        return document.queryCommandState('underline')
+      case 'bullet':
+        return document.queryCommandState('insertUnorderedList') || starterDocumentActiveBlockTag() === 'ul'
+      case 'number':
+        return document.queryCommandState('insertOrderedList') || starterDocumentActiveBlockTag() === 'ol'
+      case 'quote':
+        return starterDocumentActiveBlockTag() === 'blockquote'
+      case 'h1':
+        return starterDocumentActiveBlockTag() === 'h1'
+      case 'h2':
+        return starterDocumentActiveBlockTag() === 'h2'
+      default:
+        return false
+    }
+  } catch {
+    return false
+  }
+}
+
+function updateStarterDocumentToolbarState() {
+  elements.starterDocumentToolbar?.querySelectorAll('[data-starter-command]').forEach((button) => {
+    const isActive = starterDocumentCommandIsActive(button.dataset.starterCommand)
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false')
+  })
 }
 
 function execStarterDocumentCommand(command) {
@@ -420,6 +561,7 @@ function execStarterDocumentCommand(command) {
       return
   }
   syncStarterDocumentField()
+  updateStarterDocumentToolbarState()
 }
 
 function referenceDocumentLabel(document) {
@@ -431,6 +573,16 @@ function referenceDocumentLabel(document) {
     return `${(size / (1024 * 1024)).toFixed(1)} MB PDF`
   }
   return `${Math.max(1, Math.round(size / 1024))} KB PDF`
+}
+
+function normalizeReferencePdfDataUrl(dataUrl) {
+  const value = String(dataUrl || '').trim()
+  const commaIndex = value.indexOf(',')
+  if (commaIndex < 0 || !/^data:[^,]*;base64,/i.test(value)) {
+    return value
+  }
+  const payload = value.slice(commaIndex + 1)
+  return `data:application/pdf;base64,${payload}`
 }
 
 function renderReferenceDocumentList(documents = assignmentReferenceDocuments) {
@@ -477,7 +629,7 @@ async function readReferencePdfFile(file) {
         id: `refdoc-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`,
         title: String(file.name || 'Reference PDF').replace(/\.pdf$/i, '') || 'Reference PDF',
         mime_type: 'application/pdf',
-        data_url: typeof reader.result === 'string' ? reader.result : '',
+        data_url: normalizeReferencePdfDataUrl(reader.result),
         size_bytes: file.size || 0,
       })
     reader.readAsDataURL(file)
@@ -497,9 +649,12 @@ async function handleReferenceDocumentUpload(fileList) {
 }
 
 function buildReviewReplayCacheEntry(replay) {
+  const documentHistory = annotateReplayHistoryWithEventTimes(replay)
+  const hasReliableOrigin = replayOriginWallMs(replay) != null
   const attributedDocument = buildAttributedDocument({
     ...replay,
-    doc_history: replay.document_history || [],
+    ...(hasReliableOrigin ? {} : { created_at: '' }),
+    doc_history: documentHistory,
     doc_text: replay.current_text || '',
   }) || {
     text: String(replay?.current_text || ''),
@@ -511,6 +666,115 @@ function buildReviewReplayCacheEntry(replay) {
     replay,
     attributedDocument,
   }
+}
+
+function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
+  const sessionHistory = Array.isArray(session?.document_history) ? session.document_history : []
+  if (!sessionHistory.length) {
+    return replay
+  }
+  const replayHistory = Array.isArray(replay?.document_history) ? replay.document_history : []
+  const sessionText = String(session?.current_text || '')
+  const replayText = String(replay?.current_text || '')
+  const sessionHasNewerHistory = sessionHistory.length > replayHistory.length
+  const sessionHasMatchingNewerText = sessionText && sessionText !== replayText && sessionHistory.length >= replayHistory.length
+  if (!sessionHasNewerHistory && !sessionHasMatchingNewerText) {
+    return replay
+  }
+  return {
+    ...replay,
+    current_text: sessionText || replayText,
+    document_history: sessionHistory,
+    focus_events: Array.isArray(session?.focus_events) ? session.focus_events : replay?.focus_events,
+    url_history: Array.isArray(session?.url_history) ? session.url_history : replay?.url_history,
+    last_activity_at: session?.last_activity_at || replay?.last_activity_at,
+    updated_at: session?.updated_at || replay?.updated_at,
+  }
+}
+
+function annotateReplayHistoryWithEventTimes(replay = {}) {
+  const history = (Array.isArray(replay.document_history) ? replay.document_history : []).map((entry) => ({ ...entry }))
+  const hasReplayOrigin = replayOriginWallMs(replay) != null
+  const events = (Array.isArray(replay.events) ? replay.events : [])
+    .slice()
+    .sort((left, right) => Number(left?.seq || 0) - Number(right?.seq || 0))
+  let cursor = 0
+  for (const event of events) {
+    const tail = Array.isArray(event?.document_history_tail) ? event.document_history_tail : []
+    const anchorWallMs = Date.parse(
+      hasReplayOrigin
+        ? event?.last_activity_at || ''
+        : event?.last_activity_at || event?.updated_at || event?.created_at || '',
+    )
+    const tailTimes = tail
+      .map((entry) => Number(entry?.t))
+      .filter((value) => Number.isFinite(value))
+    if (!Number.isFinite(anchorWallMs) || !tail.length) {
+      continue
+    }
+    const maxTailTime = tailTimes.length ? Math.max(...tailTimes) : 0
+    const eventOriginWallMs = anchorWallMs - maxTailTime
+    for (const tailEntry of tail) {
+      const matchIndex = history.findIndex((entry, index) => index >= cursor && historyEntriesMatch(entry, tailEntry))
+      if (matchIndex < 0) {
+        continue
+      }
+      const existingWallMs = Number(history[matchIndex]?.absolute_wall_ms ?? tailEntry?.absolute_wall_ms)
+      if (Number.isFinite(existingWallMs) && existingWallMs > 0) {
+        history[matchIndex] = {
+          ...history[matchIndex],
+          absolute_wall_ms: existingWallMs,
+        }
+        cursor = matchIndex + 1
+        continue
+      }
+      const entryTime = Number(tailEntry?.t)
+      history[matchIndex] = {
+        ...history[matchIndex],
+        absolute_wall_ms: eventOriginWallMs + (Number.isFinite(entryTime) ? entryTime : maxTailTime),
+      }
+      cursor = matchIndex + 1
+    }
+  }
+  const anchorWallMs = Date.parse(hasReplayOrigin ? replay?.last_activity_at || '' : replay?.last_activity_at || replay?.updated_at || '')
+  const historyTimes = history
+    .map((entry) => Number(entry?.t))
+    .filter((value) => Number.isFinite(value))
+  if (Number.isFinite(anchorWallMs) && historyTimes.length) {
+    const replayOrigin = anchorWallMs - Math.max(...historyTimes)
+    return history.map((entry) => {
+      if (Number.isFinite(Number(entry?.absolute_wall_ms))) {
+        return entry
+      }
+      const entryTime = Number(entry?.t)
+      return {
+        ...entry,
+        absolute_wall_ms: replayOrigin + (Number.isFinite(entryTime) ? entryTime : 0),
+      }
+    })
+  }
+  return history
+}
+
+function replayOriginWallMs(replay = {}) {
+  const explicitOrigin = Number(replay?.replay_origin_wall_ms)
+  if (Number.isFinite(explicitOrigin) && explicitOrigin > 0) {
+    return explicitOrigin
+  }
+  const startWallNs = Number(replay?.start_wall_ns)
+  if (Number.isFinite(startWallNs) && startWallNs > 0) {
+    return Math.floor(startWallNs / 1e6)
+  }
+  return null
+}
+
+function historyEntriesMatch(left = {}, right = {}) {
+  return (
+    String(left.ins ?? '') === String(right.ins ?? '') &&
+    String(left.del ?? '') === String(right.del ?? '') &&
+    Number(left.pos ?? 0) === Number(right.pos ?? 0) &&
+    Number(left.t ?? 0) === Number(right.t ?? 0)
+  )
 }
 
 function reviewSessionHasAccess(session, assignment = getSelectedAssignment()) {
@@ -557,7 +821,126 @@ function closeRealtimeConnection(connection) {
   }
 }
 
-function openRealtimeConnection(channels, handlers = {}) {
+function realtimeAgo(value) {
+  if (!value) {
+    return 'never'
+  }
+  const seconds = Math.max(0, Math.round((Date.now() - value) / 1000))
+  return `${seconds}s ago`
+}
+
+function renderRealtimeDebug() {
+  if (!elements.reviewRealtimeDebug) {
+    renderAssignmentMonitoringStatus()
+    return
+  }
+  elements.reviewRealtimeDebug.textContent = [
+    'TODO remove later:',
+    `SSE teacher=${realtimeDebugState.teacher}`,
+    `assignment=${realtimeDebugState.assignment}`,
+    `replay=${realtimeDebugState.replay}`,
+    `event=${realtimeDebugState.lastEvent || 'none'} ${realtimeAgo(realtimeDebugState.lastEventAt)}`,
+    `fallback=${realtimeDebugState.lastFallback || 'none'} ${realtimeAgo(realtimeDebugState.lastFallbackAt)}`,
+    realtimeDebugState.lastError ? `error=${realtimeDebugState.lastError} ${realtimeAgo(realtimeDebugState.lastErrorAt)}` : 'error=none',
+  ].join(' | ')
+  renderAssignmentMonitoringStatus()
+}
+
+function assignmentMonitoringPathStatus() {
+  if (!selectedAssignmentId || currentView !== 'assignment') {
+    return {
+      label: 'Monitoring: waiting for assignment',
+      tone: 'idle',
+    }
+  }
+  const lastAssignmentRealtimeAt =
+    realtimeDebugState.lastEvent?.startsWith('assignment:')
+      ? realtimeDebugState.lastEventAt
+      : 0
+  const lastAssignmentFallbackAt =
+    realtimeDebugState.lastFallback === 'assignment-view'
+      ? realtimeDebugState.lastFallbackAt
+      : 0
+  const lastAssignmentErrorAt =
+    realtimeDebugState.lastError?.startsWith('assignment')
+      ? realtimeDebugState.lastErrorAt
+      : 0
+
+  if (lastAssignmentRealtimeAt > 0 && lastAssignmentRealtimeAt >= lastAssignmentErrorAt) {
+    return {
+      label: `Monitoring: realtime updates active ${realtimeAgo(lastAssignmentRealtimeAt)}`,
+      tone: 'realtime',
+    }
+  }
+  if (
+    (realtimeDebugState.assignment === 'ready' ||
+      realtimeDebugState.assignment === 'connecting' ||
+      realtimeDebugState.assignment === 'event') &&
+    lastAssignmentErrorAt <= lastAssignmentFallbackAt
+  ) {
+    return {
+      label: `Monitoring: realtime ${realtimeDebugState.assignment}`,
+      tone: 'realtime',
+    }
+  }
+  if (lastAssignmentFallbackAt > lastAssignmentRealtimeAt) {
+    return {
+      label: `Monitoring: fallback refresh used ${realtimeAgo(lastAssignmentFallbackAt)}`,
+      tone: 'fallback',
+    }
+  }
+  if (realtimeDebugState.assignment === 'ready' || realtimeDebugState.assignment === 'connecting') {
+    return {
+      label: `Monitoring: realtime ${realtimeDebugState.assignment}`,
+      tone: 'realtime',
+    }
+  }
+  if (realtimeDebugState.assignment === 'error') {
+    return {
+      label: 'Monitoring: realtime error, waiting for fallback',
+      tone: 'fallback',
+    }
+  }
+  return {
+    label: 'Monitoring: waiting for updates',
+    tone: 'idle',
+  }
+}
+
+function renderAssignmentMonitoringStatus() {
+  if (!elements.assignmentMonitoringStatus) {
+    return
+  }
+  const status = assignmentMonitoringPathStatus()
+  elements.assignmentMonitoringStatus.textContent = status.label
+  elements.assignmentMonitoringStatus.dataset.tone = status.tone
+}
+
+function markRealtimeStatus(label, status, detail = '') {
+  if (!label) {
+    return
+  }
+  realtimeDebugState[label] = status
+  if (status === 'error') {
+    realtimeDebugState.lastErrorAt = Date.now()
+    realtimeDebugState.lastError = `${label}${detail ? `:${detail}` : ''}`
+  }
+  renderRealtimeDebug()
+}
+
+function markRealtimeEvent(label, eventName) {
+  realtimeDebugState.lastEventAt = Date.now()
+  realtimeDebugState.lastEvent = `${label}:${eventName}`
+  markRealtimeStatus(label, 'event')
+}
+
+function markFallbackRefresh(name) {
+  realtimeDebugState.lastFallbackAt = Date.now()
+  realtimeDebugState.lastFallback = name
+  renderRealtimeDebug()
+}
+
+function openRealtimeConnection(channels, handlers = {}, label = 'teacher') {
   const selectedChannels = (channels || []).filter(Boolean)
   if (!selectedChannels.length) {
     return null
@@ -567,19 +950,56 @@ function openRealtimeConnection(channels, handlers = {}) {
     url.searchParams.append('channel', channel)
   }
   const source = new EventSource(url)
+  markRealtimeStatus(label, 'connecting')
+  source.addEventListener('ready', () => {
+    markRealtimeStatus(label, 'ready')
+    handlers.ready?.()
+  })
   source.addEventListener('dashboard', (event) => {
+    markRealtimeEvent(label, 'dashboard')
     handlers.dashboard?.(JSON.parse(event.data))
   })
   source.addEventListener('assignment', (event) => {
+    markRealtimeEvent(label, 'assignment')
     handlers.assignment?.(JSON.parse(event.data))
   })
+  source.addEventListener('access-request', (event) => {
+    markRealtimeEvent(label, 'access-request')
+    handlers.accessRequest?.(JSON.parse(event.data))
+  })
   source.addEventListener('replay', (event) => {
+    markRealtimeEvent(label, 'replay')
     handlers.replay?.(JSON.parse(event.data))
   })
   source.onerror = () => {
+    markRealtimeStatus(label, 'error')
     handlers.error?.()
   }
   return source
+}
+
+function resetRealtimeConnection(label) {
+  if (label === 'teacher') {
+    closeRealtimeConnection(teacherRealtime)
+    teacherRealtime = null
+    teacherRealtimeKey = ''
+  } else if (label === 'assignment') {
+    closeRealtimeConnection(assignmentRealtime)
+    assignmentRealtime = null
+    assignmentRealtimeKey = ''
+  } else if (label === 'replay') {
+    closeRealtimeConnection(replayRealtime)
+    replayRealtime = null
+    replayRealtimeKey = ''
+  }
+}
+
+function retryRealtimeConnection(label, fallback) {
+  fallback?.()
+  window.setTimeout(() => {
+    resetRealtimeConnection(label)
+    syncRealtimeSubscriptions()
+  }, 250)
 }
 
 function escapeHtml(value) {
@@ -645,7 +1065,9 @@ function mergeReplayIntoSessionState(sessionId, replayPayload) {
   }
   const nextSession = {
     ...(existing || selectedReviewSessionSnapshot || {}),
-    current_text: String(replayPayload.current_text || ''),
+    current_text: Object.hasOwn(replayPayload, 'current_text')
+      ? String(replayPayload.current_text || '')
+      : String(existing?.current_text || selectedReviewSessionSnapshot?.current_text || ''),
     current_url: replayPayload.current_url ?? existing?.current_url ?? selectedReviewSessionSnapshot?.current_url ?? null,
     current_url_title:
       replayPayload.current_url_title ??
@@ -666,14 +1088,11 @@ function mergeReplayIntoSessionState(sessionId, replayPayload) {
 
   dashboardState = {
     ...dashboardState,
-    live_sessions: mergeById(getLiveSessions(), [nextSession]),
+    live_sessions: mergeLiveSessions(getLiveSessions(), [nextSession]),
   }
 
   if (selectedReviewSessionSnapshot?.id === sessionId) {
-    selectedReviewSessionSnapshot = {
-      ...selectedReviewSessionSnapshot,
-      ...nextSession,
-    }
+    selectedReviewSessionSnapshot = mergeLiveSession(selectedReviewSessionSnapshot, nextSession)
   }
 }
 
@@ -685,15 +1104,54 @@ function syncSelectedReviewSessionSnapshot(session = currentReviewSession()) {
 }
 
 function sessionFreshnessValue(session) {
-  const updatedAt = Date.parse(String(session?.updated_at || ''))
-  if (Number.isFinite(updatedAt)) {
-    return updatedAt
+  return sessionPresenceTimestamp(session) || 0
+}
+
+function liveSessionText(session) {
+  return Object.hasOwn(session || {}, 'current_text') ? String(session.current_text || '') : null
+}
+
+function mergeLiveSession(existing, incoming) {
+  if (!existing) {
+    return incoming
   }
-  const lastActivityAt = Date.parse(String(session?.last_activity_at || ''))
-  if (Number.isFinite(lastActivityAt)) {
-    return lastActivityAt
+  if (!incoming) {
+    return existing
   }
-  return 0
+
+  const existingFreshness = sessionFreshnessValue(existing)
+  const incomingFreshness = sessionFreshnessValue(incoming)
+  if (incomingFreshness < existingFreshness) {
+    return existing
+  }
+
+  const merged = {
+    ...existing,
+    ...incoming,
+  }
+  const existingText = liveSessionText(existing)
+  const incomingText = liveSessionText(incoming)
+  const freshnessDeltaMs = Math.abs(incomingFreshness - existingFreshness)
+  if (incomingText === null && existingText !== null) {
+    merged.current_text = existingText
+  } else if (
+    existingText !== null &&
+    incomingText !== null &&
+    incomingText.length < existingText.length &&
+    existingText.startsWith(incomingText) &&
+    freshnessDeltaMs <= 3000
+  ) {
+    merged.current_text = existingText
+  }
+  return merged
+}
+
+function mergeLiveSessions(previous, incoming) {
+  const map = new Map((previous || []).map((item) => [item.id, item]))
+  for (const item of incoming || []) {
+    map.set(item.id, mergeLiveSession(map.get(item.id), item))
+  }
+  return [...map.values()]
 }
 
 function preferFresherSession(existing, incoming) {
@@ -703,7 +1161,7 @@ function preferFresherSession(existing, incoming) {
   if (!incoming) {
     return existing
   }
-  return sessionFreshnessValue(existing) >= sessionFreshnessValue(incoming) ? existing : incoming
+  return mergeLiveSession(existing, incoming)
 }
 
 function preserveSelectedReviewSessionInSummaries(summaries = []) {
@@ -712,7 +1170,7 @@ function preserveSelectedReviewSessionInSummaries(summaries = []) {
     return summaries
   }
   const incomingSelected = summaries.find((session) => session.id === selectedReviewSessionId) || null
-  return mergeById(summaries, [preferFresherSession(selectedSession, incomingSelected)])
+  return mergeLiveSessions(summaries, [preferFresherSession(selectedSession, incomingSelected)])
 }
 
 function preserveSelectedReviewSessionInDashboardPayload(payload) {
@@ -726,23 +1184,34 @@ function preserveSelectedReviewSessionInDashboardPayload(payload) {
   const incomingSelected = payload.live_sessions.find((session) => session.id === selectedReviewSessionId) || null
   return {
     ...payload,
-    live_sessions: mergeById(payload.live_sessions, [preferFresherSession(selectedSession, incomingSelected)]),
+    live_sessions: mergeLiveSessions(payload.live_sessions, [preferFresherSession(selectedSession, incomingSelected)]),
   }
 }
 
 function displaySessionText(session, replayData = null) {
   const direct = String(session?.current_text || '')
-  if (direct) {
-    return direct
-  }
   const replayText = String(replayData?.attributedDocument?.text || '')
-  if (replayText) {
-    return replayText
-  }
-  return latestTextFromHistory({
+  const historyText = latestTextFromHistory({
     doc_history: Array.isArray(session?.document_history) ? session.document_history : [],
     doc_text: '',
   })
+  if (direct) {
+    return textWithPreservedParagraphSpacing(direct, replayText || historyText)
+  }
+  return replayText || historyText
+}
+
+function textWithPreservedParagraphSpacing(direct, spacedCandidate) {
+  const raw = String(direct || '')
+  const candidate = String(spacedCandidate || '')
+  if (!raw || !candidate || raw.includes('\n\n') || !candidate.includes('\n\n')) {
+    return raw
+  }
+  return collapseParagraphSpacing(candidate) === raw ? candidate : raw
+}
+
+function collapseParagraphSpacing(text) {
+  return String(text || '').replace(/\n{2,}/g, '\n')
 }
 
 function normalizedInlineAnnotation(annotation = {}) {
@@ -764,7 +1233,32 @@ function normalizedInlineAnnotation(annotation = {}) {
     context_after: String(annotation.context_after || '').slice(0, COMMENT_CONTEXT_WINDOW),
     created_at: annotation.created_at || new Date().toISOString(),
     updated_at: annotation.updated_at || annotation.created_at || new Date().toISOString(),
+    resolved_by_student: Boolean(annotation.resolved_by_student),
+    resolved_at: annotation.resolved_at || null,
+    resolved_by: annotation.resolved_by || '',
   }
+}
+
+function visibleReviewAnnotations(annotations = []) {
+  return (annotations || []).filter((annotation) => !annotation?.resolved_by_student)
+}
+
+function syncReviewResolvedAnnotationsFromSession(session = currentReviewSession()) {
+  if (!reviewState || !session?.grading?.inline_annotations?.length) {
+    return
+  }
+  const resolvedById = new Map(
+    session.grading.inline_annotations
+      .filter((annotation) => annotation?.resolved_by_student)
+      .map((annotation) => [String(annotation.id || ''), annotation]),
+  )
+  if (!resolvedById.size) {
+    return
+  }
+  reviewState.inlineAnnotations = reviewState.inlineAnnotations.map((annotation) => {
+    const resolved = resolvedById.get(String(annotation.id || ''))
+    return resolved ? { ...annotation, ...resolved, resolved_by_student: true } : annotation
+  })
 }
 
 function normalizedSessionGrading(session = {}) {
@@ -784,9 +1278,45 @@ function normalizedSessionGrading(session = {}) {
         : String(grading.grade_score),
     inline_annotations: inlineAnnotations,
     updated_at: grading.updated_at || null,
+    feedback_status: grading.feedback_status === 'draft' ? 'draft' : 'published',
+    published_at: grading.published_at || null,
     actor_name: grading.actor_name || '',
     actor_email: grading.actor_email || '',
   }
+}
+
+function rubricKeyAliases(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized) return []
+  return [
+    normalized,
+    normalized.replace(/[\s:_-]+/g, ''),
+    normalized.replace(/_/g, ':'),
+    normalized.replace(/:/g, '_'),
+  ].filter((alias, index, aliases) => alias && aliases.indexOf(alias) === index)
+}
+
+function normalizedRubricScoresForAssignment(scores = {}, assignment = null) {
+  const rubric = Array.isArray(assignment?.rubric) ? assignment.rubric : []
+  if (!rubric.length || !scores || typeof scores !== 'object') {
+    return scores && typeof scores === 'object' ? { ...scores } : {}
+  }
+  const incoming = new Map()
+  for (const [key, value] of Object.entries(scores)) {
+    for (const alias of rubricKeyAliases(key)) {
+      if (!incoming.has(alias)) incoming.set(alias, value)
+    }
+  }
+  const normalized = {}
+  for (const criterion of rubric) {
+    const score = rubricKeyAliases(criterion.id || criterion.title)
+      .map((alias) => incoming.get(alias))
+      .find((value) => value !== undefined)
+    if (score !== undefined) {
+      normalized[criterion.id] = Number(score || 0)
+    }
+  }
+  return normalized
 }
 
 function reviewSummaryForSession(session, assignment) {
@@ -798,24 +1328,28 @@ function reviewSummaryForSession(session, assignment) {
     grading,
     earnedPoints,
     totalPoints,
-    annotationCount: grading.inline_annotations.length,
+    annotationCount: visibleReviewAnnotations(grading.inline_annotations).length,
   }
 }
 
 function createReviewStateFromSession(session) {
   const grading = normalizedSessionGrading(session)
+  const assignment = getSelectedAssignment()
   return {
     sessionId: session.id,
     gradeLabel: grading.grade_label,
     gradeScore: grading.grade_score,
-    rubricScores: { ...grading.rubric_scores },
+    rubricScores: normalizedRubricScoresForAssignment(grading.rubric_scores, assignment),
     teacherComment: grading.teacher_comment,
     returnedForRevision: grading.returned_for_revision,
     inlineAnnotations: grading.inline_annotations,
     updatedAt: grading.updated_at,
+    feedbackStatus: grading.feedback_status,
+    publishedAt: grading.published_at,
     updatedBy: grading.actor_name || grading.actor_email || '',
     saveState: grading.updated_at ? 'saved' : 'idle',
     dirty: false,
+    deletedAnnotationIds: [],
     selection: null,
     composerMode: '',
     composerNote: '',
@@ -824,6 +1358,10 @@ function createReviewStateFromSession(session) {
     replayData: null,
     highlightMode: 'none',
     highlightDate: '',
+    highlightDates: '',
+    highlightStartTime: '',
+    highlightEndTime: '',
+    highlightWeekdays: [],
   }
 }
 
@@ -841,7 +1379,7 @@ function getSelectedAssignment() {
 }
 
 function tenantId() {
-  return dashboardState?.summary?.tenant_id || 'tenant_demo'
+  return dashboardState?.summary?.tenant_id || teacherSession?.tenant_id || 'default'
 }
 
 function dashboardChannel() {
@@ -915,8 +1453,6 @@ function createStudentOverrideDraft(input = {}) {
       font_locked: input.editor_policy?.font_locked || 'default',
     },
     browser_policy: {
-      home_url_enabled: Boolean(input.browser_policy?.home_url_enabled),
-      home_url: String(input.browser_policy?.home_url || ''),
       mode: input.browser_policy?.mode === 'blacklist' ? 'blacklist' : 'whitelist',
       allowed_domains_enabled: Boolean(input.browser_policy?.allowed_domains_enabled),
       allowed_domains: String(input.browser_policy?.allowed_domains || ''),
@@ -959,8 +1495,6 @@ function currentStudentOverrideDrafts() {
         font_locked: card.querySelector('[data-override-editor="font_locked"]')?.value,
       },
       browser_policy: {
-        home_url_enabled: card.querySelector('[data-override-home-enabled]')?.checked,
-        home_url: card.querySelector('[data-override-home-value]')?.value || '',
         mode: card.querySelector('[data-override-browser-mode]')?.value || 'whitelist',
         allowed_domains_enabled: card.querySelector('[data-override-domains-enabled]')?.checked,
         allowed_domains: card.querySelector('[data-override-domains-value]')?.value || '',
@@ -1091,20 +1625,6 @@ function renderStudentOverrideCards(drafts = assignmentStudentOverrideDrafts) {
         </div>
         <div class="student-override-grid">
           <label class="student-override-check">
-            <input type="checkbox" data-override-home-enabled ${draft.browser_policy.home_url_enabled ? 'checked' : ''} />
-            <span>Override browser home URL</span>
-          </label>
-          <label>
-            <span>Home URL</span>
-            <input
-              type="url"
-              data-override-home-value
-              ${draft.browser_policy.home_url_enabled ? '' : 'disabled'}
-              placeholder="https://example.com"
-              value="${escapeHtml(draft.browser_policy.home_url)}"
-            />
-          </label>
-          <label class="student-override-check">
             <input type="checkbox" data-override-domains-enabled ${draft.browser_policy.allowed_domains_enabled ? 'checked' : ''} />
             <span>Override allowed domains</span>
           </label>
@@ -1142,16 +1662,6 @@ function renderStudentOverrideCards(drafts = assignmentStudentOverrideDrafts) {
     checkbox.addEventListener('change', () => {
       const card = checkbox.closest('[data-student-override-id]')
       const input = card?.querySelector('[data-override-temp-value]')
-      if (input) {
-        input.disabled = !checkbox.checked
-      }
-    })
-  })
-
-  elements.assignmentStudentOverrideList.querySelectorAll('[data-override-home-enabled]').forEach((checkbox) => {
-    checkbox.addEventListener('change', () => {
-      const card = checkbox.closest('[data-student-override-id]')
-      const input = card?.querySelector('[data-override-home-value]')
       if (input) {
         input.disabled = !checkbox.checked
       }
@@ -1214,9 +1724,6 @@ function selectedStudentOverridesFromForm() {
     if (draft.policy.browser_enabled !== 'default') {
       browserPolicy.browser_enabled = draft.policy.browser_enabled === 'true'
     }
-    if (draft.browser_policy.home_url_enabled) {
-      browserPolicy.home_url = draft.browser_policy.home_url
-    }
     if (draft.browser_policy.allowed_domains_enabled) {
       browserPolicy.mode = draft.browser_policy.mode === 'blacklist' ? 'blacklist' : 'whitelist'
       browserPolicy.allowed_domains = draft.browser_policy.allowed_domains
@@ -1271,8 +1778,6 @@ function draftsFromAssignmentStudentOverrides(assignment) {
         font_locked: boolOverrideValue(settings.editor_policy?.font_locked),
       },
       browser_policy: {
-        home_url_enabled: Object.hasOwn(settings.browser_policy || {}, 'home_url'),
-        home_url: settings.browser_policy?.home_url || '',
         mode: settings.browser_policy?.mode === 'blacklist' ? 'blacklist' : 'whitelist',
         allowed_domains_enabled: Object.hasOwn(settings.browser_policy || {}, 'allowed_domains'),
         allowed_domains: Array.isArray(settings.browser_policy?.allowed_domains)
@@ -1284,10 +1789,13 @@ function draftsFromAssignmentStudentOverrides(assignment) {
 }
 
 function parseTimeParts(value, fallbackHour, fallbackMinute) {
-  const [hour, minute] = String(value || '').split(':').map((part) => Number(part))
+  const parsed = parseReviewTimeInput(value)
+  if (parsed == null) {
+    return { hour: fallbackHour, minute: fallbackMinute }
+  }
   return {
-    hour: Number.isFinite(hour) ? hour : fallbackHour,
-    minute: Number.isFinite(minute) ? minute : fallbackMinute,
+    hour: Math.floor(parsed / 60),
+    minute: parsed % 60,
   }
 }
 
@@ -1318,22 +1826,118 @@ function setTemporaryAccessToday(hour, minute = 0) {
 }
 
 function selectedTimeParts(input, fallbackHour = 15, fallbackMinute = 0) {
-  return parseTimeParts(input?.value, fallbackHour, fallbackMinute)
+  const rawValue = String(input?.value || '').trim()
+  if (!rawValue) {
+    return { hour: fallbackHour, minute: fallbackMinute }
+  }
+  const parsed = parseReviewNativeTimeInput(rawValue) ?? parseReviewTimeInput(rawValue)
+  if (parsed == null) {
+    throw new Error('Enter a valid time.')
+  }
+  return {
+    hour: Math.floor(parsed / 60),
+    minute: parsed % 60,
+  }
 }
 
-async function extendSelectedAssignmentToToday(hour, minute = 0) {
+function localDateInputValue(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(value.getTime())) {
+    return ''
+  }
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+}
+
+function nativeTimeInputValue(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(value.getTime())) {
+    return ''
+  }
+  return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+}
+
+function defaultAccessExtensionTarget(now = new Date()) {
+  const target = new Date(now.getTime() + 60 * 60 * 1000)
+  const minute = target.getMinutes()
+  const hasPartialMinute = target.getSeconds() > 0 || target.getMilliseconds() > 0
+  target.setSeconds(0, 0)
+  const nextQuarterMinute = Math.ceil((minute + (hasPartialMinute ? 1 : 0)) / 15) * 15
+  target.setMinutes(nextQuarterMinute)
+  return target
+}
+
+function accessExtensionTargetLabel(target) {
+  const value = target instanceof Date ? target : new Date(target)
+  if (Number.isNaN(value.getTime())) {
+    return ''
+  }
+  return value.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function syncAccessExtensionDefaults({ force = false } = {}) {
+  const dateInput = elements.quickExtendDate
+  const timeInput = elements.quickExtendTime
+  if (!dateInput || !timeInput) {
+    return
+  }
+  const now = new Date()
+  let current = null
+  try {
+    current = selectedExtensionTarget(dateInput, timeInput, { allowPast: true, fallbackTarget: null })
+  } catch {
+    current = null
+  }
+  if (!force && current && current.getTime() > now.getTime()) {
+    return
+  }
+  const target = defaultAccessExtensionTarget(now)
+  dateInput.value = localDateInputValue(target)
+  timeInput.value = nativeTimeInputValue(target)
+}
+
+function selectedExtensionTarget(dateInput, timeInput, { allowPast = false, fallbackTarget = defaultAccessExtensionTarget() } = {}) {
+  const fallback = fallbackTarget instanceof Date ? fallbackTarget : null
+  const dateValue = String(dateInput?.value || '').trim() || (fallback ? localDateInputValue(fallback) : '')
+  const timeParts = selectedTimeParts(timeInput, fallback?.getHours() ?? 15, fallback?.getMinutes() ?? 0)
+  const dateMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!dateMatch) {
+    throw new Error('Choose a valid extension date.')
+  }
+  const target = new Date(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]) - 1,
+    Number(dateMatch[3]),
+    timeParts.hour,
+    timeParts.minute,
+    0,
+    0,
+  )
+  if (Number.isNaN(target.getTime())) {
+    throw new Error('Choose a valid extension date and time.')
+  }
+  if (!allowPast && target.getTime() <= Date.now()) {
+    throw new Error('Choose an extension date and time after the current time.')
+  }
+  return target
+}
+
+async function extendSelectedAssignmentUntil(target) {
   const assignment = getSelectedAssignment()
   if (!assignment) {
     window.alert('Select an assignment first.')
     return
   }
 
-  const target = nextLocalTimeAtOrAfter(hour, minute)
-
   const updatedAssignment = await request(`/api/edu/assignments/${assignment.id}`, {
     method: 'PUT',
     body: JSON.stringify({
-      temporary_access_until: todayAtLocalTimeIso(hour, minute),
+      temporary_access_until: target.toISOString(),
     }),
   })
 
@@ -1366,11 +1970,12 @@ function specialAccessBadgeFor(assignment, studentName, now = Date.now()) {
   if (!Number.isFinite(accessTime) || accessTime <= now) {
     return ''
   }
-  const formattedTime = new Date(accessTime).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-  return badge(`Special access until ${formattedTime}`, 'good')
+  return badge(`Special access until ${accessExtensionTargetLabel(accessTime)}`, 'good')
+}
+
+function wholeClassExtensionBadge(assignment, now = Date.now()) {
+  const label = wholeClassExtensionLabel(assignment, new Date(now))
+  return label ? badge(label, 'good') : ''
 }
 
 function studentAccessRevokedFor(assignment, studentName) {
@@ -1410,7 +2015,22 @@ function accessRequestsForAssignment(assignment) {
     .sort((a, b) => String(b.requested_at || '').localeCompare(String(a.requested_at || '')))
 }
 
-async function approveAssignmentAccessRequest(assignment, requestEntry, { hour = 15, minute = 0 } = {}) {
+function feedbackRequestsForAssignment(assignment) {
+  const requests = assignment?.student_feedback_requests && typeof assignment.student_feedback_requests === 'object'
+    ? assignment.student_feedback_requests
+    : {}
+  return Object.entries(requests)
+    .map(([key, value]) => ({
+      key,
+      student_name: String(value?.student_name || key || '').trim(),
+      requested_at: String(value?.requested_at || ''),
+      note: String(value?.note || '').trim(),
+    }))
+    .filter((request) => request.key && request.student_name)
+    .sort((a, b) => String(b.requested_at || '').localeCompare(String(a.requested_at || '')))
+}
+
+async function approveAssignmentAccessRequest(assignment, requestEntry, { target = null } = {}) {
   const isAlreadyOpen = assignmentIsOpenNow(assignment)
   const nextRequests = { ...(assignment.student_access_requests || {}) }
   delete nextRequests[requestEntry.key]
@@ -1421,7 +2041,11 @@ async function approveAssignmentAccessRequest(assignment, requestEntry, { hour =
   if (isAlreadyOpen) {
     delete nextStudentTemporaryAccessUntil[requestEntry.key]
   } else {
-    nextStudentTemporaryAccessUntil[requestEntry.key] = nextLocalTimeAtOrAfter(hour, minute).toISOString()
+    const extensionTarget = target instanceof Date ? target : defaultAccessExtensionTarget()
+    if (extensionTarget.getTime() <= Date.now()) {
+      throw new Error('Choose an extension date and time after the current time.')
+    }
+    nextStudentTemporaryAccessUntil[requestEntry.key] = extensionTarget.toISOString()
   }
 
   await submitAssignmentUpdateOptimistically(assignment, {
@@ -1431,7 +2055,7 @@ async function approveAssignmentAccessRequest(assignment, requestEntry, { hour =
   })
 }
 
-async function extendSelectedAssignmentForStudentToToday(studentName, hour, minute = 0) {
+async function extendSelectedAssignmentForStudentUntil(studentName, target) {
   const assignment = getSelectedAssignment()
   if (!assignment) {
     window.alert('Select an assignment first.')
@@ -1444,38 +2068,19 @@ async function extendSelectedAssignmentForStudentToToday(studentName, hour, minu
     return
   }
 
-  const target = todayAtLocalTime(hour, minute)
-  const nextStudentAccessRevoked = { ...(assignment.student_access_revoked || {}) }
-  delete nextStudentAccessRevoked[normalizedKey]
-  if (target.getTime() < Date.now()) {
-    const reopenForMinutes = window.prompt(
-      'That time has already passed. Extend this student for how many minutes from now?',
-      '15',
-    )
-    if (reopenForMinutes == null) {
-      return
-    }
-    const durationMinutes = Number.parseInt(String(reopenForMinutes).trim(), 10)
-    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
-      window.alert('Enter a whole number of minutes greater than 0.')
-      return
-    }
-    const reopenUntil = new Date(Date.now() + durationMinutes * 60_000)
-    await submitAssignmentUpdateOptimistically(assignment, {
-      student_access_revoked: nextStudentAccessRevoked,
-      student_temporary_access_until: {
-        ...(assignment.student_temporary_access_until || {}),
-        [normalizedKey]: reopenUntil.toISOString(),
-      },
-    })
+  const extensionTarget = target instanceof Date ? target : defaultAccessExtensionTarget()
+  if (extensionTarget.getTime() <= Date.now()) {
+    window.alert('Choose an extension date and time after the current time.')
     return
   }
+  const nextStudentAccessRevoked = { ...(assignment.student_access_revoked || {}) }
+  delete nextStudentAccessRevoked[normalizedKey]
 
   await submitAssignmentUpdateOptimistically(assignment, {
     student_access_revoked: nextStudentAccessRevoked,
     student_temporary_access_until: {
       ...(assignment.student_temporary_access_until || {}),
-      [normalizedKey]: target.toISOString(),
+      [normalizedKey]: extensionTarget.toISOString(),
     },
   })
 }
@@ -1770,6 +2375,7 @@ function renderAssignmentStage() {
   elements.assignmentGrid.innerHTML = assignments
     .map((assignment, index) => {
       const selected = assignment.id === selectedAssignmentId
+      const extensionBadge = wholeClassExtensionBadge(assignment)
       return `
         <button class="selection-card assignment-card${selected ? ' is-selected' : ''}" type="button" data-assignment-id="${escapeHtml(assignment.id)}">
           <span class="assignment-card-kicker">Assignment ${String(index + 1).padStart(2, '0')}</span>
@@ -1777,6 +2383,7 @@ function renderAssignmentStage() {
           <span class="selection-meta">${escapeHtml(assignment.course || classroom.name)}</span>
           <span class="selection-meta">${escapeHtml(assignmentAudienceLabel(assignment))}</span>
           <span class="selection-meta">${escapeHtml(formatWindowSummary(assignment))}</span>
+          ${extensionBadge ? `<span class="assignment-card-badges">${extensionBadge}</span>` : ''}
           <span class="selection-card-action-label">View students</span>
         </button>
       `
@@ -1786,6 +2393,7 @@ function renderAssignmentStage() {
   elements.assignmentGrid.querySelectorAll('[data-assignment-id]').forEach((button) => {
     button.addEventListener('click', () => {
       selectedAssignmentId = button.dataset.assignmentId
+      clearSelectedReviewSession()
       showAssignmentView()
     })
   })
@@ -1826,11 +2434,11 @@ function selectedSessionReviewSummary(session, assignment) {
   return badges.length ? `<div class="student-card-review-summary">${badges.join('')}</div>` : ''
 }
 
-function buildReviewPayload() {
+function buildReviewPayload({ publishFeedback = false } = {}) {
   if (!reviewState) return null
   const session = currentReviewSession()
   const assignment = getSelectedAssignment()
-  const reviewText = displaySessionText(session, reviewState.replayData)
+  const reviewText = handtypedMarkdownDisplayText(displaySessionText(session, reviewState.replayData))
   return {
     session_snapshot: session
       ? {
@@ -1856,7 +2464,7 @@ function buildReviewPayload() {
           replay_session_id: session.replay_session_id ?? null,
         }
       : null,
-    rubric_scores: { ...reviewState.rubricScores },
+    rubric_scores: normalizedRubricScoresForAssignment(reviewState.rubricScores, assignment),
     teacher_comment: reviewState.teacherComment,
     returned_for_revision: reviewState.returnedForRevision,
     grade_label: reviewState.gradeLabel,
@@ -1865,11 +2473,13 @@ function buildReviewPayload() {
       ...annotation,
       updated_at: annotation.updated_at || annotation.created_at || new Date().toISOString(),
     })),
+    publish_feedback: Boolean(publishFeedback || reviewState.feedbackStatus === 'published'),
+    allow_empty_feedback: Array.isArray(reviewState.deletedAnnotationIds) && reviewState.deletedAnnotationIds.length > 0,
   }
 }
 
 function reviewPayloadFeedbackFingerprint(payload) {
-  const { session_snapshot: _sessionSnapshot, ...feedbackPayload } = payload || {}
+  const { session_snapshot: _sessionSnapshot, publish_feedback: _publishFeedback, ...feedbackPayload } = payload || {}
   return JSON.stringify(feedbackPayload)
 }
 
@@ -1891,7 +2501,12 @@ function renderReviewSyncStatus() {
     return
   }
   if (reviewState.updatedAt) {
-    elements.reviewSyncStatus.textContent = `Saved ${timeAgoLabel(reviewState.updatedAt)}`
+    const publishLabel = reviewState.feedbackStatus === 'published'
+      ? reviewState.publishedAt
+        ? ` • published ${timeAgoLabel(reviewState.publishedAt)}`
+        : ' • published'
+      : ' • draft'
+    elements.reviewSyncStatus.textContent = `Saved ${timeAgoLabel(reviewState.updatedAt)}${publishLabel}`
     elements.reviewSyncStatus.classList.add('is-saved')
     return
   }
@@ -1935,15 +2550,18 @@ async function saveCurrentReview() {
     .then((updatedSession) => {
       dashboardState = {
         ...dashboardState,
-        live_sessions: mergeById(getLiveSessions(), [updatedSession]),
+        live_sessions: mergeLiveSessions(getLiveSessions(), [updatedSession]),
       }
       if (reviewState?.sessionId === sessionId) {
         const grading = normalizedSessionGrading(updatedSession)
         reviewState.updatedAt = grading.updated_at
+        reviewState.feedbackStatus = grading.feedback_status
+        reviewState.publishedAt = grading.published_at
         reviewState.updatedBy = grading.actor_name || grading.actor_email || ''
         if (reviewPayloadFeedbackFingerprint(buildReviewPayload()) === payloadFingerprint) {
           reviewState.dirty = false
           reviewState.saveState = 'saved'
+          reviewState.deletedAnnotationIds = []
         } else {
           reviewState.dirty = true
           reviewState.saveState = 'saving'
@@ -1969,6 +2587,49 @@ async function saveCurrentReview() {
   return reviewSavePromise
 }
 
+async function publishCurrentReviewFeedback() {
+  if (!reviewState || reviewSaveInFlight) return
+  await flushReviewSave()
+  if (!reviewState) return
+  const sessionId = reviewState.sessionId
+  const payload = buildReviewPayload({ publishFeedback: true })
+  elements.reviewPublishFeedback.disabled = true
+  reviewState.saveState = 'saving'
+  renderReviewSyncStatus()
+  try {
+    const updatedSession = await request(`/api/edu/live-sessions/${encodeURIComponent(sessionId)}/grading`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+    dashboardState = {
+      ...dashboardState,
+      live_sessions: mergeLiveSessions(getLiveSessions(), [updatedSession]),
+    }
+    if (reviewState?.sessionId === sessionId) {
+      const grading = normalizedSessionGrading(updatedSession)
+      reviewState.updatedAt = grading.updated_at
+      reviewState.feedbackStatus = grading.feedback_status
+      reviewState.publishedAt = grading.published_at
+      reviewState.updatedBy = grading.actor_name || grading.actor_email || ''
+      reviewState.dirty = false
+      reviewState.saveState = 'saved'
+      reviewState.deletedAnnotationIds = []
+    }
+    renderReviewSyncStatus()
+    renderStudentCards({ skipReviewWorkspace: true })
+  } catch (error) {
+    if (reviewState?.sessionId === sessionId) {
+      reviewState.saveState = 'error'
+    }
+    renderReviewSyncStatus()
+    window.alert(`Could not publish feedback: ${error.message}`)
+  } finally {
+    if (elements.reviewPublishFeedback) {
+      elements.reviewPublishFeedback.disabled = false
+    }
+  }
+}
+
 async function flushReviewSave() {
   if (reviewSaveTimer) {
     clearTimeout(reviewSaveTimer)
@@ -1989,6 +2650,55 @@ async function flushReviewSave() {
   if (inFlightError) {
     throw inFlightError
   }
+}
+
+function saveReviewSnapshotBeforeSwitch() {
+  if (reviewSaveTimer) {
+    clearTimeout(reviewSaveTimer)
+    reviewSaveTimer = null
+  }
+  const pendingSave = reviewSavePromise?.catch(() => {}) || Promise.resolve()
+  if (!reviewState?.dirty) {
+    return pendingSave
+  }
+
+  const sessionId = reviewState.sessionId
+  const payload = buildReviewPayload()
+  reviewState.dirty = false
+  reviewState.saveState = 'saving'
+  renderReviewSyncStatus()
+
+  return pendingSave
+    .then(() =>
+      request(`/api/edu/live-sessions/${encodeURIComponent(sessionId)}/grading`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    )
+    .then((updatedSession) => {
+      dashboardState = {
+        ...dashboardState,
+        live_sessions: mergeLiveSessions(getLiveSessions(), [updatedSession]),
+      }
+      if (reviewState?.sessionId === sessionId) {
+        const grading = normalizedSessionGrading(updatedSession)
+        reviewState.updatedAt = grading.updated_at
+        reviewState.feedbackStatus = grading.feedback_status
+        reviewState.publishedAt = grading.published_at
+        reviewState.updatedBy = grading.actor_name || grading.actor_email || ''
+        reviewState.saveState = 'saved'
+        renderReviewSyncStatus()
+      }
+      renderStudentCards({ skipReviewWorkspace: true })
+    })
+    .catch((error) => {
+      if (reviewState?.sessionId === sessionId) {
+        reviewState.dirty = true
+        reviewState.saveState = 'error'
+        renderReviewSyncStatus()
+      }
+      throw error
+    })
 }
 
 function clearReviewComposer() {
@@ -2160,7 +2870,7 @@ function annotationsOverlap(start, end, excludeId = null) {
 async function addReviewAnnotation() {
   if (!reviewState?.selection || !reviewState.composerMode) return
   const { start, end, text } = reviewState.selection
-  const reviewText = displaySessionText(currentReviewSession(), reviewState.replayData)
+  const reviewText = handtypedMarkdownDisplayText(displaySessionText(currentReviewSession(), reviewState.replayData))
   if (annotationsOverlap(start, end)) {
     window.alert('Inline comments cannot overlap yet. Choose a different span of text.')
     return
@@ -2197,14 +2907,26 @@ async function addReviewAnnotation() {
   }
 }
 
-function deleteReviewAnnotation(annotationId) {
+async function deleteReviewAnnotation(annotationId) {
   if (!reviewState) return
+  const beforeCount = reviewState.inlineAnnotations.length
   reviewState.inlineAnnotations = reviewState.inlineAnnotations.filter((annotation) => annotation.id !== annotationId)
+  if (reviewState.inlineAnnotations.length === beforeCount) {
+    return
+  }
+  reviewState.deletedAnnotationIds = [
+    ...new Set([...(reviewState.deletedAnnotationIds || []), annotationId].filter(Boolean)),
+  ]
   if (selectedAnnotationId === annotationId) {
     selectedAnnotationId = null
   }
   markReviewDirty()
   renderReviewWorkspace(getSelectedAssignment())
+  try {
+    await flushReviewSave()
+  } catch (error) {
+    window.alert(`Could not delete comment: ${error.message}`)
+  }
 }
 
 function annotationDisplayState(annotation, text) {
@@ -2265,72 +2987,480 @@ function annotationDisplayState(annotation, text) {
   }
 }
 
+const REVIEW_WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+function normalizeReviewDateInput(value) {
+  const normalized = String(value || '').trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+}
+
+function parseReviewDateList(value) {
+  return String(value || '')
+    .split(/[,\s]+/)
+    .map(normalizeReviewDateInput)
+    .filter(Boolean)
+}
+
+function parseReviewTimeInput(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2})(?::(\d{1,2}))?\s*([ap])m?$/i)
+  if (!match) {
+    return null
+  }
+  const hour = Number(match[1])
+  const minute = match[2] == null ? 0 : Number(match[2])
+  const meridiem = String(match[3]).toLowerCase()
+  if (minute < 0 || minute > 59) {
+    return null
+  }
+  if (hour < 1 || hour > 12) {
+    return null
+  }
+  const normalizedHour = meridiem === 'a'
+    ? hour === 12 ? 0 : hour
+    : hour === 12 ? 12 : hour + 12
+  return normalizedHour * 60 + minute
+}
+
+function parseReviewNativeTimeInput(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) {
+    return null
+  }
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null
+  }
+  return hour * 60 + minute
+}
+
+function parseReviewHighlightTimeInput(value) {
+  return parseReviewNativeTimeInput(value) ?? parseReviewTimeInput(value)
+}
+
+function reviewReplayLocalParts(absoluteMs) {
+  if (absoluteMs == null || absoluteMs === '') {
+    return null
+  }
+  const date = new Date(Number(absoluteMs))
+  if (Number.isNaN(date.getTime()) || date.getTime() <= 0) {
+    return null
+  }
+  return {
+    date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+      date.getDate(),
+    ).padStart(2, '0')}`,
+    weekday: REVIEW_WEEKDAYS[date.getDay()],
+    minuteOfDay: date.getHours() * 60 + date.getMinutes(),
+  }
+}
+
+function replayTeacherDateInputValue(absoluteMs) {
+  const parts = reviewReplayLocalParts(absoluteMs)
+  return parts?.date || ''
+}
+
+function reviewHighlightFilterForState() {
+  const selectedDates = new Set([
+    normalizeReviewDateInput(reviewState?.highlightDate),
+    ...parseReviewDateList(reviewState?.highlightDates),
+  ].filter(Boolean))
+  const selectedWeekdays = new Set(
+    (Array.isArray(reviewState?.highlightWeekdays) ? reviewState.highlightWeekdays : [])
+      .map((day) => String(day || '').toLowerCase())
+      .filter((day) => REVIEW_WEEKDAYS.includes(day)),
+  )
+  const startMinute = parseReviewHighlightTimeInput(reviewState?.highlightStartTime)
+  const endMinute = parseReviewHighlightTimeInput(reviewState?.highlightEndTime)
+  return {
+    selectedDates,
+    selectedWeekdays,
+    startMinute,
+    endMinute,
+    hasDateFilter: selectedDates.size > 0 || selectedWeekdays.size > 0,
+    hasTimeFilter: startMinute != null || endMinute != null,
+  }
+}
+
+function reviewTimeValue(hour = 0, minute = 0) {
+  return formatClockTime(hour, minute)
+}
+
+function setReviewHighlightModeFromControls() {
+  if (!reviewState) return
+  const hasDates = Boolean(normalizeReviewDateInput(reviewState.highlightDate) || parseReviewDateList(reviewState.highlightDates).length)
+  const hasWeekdays = Array.isArray(reviewState.highlightWeekdays) && reviewState.highlightWeekdays.length > 0
+  const hasTime = Boolean(parseReviewHighlightTimeInput(reviewState.highlightStartTime) != null || parseReviewHighlightTimeInput(reviewState.highlightEndTime) != null)
+  reviewState.highlightMode = hasDates || hasWeekdays || hasTime ? 'custom' : 'none'
+}
+
+function setReviewWeekdays(days = []) {
+  if (!reviewState) return
+  const selected = new Set(days)
+  reviewState.highlightWeekdays = REVIEW_WEEKDAYS.filter((day) => selected.has(day))
+}
+
+function applyReviewHighlightPreset(preset) {
+  if (!reviewState) return
+  const assignment = getSelectedAssignment()
+  const window = assignment?.windows?.[0] || null
+  if (preset === 'all') {
+    reviewState.highlightDate = ''
+    reviewState.highlightDates = ''
+    reviewState.highlightStartTime = ''
+    reviewState.highlightEndTime = ''
+    reviewState.highlightWeekdays = []
+    reviewState.highlightMode = 'custom'
+    return
+  }
+  if (preset === 'weekdays') {
+    setReviewWeekdays(['monday', 'tuesday', 'wednesday', 'thursday', 'friday'])
+    setReviewHighlightModeFromControls()
+    return
+  }
+  if (preset === 'window' && window) {
+    reviewState.highlightStartTime = reviewTimeValue(window.start_hour, window.start_minute)
+    reviewState.highlightEndTime = reviewTimeValue(window.end_hour, window.end_minute)
+    setReviewHighlightModeFromControls()
+    return
+  }
+  if (preset === 'after-school') {
+    reviewState.highlightStartTime = window
+      ? reviewTimeValue(window.end_hour, window.end_minute)
+      : '3:00 PM'
+    reviewState.highlightEndTime = '11:59 PM'
+    setReviewHighlightModeFromControls()
+    return
+  }
+  if (preset === 'evening') {
+    reviewState.highlightStartTime = '6:00 PM'
+    reviewState.highlightEndTime = '11:59 PM'
+    setReviewHighlightModeFromControls()
+  }
+}
+
+function syncReviewHighlightInputValue(input, value) {
+  if (!input || document.activeElement === input) {
+    return
+  }
+  input.value = value || ''
+}
+
+function nativeReviewTimeValue(value) {
+  const minutes = parseReviewHighlightTimeInput(value)
+  if (minutes == null) {
+    return ''
+  }
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}
+
+function syncReviewHighlightTimeInput(input, value) {
+  if (!input || document.activeElement === input) {
+    return
+  }
+  input.value = nativeReviewTimeValue(value)
+}
+
+function reviewTimestampMatchesHighlight(insertedAtMs) {
+  const parts = reviewReplayLocalParts(insertedAtMs)
+  if (!parts) {
+    return false
+  }
+  const filter = reviewHighlightFilterForState()
+  const dateMatches =
+    !filter.hasDateFilter || filter.selectedDates.has(parts.date) || filter.selectedWeekdays.has(parts.weekday)
+  if (!dateMatches) {
+    return false
+  }
+  if (!filter.hasTimeFilter) {
+    return true
+  }
+  const minute = parts.minuteOfDay
+  if (filter.startMinute != null && filter.endMinute != null) {
+    return filter.startMinute <= filter.endMinute
+      ? minute >= filter.startMinute && minute <= filter.endMinute
+      : minute >= filter.startMinute || minute <= filter.endMinute
+  }
+  if (filter.startMinute != null) {
+    return minute >= filter.startMinute
+  }
+  return minute <= filter.endMinute
+}
+
+function reviewTimestampEntryMatchesHighlight(entry) {
+  const insertedAtMs = Number(entry?.insertedAtMs)
+  return Number.isFinite(insertedAtMs) && reviewTimestampMatchesHighlight(insertedAtMs)
+}
+
 function reviewHighlightRangesForState(session, assignment) {
   if (!reviewState?.replayData?.attributedDocument) {
     return []
   }
-
-  switch (reviewState.highlightMode) {
-    case 'after-school-day': {
-      const replay = reviewState.replayData.replay || {}
-      const insertedAtMs = (reviewState.replayData.attributedDocument.chars || []).map((entry) => entry.insertedAtMs)
-      const offsetMinutes = Number(replay.recorded_timezone_offset_minutes || 0)
-      return buildAfterSchoolRanges(insertedAtMs, assignment, {
-        dateInput: reviewState.highlightDate,
-        offsetMinutes,
-      })
-    }
-    case 'after-school-all': {
-      const replay = reviewState.replayData.replay || {}
-      const insertedAtMs = (reviewState.replayData.attributedDocument.chars || []).map((entry) => entry.insertedAtMs)
-      const offsetMinutes = Number(replay.recorded_timezone_offset_minutes || 0)
-      return buildAfterSchoolRanges(insertedAtMs, assignment, {
-        allDates: true,
-        offsetMinutes,
-      })
-    }
-    default:
-      return []
-  }
+  return reviewHighlightModeActive() ? [{ custom: true }] : []
 }
 
 function reviewHighlightModeActive() {
   return Boolean(reviewState?.highlightMode && reviewState.highlightMode !== 'none')
 }
 
-function reviewHighlightIndexSet(text, ranges) {
+function reviewHighlightRequiresPreciseTiming() {
+  if (!reviewHighlightModeActive()) {
+    return false
+  }
+  const filter = reviewHighlightFilterForState()
+  return Boolean(filter.hasDateFilter || filter.hasTimeFilter)
+}
+
+function attributedDocumentHasReliableInsertionTiming(attributed = {}) {
+  const chars = Array.isArray(attributed?.chars) ? attributed.chars : []
+  const finiteTimes = chars
+    .map((entry) => Number(entry?.insertedAtMs))
+    .filter((value) => Number.isFinite(value))
+  if (!finiteTimes.length) {
+    return false
+  }
+  if (chars.length > 1 && new Set(finiteTimes).size <= 1) {
+    return false
+  }
+  return true
+}
+
+function reviewHighlightTimingUnavailableMessage() {
+  return 'Precise replay timing is not available for this draft, so time-based highlighting cannot be applied reliably.'
+}
+
+function reviewHighlightIndexSet(text, ranges, sourceMarkdown = '') {
   if (!reviewState?.replayData?.attributedDocument || !Array.isArray(ranges) || !ranges.length) {
     return new Set()
   }
   const attributed = reviewState.replayData.attributedDocument
-  if (attributed.text !== String(text || '')) {
+  const active = new Set()
+  const suppressCoarseFullHighlight = () =>
+    ranges.some((range) => range.custom) &&
+    reviewHighlightRequiresPreciseTiming() &&
+    !attributedDocumentHasReliableInsertionTiming(attributed) &&
+    active.size >= Array.from(String(text || '')).length
+
+  if (attributed.text === String(text || '')) {
+    attributed.chars.forEach((entry, index) => {
+      if (ranges.some((range) => range.custom ? reviewTimestampEntryMatchesHighlight(entry) : Number(entry?.insertedAtMs) >= range.startMs && Number(entry?.insertedAtMs) <= range.endMs)) {
+        active.add(index)
+      }
+    })
+    if (suppressCoarseFullHighlight()) {
+      return new Set()
+    }
+    return active
+  }
+
+  const source = String(sourceMarkdown || '')
+  if (source && attributed.text === source) {
+    const model = handtypedMarkdownDisplayModel(source)
+    if (model.text !== String(text || '')) {
+      return active
+    }
+    model.chars.forEach((entry, displayIndex) => {
+      const sourceEntry = attributed.chars[entry.sourceIndex]
+      const insertedAtMs = Number(sourceEntry?.insertedAtMs)
+      if (ranges.some((range) => range.custom ? reviewTimestampEntryMatchesHighlight(sourceEntry) : insertedAtMs >= range.startMs && insertedAtMs <= range.endMs)) {
+        active.add(displayIndex)
+      }
+    })
+  }
+  if (suppressCoarseFullHighlight()) {
     return new Set()
   }
-  const active = new Set()
-  attributed.chars.forEach((entry, index) => {
-    const insertedAtMs = Number(entry?.insertedAtMs)
-    if (!Number.isFinite(insertedAtMs)) {
-      return
-    }
-    if (ranges.some((range) => insertedAtMs >= range.startMs && insertedAtMs <= range.endMs)) {
-      active.add(index)
-    }
-  })
   return active
 }
 
 function renderIndexedSlice(text, start, end, annotation, highlightIndexes, selectionIndexes) {
+  return renderIndexedSegments(
+    handtypedMarkdownDisplayModel(text),
+    start,
+    end,
+    annotation,
+    highlightIndexes,
+    selectionIndexes,
+  )
+}
+
+function markdownStyleKey(mark = {}) {
+  return [
+    mark.size || '',
+    mark.font || '',
+    mark.bold ? 'b' : '',
+    mark.italic ? 'i' : '',
+    mark.underline ? 'u' : '',
+    mark.highlight ? 'h' : '',
+    mark.heading || '',
+  ].join('|')
+}
+
+function copyMarkdownMarks(active, extra = {}) {
+  return {
+    size: active.size || '',
+    font: active.font || '',
+    bold: Boolean(active.bold),
+    italic: Boolean(active.italic),
+    underline: Boolean(active.underline),
+    highlight: Boolean(active.highlight),
+    heading: active.heading || '',
+    ...extra,
+  }
+}
+
+function handtypedMarkdownDisplayModel(markdown = '') {
+  const raw = String(markdown || '').replace(/\r/g, '')
+  const chars = []
+  const active = {}
+  let index = 0
+  let atLineStart = true
+  let heading = ''
+
+  const pushChar = (char, sourceIndex) => {
+    chars.push({
+      char,
+      sourceIndex,
+      marks: copyMarkdownMarks(active, { heading }),
+    })
+    atLineStart = char === '\n'
+    if (char === '\n') {
+      heading = ''
+    }
+  }
+
+  while (index < raw.length) {
+    const rest = raw.slice(index)
+    if (atLineStart) {
+      const headingMatch = rest.match(/^(#{1,3})[ \t]+/)
+      if (headingMatch) {
+        heading = `h${headingMatch[1].length}`
+        index += headingMatch[0].length
+        atLineStart = false
+        continue
+      }
+    }
+
+    const bracketMatch = rest.match(/^\[(\/?)(size|font|u|highlight)(?:[ =]([^\]]+))?\]/i)
+    if (bracketMatch) {
+      const closing = Boolean(bracketMatch[1])
+      const name = bracketMatch[2].toLowerCase()
+      const value = String(bracketMatch[3] || '').trim().toLowerCase()
+      if (name === 'size') {
+        active.size = closing ? '' : value.replace(/[^\d]/g, '')
+      } else if (name === 'font') {
+        active.font = closing ? '' : value
+      } else if (name === 'u') {
+        active.underline = !closing
+      } else if (name === 'highlight') {
+        active.highlight = !closing
+      }
+      index += bracketMatch[0].length
+      continue
+    }
+
+    if (rest.startsWith('**')) {
+      active.bold = !active.bold
+      index += 2
+      continue
+    }
+    if (rest.startsWith('__')) {
+      active.bold = !active.bold
+      index += 2
+      continue
+    }
+    if (rest[0] === '*' && rest[1] !== '*') {
+      active.italic = !active.italic
+      index += 1
+      continue
+    }
+    if (rest[0] === '_' && rest[1] !== '_') {
+      active.italic = !active.italic
+      index += 1
+      continue
+    }
+
+    pushChar(raw[index], index)
+    index += 1
+  }
+
+  return {
+    text: chars.map((entry) => entry.char).join(''),
+    chars,
+  }
+}
+
+function handtypedMarkdownDisplayText(markdown = '') {
+  return handtypedMarkdownDisplayModel(markdown).text
+}
+
+function reviewDraftStyleForMarks(marks = {}) {
+  const styles = []
+  const size = Number(marks.size)
+  if (Number.isFinite(size) && size >= 10 && size <= 100) {
+    styles.push(`font-size:${size}px`)
+  }
+  const fontFamilies = {
+    arial: 'Arial, Helvetica, sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    sans: 'Inter, Arial, Helvetica, sans-serif',
+    mono: '"Courier New", monospace',
+    georgia: 'Georgia, serif',
+    times: '"Times New Roman", serif',
+    garamond: 'Garamond, Georgia, serif',
+    palatino: 'Palatino, "Palatino Linotype", serif',
+    baskerville: 'Baskerville, Georgia, serif',
+    verdana: 'Verdana, Geneva, sans-serif',
+    trebuchet: '"Trebuchet MS", Arial, sans-serif',
+    tahoma: 'Tahoma, Geneva, sans-serif',
+    helvetica: 'Helvetica, Arial, sans-serif',
+    courier: '"Courier New", Courier, monospace',
+    'comic-sans': '"Comic Sans MS", "Comic Sans", cursive',
+    lucida: '"Lucida Sans", "Lucida Grande", sans-serif',
+  }
+  if (fontFamilies[marks.font]) {
+    styles.push(`font-family:${fontFamilies[marks.font]}`)
+  }
+  return styles.join(';')
+}
+
+function renderWysiwygContent(content, marks = {}) {
+  let html = escapeHtml(content)
+  if (marks.underline) {
+    html = `<u>${html}</u>`
+  }
+  if (marks.italic) {
+    html = `<em>${html}</em>`
+  }
+  if (marks.bold || marks.heading) {
+    html = `<strong>${html}</strong>`
+  }
+  const classes = []
+  if (marks.highlight) classes.push('review-draft-highlight-mark')
+  if (marks.heading) classes.push(`review-draft-heading-${marks.heading}`)
+  const style = reviewDraftStyleForMarks(marks)
+  if (classes.length || style) {
+    html = `<span${classes.length ? ` class="${classes.join(' ')}"` : ''}${style ? ` style="${escapeHtml(style)}"` : ''}>${html}</span>`
+  }
+  return html
+}
+
+function renderIndexedSegments(model, start, end, annotation, highlightIndexes, selectionIndexes) {
   let html = ''
   let cursor = start
+  const text = model.text || ''
+  const chars = model.chars || []
 
   while (cursor < end) {
     const highlighted = highlightIndexes.has(cursor)
     const selected = selectionIndexes.has(cursor)
+    const markKey = markdownStyleKey(chars[cursor]?.marks || {})
     let next = cursor + 1
     while (
       next < end &&
       highlightIndexes.has(next) === highlighted &&
-      selectionIndexes.has(next) === selected
+      selectionIndexes.has(next) === selected &&
+      markdownStyleKey(chars[next]?.marks || {}) === markKey
     ) {
       next += 1
     }
@@ -2352,7 +3482,7 @@ function renderIndexedSlice(text, start, end, annotation, highlightIndexes, sele
       classes.push('review-highlight-pending')
     }
 
-    const content = escapeHtml(String(text || '').slice(cursor, next))
+    const content = renderWysiwygContent(String(text || '').slice(cursor, next), chars[cursor]?.marks || {})
     if (!classes.length) {
       html += content
     } else {
@@ -2371,19 +3501,38 @@ function renderReviewHighlightUi(session, assignment) {
   }
 
   if (elements.reviewHighlightDate) {
-    elements.reviewHighlightDate.value = reviewState.highlightDate
+    syncReviewHighlightInputValue(elements.reviewHighlightDate, reviewState.highlightDate)
   }
+  if (elements.reviewHighlightDates) {
+    syncReviewHighlightInputValue(elements.reviewHighlightDates, reviewState.highlightDates)
+  }
+  syncReviewHighlightTimeInput(elements.reviewHighlightStartTime, reviewState.highlightStartTime)
+  syncReviewHighlightTimeInput(elements.reviewHighlightEndTime, reviewState.highlightEndTime)
+  const selectedWeekdays = new Set(reviewState.highlightWeekdays || [])
+  elements.reviewHighlightWeekdays?.forEach((checkbox) => {
+    checkbox.checked = selectedWeekdays.has(checkbox.value)
+  })
 
-  const noReplay = !session?.replay_session_id
+  const noReplay = reviewState.replayLoadState === 'missing' && !reviewState.replayError
   const loading = reviewState.replayLoadState === 'loading'
   const ready = reviewState.replayLoadState === 'ready'
-  const disablePresets = noReplay || loading || !ready
-  if (elements.reviewHighlightAfterSchoolDay) {
-    elements.reviewHighlightAfterSchoolDay.disabled = disablePresets || !reviewState.highlightDate
-  }
-  if (elements.reviewHighlightAfterSchoolAll) {
-    elements.reviewHighlightAfterSchoolAll.disabled = disablePresets
-  }
+  const disablePresets = loading
+  ;[
+    elements.reviewHighlightDate,
+    elements.reviewHighlightDates,
+    elements.reviewHighlightStartTime,
+    elements.reviewHighlightEndTime,
+    elements.reviewHighlightPresetWindow,
+    elements.reviewHighlightPresetAfterSchool,
+    elements.reviewHighlightPresetEvening,
+    elements.reviewHighlightPresetWeekdays,
+    elements.reviewHighlightAll,
+    ...elements.reviewHighlightWeekdays,
+  ].forEach((control) => {
+    if (control) {
+      control.disabled = disablePresets
+    }
+  })
   if (elements.reviewHighlightClear) {
     elements.reviewHighlightClear.disabled = !reviewHighlightModeActive()
   }
@@ -2403,20 +3552,22 @@ function renderReviewHighlightUi(session, assignment) {
 
   const displayText = displaySessionText(session, reviewState.replayData)
   const ranges = reviewHighlightRangesForState(session, assignment)
-  const highlights = reviewHighlightIndexSet(displayText, ranges)
+  const highlights = reviewHighlightIndexSet(handtypedMarkdownDisplayText(displayText), ranges, displayText)
   if (reviewHighlightModeActive() && !highlights.size) {
-    elements.reviewHighlightMeta.textContent = 'No surviving characters matched that after-school filter.'
+    elements.reviewHighlightMeta.textContent = reviewHighlightRequiresPreciseTiming() &&
+      !attributedDocumentHasReliableInsertionTiming(reviewState.replayData?.attributedDocument)
+      ? 'No confidently timed surviving characters matched that time filter.'
+      : 'No surviving characters matched that time filter.'
     return
   }
-  if (reviewState.highlightMode === 'after-school-day') {
-    elements.reviewHighlightMeta.textContent = `${highlights.size} surviving character${highlights.size === 1 ? '' : 's'} highlighted from after school on ${reviewState.highlightDate}.`
+  if (reviewHighlightModeActive()) {
+    const filter = reviewHighlightFilterForState()
+    const dateLabel = filter.hasDateFilter ? 'selected dates/days' : 'any day'
+    const timeLabel = filter.hasTimeFilter ? 'selected time range' : 'any time'
+    elements.reviewHighlightMeta.textContent = `${highlights.size} surviving character${highlights.size === 1 ? '' : 's'} highlighted from ${dateLabel}, ${timeLabel}.`
     return
   }
-  if (reviewState.highlightMode === 'after-school-all') {
-    elements.reviewHighlightMeta.textContent = `${highlights.size} surviving character${highlights.size === 1 ? '' : 's'} highlighted from after-school writing across the replay.`
-    return
-  }
-  elements.reviewHighlightMeta.textContent = 'Pick a day or use all after school to highlight the surviving text added outside class time.'
+  elements.reviewHighlightMeta.textContent = 'Pick dates, weekdays, or a time range to highlight surviving text added then.'
 }
 
 async function loadReviewReplayData(session) {
@@ -2452,8 +3603,14 @@ async function loadReviewReplayData(session) {
           events: [],
         }
       }
-      cached = buildReviewReplayCacheEntry(replay)
+      cached = buildReviewReplayCacheEntry(mergeReviewReplayWithLiveSession(replay, currentReviewSession() || session))
       reviewReplayCache.set(session.id, cached)
+    } else {
+      const mergedReplay = mergeReviewReplayWithLiveSession(cached.replay, currentReviewSession() || session)
+      if (mergedReplay !== cached.replay) {
+        cached = buildReviewReplayCacheEntry(mergedReplay)
+        reviewReplayCache.set(session.id, cached)
+      }
     }
 
     if (!reviewState || reviewState.sessionId !== session.id) {
@@ -2462,9 +3619,8 @@ async function loadReviewReplayData(session) {
     reviewState.replayData = cached
     reviewState.replayLoadState = 'ready'
     if (!reviewState.highlightDate) {
-      reviewState.highlightDate = replayLocalDateInputValue(
+      reviewState.highlightDate = replayTeacherDateInputValue(
         cached.attributedDocument.firstInsertedAtMs || cached.attributedDocument.lastInsertedAtMs,
-        Number(cached.replay.recorded_timezone_offset_minutes || 0),
       )
     }
     renderReviewWorkspace(getSelectedAssignment())
@@ -2502,7 +3658,7 @@ function handleRealtimeAssignment(payload) {
         : null
     dashboardState = {
       ...dashboardState,
-      live_sessions: mergeById(
+      live_sessions: mergeLiveSessions(
         getLiveSessions().filter((session) => session.assignment_id !== payload.assignment?.id),
         nextAssignmentSessions,
       ),
@@ -2521,6 +3677,16 @@ function handleRealtimeAssignment(payload) {
     }
     renderStudentCards({ skipReviewWorkspace: preserveReviewInputs })
   }
+}
+
+function handleRealtimeAccessRequest(payload) {
+  if (!payload?.assignment) return
+  upsertAssignmentInState(payload.assignment)
+  if (currentView === 'assignment' && selectedAssignmentId === payload.assignment.id) {
+    renderStudentCards({ skipReviewWorkspace: Boolean(activeReviewEditorElement()) })
+    return
+  }
+  renderView()
 }
 
 function handleRealtimeReplay(payload) {
@@ -2542,13 +3708,14 @@ function syncRealtimeSubscriptions() {
     closeRealtimeConnection(teacherRealtime)
     teacherRealtimeKey = nextTeacherKey
     teacherRealtime = nextTeacherKey
-      ? openRealtimeConnection([nextTeacherKey], {
-          dashboard: handleRealtimeDashboard,
-          error: () => {
-            refreshDashboard().catch(() => {})
-          },
-        })
-      : null
+	      ? openRealtimeConnection([nextTeacherKey], {
+	          dashboard: handleRealtimeDashboard,
+	          accessRequest: handleRealtimeAccessRequest,
+	          error: () => {
+	            retryRealtimeConnection('teacher', () => refreshDashboard().catch(() => {}))
+	          },
+	        }, 'teacher')
+	      : null
   }
 
   const nextAssignmentKey = currentView === 'assignment' && selectedAssignmentId ? assignmentChannel() : ''
@@ -2556,13 +3723,14 @@ function syncRealtimeSubscriptions() {
     closeRealtimeConnection(assignmentRealtime)
     assignmentRealtimeKey = nextAssignmentKey
     assignmentRealtime = nextAssignmentKey
-      ? openRealtimeConnection([nextAssignmentKey], {
-          assignment: handleRealtimeAssignment,
-          error: () => {
-            refreshAssignmentViewData().catch(() => {})
-          },
-        })
-      : null
+	      ? openRealtimeConnection([nextAssignmentKey], {
+	          assignment: handleRealtimeAssignment,
+	          accessRequest: handleRealtimeAccessRequest,
+	          error: () => {
+	            retryRealtimeConnection('assignment', () => refreshAssignmentViewData().catch(() => {}))
+	          },
+	        }, 'assignment')
+	      : null
   }
 
   const nextReplayKey = reviewWorkspaceOpen && selectedReviewSessionId ? replayChannel() : ''
@@ -2570,13 +3738,13 @@ function syncRealtimeSubscriptions() {
     closeRealtimeConnection(replayRealtime)
     replayRealtimeKey = nextReplayKey
     replayRealtime = nextReplayKey
-      ? openRealtimeConnection([nextReplayKey], {
-          replay: handleRealtimeReplay,
-          error: () => {
-            refreshSelectedReviewReplayData().catch(() => {})
-          },
-        })
-      : null
+	      ? openRealtimeConnection([nextReplayKey], {
+	          replay: handleRealtimeReplay,
+	          error: () => {
+	            retryRealtimeConnection('replay', () => refreshSelectedReviewReplayData().catch(() => {}))
+	          },
+	        }, 'replay')
+	      : null
   }
 }
 
@@ -2634,11 +3802,18 @@ async function refreshSelectedReviewSessionData() {
 
   dashboardState = {
     ...dashboardState,
-    live_sessions: mergeById(getLiveSessions(), [selectedSession]),
+    live_sessions: mergeLiveSessions(getLiveSessions(), [selectedSession]),
   }
-  syncSelectedReviewSessionSnapshot(selectedSession)
+  syncSelectedReviewSessionSnapshot(currentReviewSession() || selectedSession)
 
   if (reviewState?.sessionId === selectedSession.id) {
+    const cached = reviewReplayCache.get(selectedSession.id)
+    if (cached) {
+      const mergedReplay = mergeReviewReplayWithLiveSession(cached.replay, selectedSession)
+      if (mergedReplay !== cached.replay) {
+        reviewReplayCache.set(selectedSession.id, buildReviewReplayCacheEntry(mergedReplay))
+      }
+    }
     renderReviewWorkspaceLiveContent(getSelectedAssignment())
   } else {
     renderStudentCards({ skipReviewWorkspace: true })
@@ -2646,13 +3821,18 @@ async function refreshSelectedReviewSessionData() {
 }
 
 function renderDraftSurface(text, annotations) {
-  const safeText = String(text || '')
+  const model = handtypedMarkdownDisplayModel(text)
+  const safeText = model.text
   if (!safeText) {
-    elements.reviewDraftSurface.innerHTML = '<span class="student-meta">(empty draft)</span>'
+    const emptyHtml = '<span class="student-meta">(empty draft)</span>'
+    if (reviewDraftSurfaceHtml !== emptyHtml) {
+      elements.reviewDraftSurface.innerHTML = emptyHtml
+      reviewDraftSurfaceHtml = emptyHtml
+    }
     return
   }
 
-  const highlightIndexes = reviewHighlightIndexSet(safeText, reviewHighlightRangesForState(currentReviewSession(), getSelectedAssignment()))
+  const highlightIndexes = reviewHighlightIndexSet(safeText, reviewHighlightRangesForState(currentReviewSession(), getSelectedAssignment()), text)
   const pendingSelection = normalizedPendingReviewSelection(safeText, reviewState?.selection)
   const selectionIndexes = new Set()
   if (pendingSelection) {
@@ -2671,7 +3851,7 @@ function renderDraftSurface(text, annotations) {
     const end = Math.max(start, Math.min(annotation.end, safeText.length))
     if (start === end) {
       if (start > cursor) {
-        parts.push(renderIndexedSlice(safeText, cursor, start, null, highlightIndexes, selectionIndexes))
+        parts.push(renderIndexedSegments(model, cursor, start, null, highlightIndexes, selectionIndexes))
       }
       parts.push(
         `<span class="review-annotation-anchor-marker" data-annotation-id="${escapeHtml(annotation.id)}" aria-hidden="true"></span>`,
@@ -2680,21 +3860,25 @@ function renderDraftSurface(text, annotations) {
       continue
     }
     if (start > cursor) {
-      parts.push(renderIndexedSlice(safeText, cursor, start, null, highlightIndexes, selectionIndexes))
+      parts.push(renderIndexedSegments(model, cursor, start, null, highlightIndexes, selectionIndexes))
     }
-    parts.push(renderIndexedSlice(safeText, start, end, annotation, highlightIndexes, selectionIndexes))
+    parts.push(renderIndexedSegments(model, start, end, annotation, highlightIndexes, selectionIndexes))
     cursor = end
   }
   if (cursor < safeText.length) {
-    parts.push(renderIndexedSlice(safeText, cursor, safeText.length, null, highlightIndexes, selectionIndexes))
+    parts.push(renderIndexedSegments(model, cursor, safeText.length, null, highlightIndexes, selectionIndexes))
   }
-  elements.reviewDraftSurface.innerHTML = parts.join('')
+  const nextHtml = parts.join('')
+  if (reviewDraftSurfaceHtml !== nextHtml) {
+    elements.reviewDraftSurface.innerHTML = nextHtml
+    reviewDraftSurfaceHtml = nextHtml
+  }
 }
 
 function renderReviewAnnotationList(session) {
   if (!reviewState) return
-  const text = String(session?.current_text || '')
-  const annotations = reviewState.inlineAnnotations
+  const text = handtypedMarkdownDisplayText(session?.current_text || '')
+  const annotations = visibleReviewAnnotations(reviewState.inlineAnnotations)
     .map((annotation) => annotationDisplayState(annotation, text))
     .sort((a, b) => a.start - b.start || a.end - b.end)
 
@@ -2739,7 +3923,9 @@ function renderReviewAnnotationList(session) {
   })
 
   elements.reviewAnnotationList.querySelectorAll('[data-delete-annotation]').forEach((button) => {
-    button.addEventListener('click', () => deleteReviewAnnotation(button.dataset.deleteAnnotation || ''))
+    button.addEventListener('click', () => {
+      deleteReviewAnnotation(button.dataset.deleteAnnotation || '').catch(() => {})
+    })
   })
 }
 
@@ -2832,14 +4018,16 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
     return
   }
   syncSelectedReviewSessionSnapshot(session)
+  syncReviewResolvedAnnotationsFromSession(session)
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
   const reviewText = displaySessionText(session, reviewState.replayData)
-  elements.reviewDraftMeta.textContent = reviewText
-    ? `Live draft is ${reviewText.length} characters. Select text to anchor comments.`
+  const reviewDisplayText = handtypedMarkdownDisplayText(reviewText)
+  elements.reviewDraftMeta.textContent = reviewDisplayText
+    ? `Live draft is ${reviewDisplayText.length} characters. Select text to anchor comments.`
     : 'The student draft is still empty.'
   renderReviewHighlightUi(session, selectedAssignment)
-  renderDraftSurface(reviewText, reviewState.inlineAnnotations)
+  renderDraftSurface(reviewText, visibleReviewAnnotations(reviewState.inlineAnnotations))
   elements.reviewDraftSurface.querySelectorAll('[data-annotation-id]').forEach((node) => {
     node.addEventListener('click', () => {
       selectedAnnotationId = node.dataset.annotationId || null
@@ -2848,7 +4036,7 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
   })
   renderReviewAnnotationList({
     ...session,
-    current_text: reviewText,
+    current_text: reviewDisplayText,
   })
   renderReviewSelectionUi()
   renderReviewSyncStatus()
@@ -2879,6 +4067,7 @@ function renderReviewWorkspace(selectedAssignment) {
     reviewState = createReviewStateFromSession(session)
     selectedAnnotationId = null
   }
+  syncReviewResolvedAnnotationsFromSession(session)
 
   elements.reviewWorkspaceEmpty.hidden = true
   elements.reviewWorkspaceContent.hidden = false
@@ -2888,13 +4077,17 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.reviewGradeScore.value = reviewState.gradeScore
   elements.reviewTeacherComment.value = reviewState.teacherComment
   elements.reviewReturned.checked = reviewState.returnedForRevision
+  if (elements.reviewPublishFeedback) {
+    elements.reviewPublishFeedback.disabled = reviewState.saveState === 'saving'
+  }
   const reviewText = displaySessionText(session, reviewState.replayData)
-  elements.reviewDraftMeta.textContent = reviewText
-    ? `Live draft is ${reviewText.length} characters. Select text to anchor comments.`
+  const reviewDisplayText = handtypedMarkdownDisplayText(reviewText)
+  elements.reviewDraftMeta.textContent = reviewDisplayText
+    ? `Live draft is ${reviewDisplayText.length} characters. Select text to anchor comments.`
     : 'The student draft is still empty.'
   renderReviewHighlightUi(session, selectedAssignment)
   renderReviewRubric(selectedAssignment)
-  renderDraftSurface(reviewText, reviewState.inlineAnnotations)
+  renderDraftSurface(reviewText, visibleReviewAnnotations(reviewState.inlineAnnotations))
   elements.reviewDraftSurface.querySelectorAll('[data-annotation-id]').forEach((node) => {
     node.addEventListener('click', () => {
       selectedAnnotationId = node.dataset.annotationId || null
@@ -2903,7 +4096,7 @@ function renderReviewWorkspace(selectedAssignment) {
   })
   renderReviewAnnotationList({
     ...session,
-    current_text: reviewText,
+    current_text: reviewDisplayText,
   })
   renderReviewSelectionUi()
   renderReviewSyncStatus()
@@ -2972,7 +4165,7 @@ function activeReviewEditorElement() {
 
 async function selectReviewSession(sessionId) {
   if (!sessionId) return
-  await flushReviewSave()
+  const previousSave = saveReviewSnapshotBeforeSwitch()
   reviewWorkspaceOpen = true
   elements.reviewWorkspace?.removeAttribute('hidden')
   const sameSession = selectedReviewSessionId === sessionId
@@ -2987,6 +4180,7 @@ async function selectReviewSession(sessionId) {
   if (sameSession) {
     syncSelectedReviewSessionSnapshot()
   }
+  previousSave.catch(() => {})
   await Promise.all([
     refreshSelectedReviewSessionData(),
     refreshAssignmentViewData(),
@@ -3002,56 +4196,10 @@ async function closeReviewWorkspace() {
   renderStudentCards()
 }
 
-function renderMonitoringOverview(matchingSessions) {
-  const now = Date.now()
-  const activeSessions = matchingSessions.filter((session) => deriveSessionRisk(session, now).active)
-  const attentionSessions = matchingSessions.filter((session) => deriveSessionRisk(session, now).needsAttention)
-  const unfocusedSessions = matchingSessions.filter((session) => deriveSessionRisk(session, now).active && !session.focused)
-  const offlineSessions = matchingSessions.filter((session) => !deriveSessionRisk(session, now).active)
-  const editActivity = aggregateRecentEditActivity(matchingSessions)
-
-  elements.overviewStudents.textContent = String(matchingSessions.length)
-  elements.overviewStudentsMeta.textContent = `${activeSessions.length} actively reporting`
-  elements.overviewAttention.textContent = String(attentionSessions.length)
-  elements.overviewAttentionMeta.textContent = attentionSessions.length
-    ? 'Students to investigate first'
-    : 'No active alerts'
-  elements.overviewUnfocused.textContent = String(unfocusedSessions.length)
-  elements.overviewUnfocusedMeta.textContent = unfocusedSessions.length
-    ? 'Students currently outside the app'
-    : 'Everyone is focused'
-  elements.overviewOffline.textContent = String(offlineSessions.length)
-  elements.overviewOfflineMeta.textContent = offlineSessions.length
-    ? 'Students not updating right now'
-    : 'All sessions are fresh'
-  elements.overviewEdits.textContent = String(editActivity.totalEdits)
-  elements.overviewEditsMeta.textContent = editActivity.activeStudents
-    ? `${editActivity.activeStudents} student${editActivity.activeStudents === 1 ? '' : 's'} changed text in the last 5 min`
-    : 'No recent writing changes'
-}
-
-function sessionMatchesFilter(session) {
-  const now = Date.now()
-  const risk = deriveSessionRisk(session, now)
-  const nameMatch = !sessionSearch || String(session.student_name || '').toLowerCase().includes(sessionSearch.toLowerCase())
-  if (!nameMatch) {
-    return false
-  }
-  switch (sessionFilter) {
-    case 'attention':
-      return risk.needsAttention
-    case 'active':
-      return risk.active
-    case 'offline':
-      return !risk.active
-    default:
-      return true
-  }
-}
-
 function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   const selectedClassroom = getSelectedClassroom()
   const selectedAssignment = getSelectedAssignment()
+  syncAccessExtensionDefaults()
   const matchingSessions = sessionsForAssignment(
     getLiveSessions(),
     selectedClassroom?.name,
@@ -3064,9 +4212,10 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
     viewTitle.textContent = selectedAssignment.title
     viewMeta.textContent = assignmentViewMeta(selectedAssignment, selectedClassroom, getLiveSessions())
   }
+  renderAssignmentMonitoringStatus()
 
-  renderMonitoringOverview(matchingSessions)
   renderAccessRequests(selectedAssignment, matchingSessions)
+  renderFeedbackRequests(selectedAssignment, matchingSessions)
   if (!selectedClassroom || !selectedAssignment) {
     elements.sessionGrid.innerHTML = `<div class="student-empty">Choose an assignment to see student work.</div>`
     if (!skipReviewWorkspace) {
@@ -3079,7 +4228,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
     clearSelectedReviewSession()
   }
 
-  const visibleSessions = sortSessionsForDisplay(matchingSessions).filter(sessionMatchesFilter)
+  const visibleSessions = sortSessionsForDisplay(matchingSessions)
 
   if (!visibleSessions.length) {
     elements.sessionGrid.innerHTML = `<div class="student-empty">No student sessions match the current filter.</div>`
@@ -3101,6 +4250,8 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
       const requestKey = normalizeStudentOverrideKey(session.student_name)
       const pendingRequest = selectedAssignment?.student_access_requests?.[requestKey]
       const requestBadge = pendingRequest ? badge('Access requested', 'warn') : ''
+      const pendingFeedbackRequest = selectedAssignment?.student_feedback_requests?.[requestKey]
+      const feedbackRequestBadge = pendingFeedbackRequest ? badge('Feedback requested', 'warn') : ''
       const specialAccessBadge = specialAccessBadgeFor(selectedAssignment, session.student_name, now)
       const accessRevoked = studentAccessRevokedFor(selectedAssignment, session.student_name)
       const accessActionPending = pendingStudentAccessActionFor(session.student_name)
@@ -3123,18 +4274,19 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
         <article
           class="student-card student-card-risk-${risk.score >= 45 ? 'high' : risk.score >= 20 ? 'medium' : 'low'}${selectedReviewSessionId === session.id ? ' is-selected' : ''}"
           data-review-session="${escapeHtml(session.id)}"
+          data-special-access-active="${specialAccessBadge ? 'true' : 'false'}"
         >
           <div class="student-card-header">
             <div>
               <h2>${escapeHtml(session.student_name)}</h2>
-              <div class="student-meta">Last activity ${escapeHtml(timeAgoLabel(session.last_activity_at, now))}</div>
+              <div class="student-meta" data-student-last-activity>Last activity ${escapeHtml(timeAgoLabel(session.last_activity_at, now))}</div>
             </div>
-            <div class="student-badges">${badge(statusLabel, statusTone)}${specialAccessBadge}${requestBadge}</div>
+            <div class="student-badges"><span class="student-badge student-badge-${statusTone}" data-student-status-badge>${escapeHtml(statusLabel)}</span>${specialAccessBadge}${requestBadge}${feedbackRequestBadge}</div>
           </div>
           <div class="student-card-body">
             <div class="student-section">
               <div class="section-label">Status</div>
-              <div class="student-meta">${escapeHtml(statusLabel)}</div>
+              <div class="student-meta" data-student-status-text>${escapeHtml(statusLabel)}</div>
             </div>
             <div class="student-section">
               <div class="section-label">Recent browser URLs</div>
@@ -3186,9 +4338,9 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
       if (!studentName || pendingStudentAccessActionFor(studentName)) return
       setPendingStudentAccessAction(studentName, 'extend')
       renderStudentCards({ skipReviewWorkspace: true })
-      const { hour, minute } = selectedTimeParts(elements.quickExtendTime, 15, 0)
       try {
-        await extendSelectedAssignmentForStudentToToday(studentName, hour, minute)
+        const target = selectedExtensionTarget(elements.quickExtendDate, elements.quickExtendTime)
+        await extendSelectedAssignmentForStudentUntil(studentName, target)
       } finally {
         clearPendingStudentAccessAction(studentName)
         renderStudentCards({ skipReviewWorkspace: true })
@@ -3223,6 +4375,61 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
   }
 }
 
+function refreshStudentCardLiveLabels() {
+  if (!dashboardState || currentView !== 'assignment' || reviewWorkspaceOpen || !elements.sessionGrid) {
+    return
+  }
+  const selectedClassroom = getSelectedClassroom()
+  const selectedAssignment = getSelectedAssignment()
+  if (!selectedClassroom || !selectedAssignment) {
+    return
+  }
+  const now = Date.now()
+  const sessionsById = new Map(
+    sortSessionsForDisplay(
+      sessionsForAssignment(getLiveSessions(), selectedClassroom.name, selectedAssignment.id),
+    ).map((session) => [session.id, session]),
+  )
+  const viewMeta = document.getElementById('assignment-view-meta')
+  if (viewMeta) {
+    viewMeta.textContent = assignmentViewMeta(selectedAssignment, selectedClassroom, getLiveSessions())
+  }
+
+  let needsFullRender = false
+  elements.sessionGrid.querySelectorAll('[data-review-session]').forEach((card) => {
+    const session = sessionsById.get(card.dataset.reviewSession || '')
+    if (!session) {
+      needsFullRender = true
+      return
+    }
+    const risk = deriveSessionRisk(session, now)
+    const statusLabel = risk.active ? 'Active' : 'Offline'
+    const statusTone = risk.active ? (session.focused ? 'good' : 'warn') : 'danger'
+    const specialAccessActive = Boolean(specialAccessBadgeFor(selectedAssignment, session.student_name, now))
+    if (card.dataset.specialAccessActive !== String(specialAccessActive)) {
+      needsFullRender = true
+      return
+    }
+    const activity = card.querySelector('[data-student-last-activity]')
+    if (activity) {
+      activity.textContent = `Last activity ${timeAgoLabel(session.last_activity_at, now)}`
+    }
+    const statusText = card.querySelector('[data-student-status-text]')
+    if (statusText) {
+      statusText.textContent = statusLabel
+    }
+    const statusBadge = card.querySelector('[data-student-status-badge]')
+    if (statusBadge) {
+      statusBadge.textContent = statusLabel
+      statusBadge.className = `student-badge student-badge-${statusTone}`
+    }
+  })
+
+  if (needsFullRender) {
+    renderStudentCards({ skipReviewWorkspace: true })
+  }
+}
+
 function renderDashboard(data) {
   dashboardState = preserveSelectedReviewSessionInDashboardPayload(data)
   dashboardCursor = String(data?.updated_at || dashboardCursor || '')
@@ -3244,6 +4451,9 @@ function renderAccessRequests(assignment, matchingSessions = []) {
 
   const sessionKeys = new Set((matchingSessions || []).map((session) => normalizeStudentOverrideKey(session.student_name)))
   const assignmentOpen = assignmentIsOpenNow(assignment)
+  const defaultTarget = defaultAccessExtensionTarget()
+  const defaultDate = localDateInputValue(defaultTarget)
+  const defaultTime = nativeTimeInputValue(defaultTarget)
   elements.accessRequestList.closest('.access-request-panel')?.removeAttribute('hidden')
   elements.accessRequestList.innerHTML = requests
     .map((entry) => {
@@ -3265,10 +4475,16 @@ function renderAccessRequests(assignment, matchingSessions = []) {
               assignmentOpen
                 ? '<div class="student-meta">Approve now and use the normal class window.</div>'
                 : `
-                  <label class="access-request-time">
-                    <span>End time</span>
-                    <input type="time" value="${escapeHtml(elements.quickExtendTime?.value || '15:00')}" data-access-request-time="${escapeHtml(entry.key)}" />
-                  </label>
+                  <div class="access-request-date-time">
+                    <label class="access-request-time">
+                      <span>End date</span>
+                      <input type="date" value="${escapeHtml(defaultDate)}" data-access-request-date="${escapeHtml(entry.key)}" />
+                    </label>
+                    <label class="access-request-time">
+                      <span>End time</span>
+                      <input type="time" value="${escapeHtml(defaultTime)}" data-access-request-time="${escapeHtml(entry.key)}" />
+                    </label>
+                  </div>
                 `
             }
             <button class="button small-button" type="button" data-approve-access-request="${escapeHtml(entry.key)}" ${approvalPending ? 'disabled' : ''}>
@@ -3287,6 +4503,17 @@ function renderAccessRequests(assignment, matchingSessions = []) {
       if (!assignment || !entry) {
         return
       }
+      let approvalTarget = null
+      try {
+        if (!assignmentIsOpenNow(assignment)) {
+          const dateInput = elements.accessRequestList.querySelector(`[data-access-request-date="${CSS.escape(requestKey)}"]`)
+          const timeInput = elements.accessRequestList.querySelector(`[data-access-request-time="${CSS.escape(requestKey)}"]`)
+          approvalTarget = selectedExtensionTarget(dateInput, timeInput)
+        }
+      } catch (error) {
+        window.alert(`Could not approve access: ${error.message}`)
+        return
+      }
       pendingAccessRequestApprovals.add(requestKey)
       renderAccessRequests(assignment, matchingSessions)
       try {
@@ -3294,9 +4521,7 @@ function renderAccessRequests(assignment, matchingSessions = []) {
           await approveAssignmentAccessRequest(assignment, entry)
           return
         }
-        const timeInput = elements.accessRequestList.querySelector(`[data-access-request-time="${CSS.escape(requestKey)}"]`)
-        const { hour, minute } = selectedTimeParts(timeInput, 15, 0)
-        await approveAssignmentAccessRequest(assignment, entry, { hour, minute })
+        await approveAssignmentAccessRequest(assignment, entry, { target: approvalTarget })
       } catch (error) {
         window.alert(`Could not approve access: ${error.message}`)
       } finally {
@@ -3308,6 +4533,39 @@ function renderAccessRequests(assignment, matchingSessions = []) {
       }
     })
   })
+}
+
+function renderFeedbackRequests(assignment, matchingSessions = []) {
+  if (!elements.feedbackRequestList) {
+    return
+  }
+  const requests = feedbackRequestsForAssignment(assignment)
+  if (!assignment || !requests.length) {
+    elements.feedbackRequestList.innerHTML = ''
+    elements.feedbackRequestList.closest('.feedback-request-panel')?.setAttribute('hidden', '')
+    return
+  }
+
+  const sessionKeys = new Set((matchingSessions || []).map((session) => normalizeStudentOverrideKey(session.student_name)))
+  elements.feedbackRequestList.closest('.feedback-request-panel')?.removeAttribute('hidden')
+  elements.feedbackRequestList.innerHTML = requests
+    .map((entry) => {
+      const requestTime = entry.requested_at ? timeAgoLabel(entry.requested_at) : 'just now'
+      const linkedToLiveSession = sessionKeys.has(entry.key)
+      return `
+        <article class="access-request-card">
+          <div class="access-request-copy">
+            <div class="access-request-title-row">
+              <h3>${escapeHtml(entry.student_name)}</h3>
+              <span class="student-badge student-badge-warn">Feedback requested</span>
+            </div>
+            <div class="student-meta">Requested ${escapeHtml(requestTime)}${linkedToLiveSession ? ' • visible in student list' : ''}</div>
+            ${entry.note ? `<p class="access-request-note">${escapeHtml(entry.note)}</p>` : ''}
+          </div>
+        </article>
+      `
+    })
+    .join('')
 }
 
 function mergeById(previous, incoming) {
@@ -3375,6 +4633,7 @@ async function refreshAssignmentViewData() {
   if (!dashboardState || currentView !== 'assignment' || !selectedAssignmentId) {
     return
   }
+  markFallbackRefresh('assignment-view')
 
   const now = Date.now()
   const fetchSummaryBundle =
@@ -3422,7 +4681,7 @@ async function refreshAssignmentViewData() {
     const nextAssignmentSessions = preserveSelectedReviewSessionInSummaries(summariesPayload.live_sessions)
     dashboardState = {
       ...dashboardState,
-      live_sessions: mergeById(
+      live_sessions: mergeLiveSessions(
         getLiveSessions().filter((session) => session.assignment_id !== selectedAssignmentId),
         nextAssignmentSessions,
       ),
@@ -3445,9 +4704,9 @@ async function refreshAssignmentViewData() {
     } else {
       dashboardState = {
         ...dashboardState,
-        live_sessions: mergeById(getLiveSessions(), [selectedSession]),
+        live_sessions: mergeLiveSessions(getLiveSessions(), [selectedSession]),
       }
-      syncSelectedReviewSessionSnapshot(selectedSession)
+      syncSelectedReviewSessionSnapshot(currentReviewSession() || selectedSession)
     }
   }
 
@@ -3466,7 +4725,7 @@ function applyDashboardDelta(delta) {
     summary: delta.summary || dashboardState.summary,
     classrooms: Array.isArray(delta.classrooms) ? delta.classrooms : dashboardState.classrooms,
     assignments: Array.isArray(delta.assignments) ? delta.assignments : dashboardState.assignments,
-    live_sessions: mergeById(dashboardState.live_sessions, delta.live_sessions),
+    live_sessions: mergeLiveSessions(dashboardState.live_sessions, delta.live_sessions),
     assignment_audits: mergeById(dashboardState.assignment_audits, delta.assignment_audits),
   }
   if (Array.isArray(delta.replays) && dashboardState.summary) {
@@ -3516,11 +4775,20 @@ function renderView() {
   if (elements.quickExtendButton) {
     elements.quickExtendButton.disabled = !getSelectedAssignment()
   }
+  if (elements.quickExtendDate) {
+    elements.quickExtendDate.disabled = !getSelectedAssignment()
+  }
   if (elements.quickExtendTime) {
     elements.quickExtendTime.disabled = !getSelectedAssignment()
   }
+  if (getSelectedAssignment()) {
+    syncAccessExtensionDefaults()
+  }
   if (elements.deleteAssignmentButton) {
     elements.deleteAssignmentButton.disabled = !getSelectedAssignment()
+  }
+  if (elements.editAssignmentButton) {
+    elements.editAssignmentButton.disabled = !selectedAssignmentId
   }
 
   if (currentView === 'assignment' && selectedAssignmentId) {
@@ -3570,6 +4838,7 @@ async function refreshDashboard() {
   refreshInFlight = true
   try {
     if (!dashboardState) {
+      markFallbackRefresh('dashboard-full')
       renderDashboard(await request('/api/edu/dashboard'))
       return
     }
@@ -3577,6 +4846,7 @@ async function refreshDashboard() {
       await refreshAssignmentViewData()
       return
     }
+    markFallbackRefresh('dashboard-delta')
     const delta = await request(`/api/edu/dashboard/updates?since=${encodeURIComponent(dashboardCursor || '')}`)
     if (dashboardDeltaNeedsFullRefresh(dashboardState, delta)) {
       renderDashboard(await request('/api/edu/dashboard'))
@@ -3599,11 +4869,14 @@ function startDashboardRefresh() {
   syncRealtimeSubscriptions()
   if (!statusTickTimer) {
     statusTickTimer = window.setInterval(() => {
-      if (!document.hidden && reviewWorkspaceOpen) {
-        renderReviewWorkspaceMeta()
-      }
+	      if (!document.hidden && reviewWorkspaceOpen) {
+	        renderReviewWorkspaceMeta()
+	      }
+	      if (!document.hidden) {
+	        renderRealtimeDebug()
+	      }
       if (!document.hidden && dashboardState && !reviewWorkspaceOpen && !activeReviewEditorElement()) {
-        renderView()
+        refreshStudentCardLiveLabels()
       }
     }, TEACHER_STATUS_TICK_MS)
   }
@@ -3626,8 +4899,52 @@ function dayLabel(days) {
 }
 
 function renderValidationList(element, items) {
+  if (!element) {
+    return
+  }
   element.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
   element.hidden = !items.length
+}
+
+function hideAssignmentFormToast() {
+  if (assignmentFormToastTimer) {
+    window.clearTimeout(assignmentFormToastTimer)
+    assignmentFormToastTimer = null
+  }
+  if (!elements.assignmentFormToast) {
+    return
+  }
+  elements.assignmentFormToast.hidden = true
+  elements.assignmentFormToast.textContent = ''
+  delete elements.assignmentFormToast.dataset.tone
+}
+
+function showAssignmentFormToast(message, tone = 'error') {
+  if (!elements.assignmentFormToast || !message) {
+    return
+  }
+  if (assignmentFormToastTimer) {
+    window.clearTimeout(assignmentFormToastTimer)
+  }
+  elements.assignmentFormToast.dataset.tone = tone
+  elements.assignmentFormToast.textContent = String(message)
+  elements.assignmentFormToast.hidden = false
+  assignmentFormToastTimer = window.setTimeout(() => {
+    hideAssignmentFormToast()
+  }, 3600)
+}
+
+function labelTextForField(field) {
+  const label = field?.closest?.('label')
+  const text = label?.querySelector?.('span')?.textContent || field?.getAttribute?.('aria-label') || field?.name || 'Field'
+  return String(text).replace(/\s+/g, ' ').trim()
+}
+
+function parseDomainLines(value = '') {
+  return String(value || '')
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
 }
 
 function validateAssignmentDraft() {
@@ -3636,25 +4953,28 @@ function validateAssignmentDraft() {
   const warnings = []
   const days = readWindowDays(form)
   const hasDay = Object.values(days).some(Boolean)
-  const start = parseTimeParts(form.get('window_start_time'), 10, 0)
-  const end = parseTimeParts(form.get('window_end_time'), 11, 0)
+  const rawStartTime = form.get('window_start_time')
+  const rawEndTime = form.get('window_end_time')
+  const parsedStartTime = parseReviewTimeInput(rawStartTime)
+  const parsedEndTime = parseReviewTimeInput(rawEndTime)
+  const start = parseTimeParts(rawStartTime, 10, 0)
+  const end = parseTimeParts(rawEndTime, 11, 0)
   const startMinutes = start.hour * 60 + start.minute
   const endMinutes = end.hour * 60 + end.minute
   const browserEnabled = form.get('browser_enabled') === 'on'
-  const homeUrl = String(form.get('browser_home_url') || '').trim()
-  const domains = String(form.get('browser_allowed_domains') || '')
-    .split('\n')
-    .map((value) => value.trim())
-    .filter(Boolean)
+  const domains = parseDomainLines(form.get('browser_allowed_domains') || '')
 
   if (!hasDay) {
     errors.push('Select at least one day of the week.')
   }
-  if (endMinutes <= startMinutes) {
-    errors.push('End time must be after start time.')
+  if (parsedStartTime == null) {
+    errors.push('Enter a 12-hour start time with AM or PM, like 10:00 AM.')
   }
-  if (browserEnabled && !homeUrl) {
-    errors.push('Study browser is enabled, so a home URL is required.')
+  if (parsedEndTime == null) {
+    errors.push('Enter a 12-hour end time with AM or PM, like 11:00 AM.')
+  }
+  if (parsedStartTime != null && parsedEndTime != null && endMinutes <= startMinutes) {
+    errors.push('End time must be after start time.')
   }
   if (browserEnabled && !domains.length) {
     warnings.push('Study browser is enabled without any URL rules.')
@@ -3671,7 +4991,9 @@ function validateAssignmentDraft() {
 }
 
 function updateAssignmentFormGuidance() {
-  const { errors } = validateAssignmentDraft()
+  const { errors, warnings } = validateAssignmentDraft()
+  renderValidationList(elements.assignmentFormErrors, errors)
+  renderValidationList(elements.assignmentFormWarnings, warnings)
   elements.assignmentFormSubmit.disabled = assignmentFormSubmitting || errors.length > 0
 }
 
@@ -3684,6 +5006,22 @@ function setAssignmentFormSubmitting(isSubmitting, isEditing = false) {
     elements.assignmentFormCancel.disabled = assignmentFormSubmitting
   }
   updateAssignmentFormGuidance()
+}
+
+async function selectedAssignmentForEditing() {
+  const assignment = getSelectedAssignment()
+  if (assignment) {
+    return assignment
+  }
+  if (!selectedAssignmentId) {
+    return null
+  }
+  const fetched = await request(`/api/edu/assignments/${encodeURIComponent(selectedAssignmentId)}`)
+  if (fetched?.id) {
+    upsertAssignmentInState(fetched)
+    return fetched
+  }
+  return null
 }
 
 function wireModalButtons() {
@@ -3719,14 +5057,21 @@ function wireModalButtons() {
     openModal(elements.assignmentModal)
   })
 
-  elements.editAssignmentButton?.addEventListener('click', () => {
-    const assignment = getSelectedAssignment()
-    if (!assignment) {
-      window.alert('Select an assignment first.')
-      return
+  elements.editAssignmentButton?.addEventListener('click', async () => {
+    elements.editAssignmentButton.disabled = true
+    try {
+      const assignment = await selectedAssignmentForEditing()
+      if (!assignment) {
+        window.alert('Select an assignment first.')
+        return
+      }
+      populateAssignmentModalForEdit(assignment)
+      openModal(elements.assignmentModal)
+    } catch (error) {
+      window.alert(`Could not load assignment: ${error.message}`)
+    } finally {
+      elements.editAssignmentButton.disabled = !selectedAssignmentId
     }
-    populateAssignmentModalForEdit(assignment)
-    openModal(elements.assignmentModal)
   })
 
   elements.deleteAssignmentButton?.addEventListener('click', async () => {
@@ -3753,11 +5098,11 @@ function wireModalButtons() {
   elements.quickExtendButton?.addEventListener('click', async () => {
     elements.quickExtendButton.disabled = true
     try {
-      const time = selectedTimeParts(elements.quickExtendTime)
-      await extendSelectedAssignmentToToday(time.hour, time.minute)
+      const target = selectedExtensionTarget(elements.quickExtendDate, elements.quickExtendTime)
+      await extendSelectedAssignmentUntil(target)
       if (elements.quickExtendStatus) {
         elements.quickExtendStatus.hidden = false
-        elements.quickExtendStatus.textContent = `Extended until ${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')} today.`
+        elements.quickExtendStatus.textContent = `Extended until ${accessExtensionTargetLabel(target)}.`
       }
     } catch (error) {
       window.alert(`Could not extend access: ${error.message}`)
@@ -3800,13 +5145,25 @@ function wireModalButtons() {
     }
   })
   elements.starterDocumentToolbar?.querySelectorAll('[data-starter-command]').forEach((button) => {
+    button.addEventListener('mousedown', (event) => {
+      event.preventDefault()
+    })
     button.addEventListener('click', () => {
       execStarterDocumentCommand(button.dataset.starterCommand)
     })
   })
   elements.starterDocumentEditor?.addEventListener('input', () => {
     syncStarterDocumentField()
+    updateStarterDocumentToolbarState()
     updateAssignmentFormGuidance()
+  })
+  ;['focus', 'keyup', 'mouseup'].forEach((eventName) => {
+    elements.starterDocumentEditor?.addEventListener(eventName, () => {
+      updateStarterDocumentToolbarState()
+    })
+  })
+  document.addEventListener('selectionchange', () => {
+    updateStarterDocumentToolbarState()
   })
   elements.assignmentAddRubric?.addEventListener('click', () => {
     renderRubricBuilder([...selectedRubricFromForm(), createRubricDraft({ title: '', points: 4 })])
@@ -3831,6 +5188,7 @@ function wireModalButtons() {
 
 function resetAssignmentModal() {
   assignmentFormSubmitting = false
+  hideAssignmentFormToast()
   elements.assignmentIdInput.value = ''
   elements.assignmentModalLabel.textContent = 'Create assignment'
   elements.assignmentModalTitle.textContent = 'New assignment'
@@ -3861,6 +5219,7 @@ function resetAssignmentModal() {
 
 function populateAssignmentModalForEdit(assignment) {
   assignmentFormSubmitting = false
+  hideAssignmentFormToast()
   elements.assignmentIdInput.value = assignment.id
   elements.assignmentModalLabel.textContent = 'Edit assignment'
   elements.assignmentModalTitle.textContent = assignment.title
@@ -3876,8 +5235,8 @@ function populateAssignmentModalForEdit(assignment) {
 
   if (assignment.windows?.[0]) {
     const win = assignment.windows[0]
-    field('window_start_time').value = `${String(win.start_hour).padStart(2, '0')}:${String(win.start_minute).padStart(2, '0')}`
-    field('window_end_time').value = `${String(win.end_hour).padStart(2, '0')}:${String(win.end_minute).padStart(2, '0')}`
+    field('window_start_time').value = formatClockTime(win.start_hour, win.start_minute)
+    field('window_end_time').value = formatClockTime(win.end_hour, win.end_minute)
     field('window_end_date').value = win.end_date || ''
     field('day_monday').checked = win.days?.monday ?? true
     field('day_tuesday').checked = win.days?.tuesday ?? true
@@ -3912,7 +5271,6 @@ function populateAssignmentModalForEdit(assignment) {
   if (assignment.browser_policy) {
     field('browser_enabled').checked = assignment.browser_policy.browser_enabled ?? false
     field('browser_mode').value = assignment.browser_policy.mode === 'blacklist' ? 'blacklist' : 'whitelist'
-    field('browser_home_url').value = assignment.browser_policy.home_url || ''
     field('browser_allowed_domains').value = (assignment.browser_policy.allowed_domains || []).join('\n')
   }
   const assignedStudents = Array.isArray(assignment.assigned_students) ? assignment.assigned_students : []
@@ -3949,6 +5307,13 @@ function wireForms() {
 
   elements.assignmentForm.addEventListener('input', updateAssignmentFormGuidance)
   elements.assignmentForm.addEventListener('change', updateAssignmentFormGuidance)
+  elements.assignmentForm.addEventListener('invalid', (event) => {
+    const field = event.target
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+      return
+    }
+    showAssignmentFormToast(`${labelTextForField(field)}: ${field.validationMessage}`)
+  }, true)
   elements.assignmentForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     const formEl = event.currentTarget
@@ -3958,10 +5323,12 @@ function wireForms() {
     const validation = validateAssignmentDraft()
     if (validation.errors.length) {
       updateAssignmentFormGuidance()
+      showAssignmentFormToast(validation.errors[0])
       return
     }
 
     try {
+      hideAssignmentFormToast()
       syncStarterDocumentField()
       const form = new FormData(formEl)
       const assignmentId = form.get('assignment_id')
@@ -3973,7 +5340,7 @@ function wireForms() {
       const studentOverrides = selectedStudentOverridesFromForm()
 
       if (!isEditing && !activeClassroom) {
-        window.alert('Choose a class first before creating an assignment.')
+        showAssignmentFormToast('Choose a class first before creating an assignment.')
         return
       }
 
@@ -4017,11 +5384,8 @@ function wireForms() {
         browser_policy: {
           browser_enabled: form.get('browser_enabled') === 'on',
           mode: form.get('browser_mode') === 'blacklist' ? 'blacklist' : 'whitelist',
-          home_url: form.get('browser_home_url') || '',
-          allowed_domains: String(form.get('browser_allowed_domains') || '')
-            .split('\n')
-            .map((value) => value.trim())
-            .filter(Boolean),
+          home_url: '',
+          allowed_domains: parseDomainLines(form.get('browser_allowed_domains') || ''),
         },
         student_overrides: studentOverrides.studentOverrides,
         linked_assignment_ids: [...new Set(form.getAll('linked_assignment_ids').map((value) => String(value).trim()).filter(Boolean))],
@@ -4055,27 +5419,10 @@ function wireForms() {
       renderView()
       refreshDashboard().catch(() => {})
     } catch (error) {
-      window.alert(`Could not save assignment: ${error.message}`)
+      showAssignmentFormToast(`Could not save assignment: ${error.message}`)
     } finally {
       setAssignmentFormSubmitting(false, Boolean(elements.assignmentIdInput.value))
     }
-  })
-}
-
-function wireMonitoringControls() {
-  elements.sessionFilterBar?.querySelectorAll('[data-filter]').forEach((button) => {
-    button.addEventListener('click', () => {
-      sessionFilter = button.dataset.filter || 'all'
-      elements.sessionFilterBar.querySelectorAll('[data-filter]').forEach((node) => {
-        node.classList.toggle('is-selected', node === button)
-      })
-      renderStudentCards()
-    })
-  })
-
-  elements.sessionSearchInput?.addEventListener('input', () => {
-    sessionSearch = elements.sessionSearchInput.value.trim()
-    renderStudentCards()
   })
 }
 
@@ -4107,27 +5454,82 @@ function wireReviewWorkspace() {
     renderStudentCards({ skipReviewWorkspace: true })
   })
 
+  elements.reviewPublishFeedback?.addEventListener('click', () => {
+    publishCurrentReviewFeedback().catch(() => {})
+  })
+
   elements.reviewHighlightDate?.addEventListener('input', () => {
     if (!reviewState) return
     reviewState.highlightDate = elements.reviewHighlightDate.value
+    setReviewHighlightModeFromControls()
     renderReviewWorkspace(getSelectedAssignment())
   })
 
-  elements.reviewHighlightAfterSchoolDay?.addEventListener('click', () => {
+  elements.reviewHighlightDates?.addEventListener('input', () => {
     if (!reviewState) return
-    reviewState.highlightMode = 'after-school-day'
+    reviewState.highlightDates = elements.reviewHighlightDates.value
+    setReviewHighlightModeFromControls()
     renderReviewWorkspace(getSelectedAssignment())
   })
 
-  elements.reviewHighlightAfterSchoolAll?.addEventListener('click', () => {
+  elements.reviewHighlightStartTime?.addEventListener('input', () => {
     if (!reviewState) return
-    reviewState.highlightMode = 'after-school-all'
+    reviewState.highlightStartTime = elements.reviewHighlightStartTime.value
+    setReviewHighlightModeFromControls()
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightEndTime?.addEventListener('input', () => {
+    if (!reviewState) return
+    reviewState.highlightEndTime = elements.reviewHighlightEndTime.value
+    setReviewHighlightModeFromControls()
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightWeekdays?.forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      if (!reviewState) return
+      reviewState.highlightWeekdays = elements.reviewHighlightWeekdays
+        .filter((item) => item.checked)
+        .map((item) => item.value)
+      setReviewHighlightModeFromControls()
+      renderReviewWorkspace(getSelectedAssignment())
+    })
+  })
+
+  elements.reviewHighlightPresetWindow?.addEventListener('click', () => {
+    applyReviewHighlightPreset('window')
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightPresetAfterSchool?.addEventListener('click', () => {
+    applyReviewHighlightPreset('after-school')
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightPresetEvening?.addEventListener('click', () => {
+    applyReviewHighlightPreset('evening')
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightPresetWeekdays?.addEventListener('click', () => {
+    applyReviewHighlightPreset('weekdays')
+    renderReviewWorkspace(getSelectedAssignment())
+  })
+
+  elements.reviewHighlightAll?.addEventListener('click', () => {
+    applyReviewHighlightPreset('all')
     renderReviewWorkspace(getSelectedAssignment())
   })
 
   elements.reviewHighlightClear?.addEventListener('click', () => {
     if (!reviewState) return
     reviewState.highlightMode = 'none'
+    reviewState.highlightDate = ''
+    reviewState.highlightDates = ''
+    reviewState.highlightStartTime = ''
+    reviewState.highlightEndTime = ''
+    reviewState.highlightWeekdays = []
     renderReviewWorkspace(getSelectedAssignment())
   })
 
@@ -4187,7 +5589,6 @@ async function loadApp() {
   wireModalButtons()
   populateAssignmentFontSizeOptions()
   wireForms()
-  wireMonitoringControls()
   wireReviewWorkspace()
   await refreshDashboard()
   startDashboardRefresh()

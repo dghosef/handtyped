@@ -102,24 +102,24 @@ export function formatAbsoluteReplayTime(session, elapsedMs) {
     return 'Unknown time'
   }
 
-  const offsetMinutes = Number(session?.recorded_timezone_offset_minutes)
-  const normalizedOffset = Number.isFinite(offsetMinutes) ? offsetMinutes : 0
-  const shifted = new Date(origin + Math.max(0, Number(elapsedMs) || 0) + normalizedOffset * 60_000)
-  const month = shifted.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
-  const day = shifted.getUTCDate()
-  const year = shifted.getUTCFullYear()
-  let hours = shifted.getUTCHours()
-  const minutes = String(shifted.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(shifted.getUTCSeconds()).padStart(2, '0')
+  const local = new Date(origin + Math.max(0, Number(elapsedMs) || 0))
+  const month = local.toLocaleString('en-US', { month: 'short' })
+  const day = local.getDate()
+  const year = local.getFullYear()
+  let hours = local.getHours()
+  const minutes = String(local.getMinutes()).padStart(2, '0')
+  const seconds = String(local.getSeconds()).padStart(2, '0')
   const meridiem = hours >= 12 ? 'PM' : 'AM'
   hours = hours % 12 || 12
 
-  const offsetSign = normalizedOffset >= 0 ? '+' : '-'
-  const absoluteOffset = Math.abs(normalizedOffset)
+  const offsetMinutes = -local.getTimezoneOffset()
+  const offsetSign = offsetMinutes >= 0 ? '+' : '-'
+  const absoluteOffset = Math.abs(offsetMinutes)
   const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
   const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
-  const timezone = session?.recorded_timezone
-    ? `${session.recorded_timezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = localTimezone
+    ? `${localTimezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
     : `UTC${offsetSign}${offsetHours}:${offsetMins}`
 
   return `${month} ${day}, ${year}, ${hours}:${minutes}:${seconds} ${meridiem} ${timezone}`
@@ -563,6 +563,35 @@ function toAttributedChars(text, insertedAtMs) {
   return Array.from(String(text || '')).map((char) => ({ char, insertedAtMs }))
 }
 
+function reconcileAttributedCharsWithFinalText(chars, finalText) {
+  const finalChars = Array.from(String(finalText || ''))
+  const knownText = chars.map((entry) => entry.char).join('')
+  if (!knownText) {
+    return toAttributedChars(finalText, null)
+  }
+
+  const knownIndex = finalChars.join('').indexOf(knownText)
+  if (knownIndex >= 0) {
+    return [
+      ...toAttributedChars(finalChars.slice(0, knownIndex).join(''), null),
+      ...chars,
+      ...toAttributedChars(finalChars.slice(knownIndex + Array.from(knownText).length).join(''), null),
+    ]
+  }
+
+  const reconciled = []
+  let knownCursor = 0
+  for (const char of finalChars) {
+    if (knownCursor < chars.length && chars[knownCursor]?.char === char) {
+      reconciled.push(chars[knownCursor])
+      knownCursor += 1
+    } else {
+      reconciled.push({ char, insertedAtMs: null })
+    }
+  }
+  return reconciled
+}
+
 function applyDeltaEntry(currentText, entry) {
   if (!Number.isInteger(entry?.pos) || typeof entry?.ins !== 'string') {
     return null
@@ -728,8 +757,13 @@ export function buildAttributedDocument(session = {}) {
 
   let chars = []
   let latestRawT = 0
+  let sawPartialDelta = false
 
-  const absoluteFromRawT = (rawT) => {
+  const absoluteFromRawT = (rawT, entry = null) => {
+    const absoluteWallMs = Number(entry?.absolute_wall_ms)
+    if (Number.isFinite(absoluteWallMs) && absoluteWallMs > 0) {
+      return absoluteWallMs
+    }
     const normalizedRawT = Math.max(0, Number(rawT) || 0)
     latestRawT = Math.max(latestRawT, normalizedRawT)
     return Number.isFinite(originWallMs) ? originWallMs + normalizedRawT : null
@@ -773,10 +807,13 @@ export function buildAttributedDocument(session = {}) {
     if (typeof nextText === 'string') {
       if (applyDeltaEntry(chars.map((item) => item.char).join(''), entry) != null && !entry.op) {
         const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
+        if (Number(entry.pos) > chars.length) {
+          sawPartialDelta = true
+        }
         const delCount = typeof entry.del === 'string'
           ? Array.from(entry.del).length
           : Math.max(0, Number(entry.del) || 0)
-        chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT)))
+        chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT, entry)))
       } else {
         applySnapshot(nextText, rawT)
       }
@@ -785,7 +822,11 @@ export function buildAttributedDocument(session = {}) {
 
   const finalText = String(session?.doc_text || latestTextFromHistory(session) || '')
   if (chars.map((entry) => entry.char).join('') !== finalText) {
-    applySnapshot(finalText, latestRawT)
+    if (sawPartialDelta || chars.length) {
+      chars = reconcileAttributedCharsWithFinalText(chars, finalText)
+    } else {
+      applySnapshot(finalText, latestRawT)
+    }
   }
 
   const insertedAtValues = chars

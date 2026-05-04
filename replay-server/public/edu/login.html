@@ -51,8 +51,7 @@
           <div id="google-signin-button"></div>
         </div>
         <div class="login-divider"><span>new here?</span></div>
-        <button class="button button-secondary" id="show-signup-button" type="button">Create teacher account</button>
-        <form class="edu-form login-form" id="teacher-signup-form" hidden>
+        <form class="edu-form login-form" id="teacher-signup-form">
           <label>
             <span>Name</span>
             <input name="name" type="text" placeholder="Teacher name" required />
@@ -79,7 +78,6 @@
     const statusEl = document.getElementById('login-status')
     const form = document.getElementById('teacher-login-form')
     const signupForm = document.getElementById('teacher-signup-form')
-    const showSignupButton = document.getElementById('show-signup-button')
     const googleShell = document.getElementById('google-signin-shell')
     const googleDivider = document.getElementById('google-login-divider')
 
@@ -182,10 +180,6 @@
       setStatus('')
       const payload = Object.fromEntries(new FormData(form).entries())
       await loginWithPayload({ ...payload, provider: 'password' }, 'Could not sign in.')
-    })
-
-    showSignupButton.addEventListener('click', () => {
-      signupForm.hidden = !signupForm.hidden
     })
 
     signupForm.addEventListener('submit', async (event) => {

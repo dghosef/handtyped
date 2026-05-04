@@ -53,7 +53,8 @@ class FakeD1Database {
       return
     }
 
-    if (sql.startsWith('CREATE INDEX IF NOT EXISTS edu_records_')) {
+    if (sql.startsWith('CREATE INDEX IF NOT EXISTS edu_records_')
+      || sql.startsWith('CREATE UNIQUE INDEX IF NOT EXISTS edu_records_')) {
       return
     }
 
@@ -141,6 +142,17 @@ class FakeD1Database {
         .map((row) => ({ ...row }))
     }
 
+    if (sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? ORDER BY updated_at DESC')) {
+      const [kind] = args
+      return records
+        .filter((row) => row.kind === kind)
+        .sort((a, b) => {
+          const updatedCompare = String(b.updated_at).localeCompare(String(a.updated_at))
+          return updatedCompare || String(b.id).localeCompare(String(a.id))
+        })
+        .map((row) => ({ ...row }))
+    }
+
     if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
       || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')) {
       const [kind, id] = args
@@ -152,6 +164,12 @@ class FakeD1Database {
       || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')) {
       const [tenant_id, kind, email] = args
       const row = records.find((item) => item.tenant_id === tenant_id && item.kind === kind && item.email === email)
+      return row ? [{ ...row }] : []
+    }
+
+    if (sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND email = ? LIMIT 1')) {
+      const [kind, email] = args
+      const row = records.find((item) => item.kind === kind && item.email === email)
       return row ? [{ ...row }] : []
     }
 

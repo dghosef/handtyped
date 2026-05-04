@@ -559,6 +559,128 @@ export function escapeHtml(text) {
     .replace(/'/g, '&#39;')
 }
 
+export function stripHandtypedInlineMarkup(markdown = '') {
+  return String(markdown || '').replace(/\[(\/?)(size|font|u|highlight)(?:[ =][^\]]+)?\]/gi, '')
+}
+
+const HANDTYPED_REPLAY_FONT_FAMILIES = Object.freeze({
+  arial: 'Arial, Helvetica, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+  sans: 'Inter, Arial, Helvetica, sans-serif',
+  mono: '"Courier New", monospace',
+  georgia: 'Georgia, serif',
+  times: '"Times New Roman", Times, serif',
+  garamond: 'Garamond, Georgia, serif',
+  palatino: 'Palatino, "Palatino Linotype", serif',
+  baskerville: 'Baskerville, Georgia, serif',
+  verdana: 'Verdana, Geneva, sans-serif',
+  trebuchet: '"Trebuchet MS", Arial, sans-serif',
+  tahoma: 'Tahoma, Geneva, sans-serif',
+  helvetica: 'Helvetica, Arial, sans-serif',
+  courier: '"Courier New", Courier, monospace',
+  'comic-sans': '"Comic Sans MS", "Comic Sans", cursive',
+  lucida: '"Lucida Sans Unicode", "Lucida Grande", sans-serif',
+})
+
+function safeHandtypedFontFamily(value) {
+  return HANDTYPED_REPLAY_FONT_FAMILIES[String(value || '').trim().toLowerCase()] || ''
+}
+
+function safeHandtypedFontSize(value) {
+  const size = Number.parseInt(value, 10)
+  return Number.isFinite(size) && size >= 10 && size <= 100 ? size : null
+}
+
+export function renderHandtypedInlineMarkupHtml(html = '') {
+  const source = String(html || '')
+  const tokenPattern = /\[(\/?)(size|font|u|highlight)(?:[ =]([^\]]+))?\]/gi
+  const stacks = {
+    font: [],
+    highlight: [],
+    size: [],
+    u: [],
+  }
+  let result = ''
+  let cursor = 0
+  let match = tokenPattern.exec(source)
+
+  while (match) {
+    result += source.slice(cursor, match.index)
+    cursor = match.index + match[0].length
+
+    const closing = Boolean(match[1])
+    const mark = String(match[2] || '').toLowerCase()
+    const value = match[3]
+
+    if (closing) {
+      const opened = stacks[mark]?.pop()
+      if (opened) {
+        result += mark === 'u' ? '</u>' : mark === 'highlight' ? '</mark>' : '</span>'
+      }
+      match = tokenPattern.exec(source)
+      continue
+    }
+
+    if (mark === 'u') {
+      stacks.u.push(true)
+      result += '<u>'
+    } else if (mark === 'highlight') {
+      stacks.highlight.push(true)
+      result += '<mark class="handtyped-replay-highlight">'
+    } else if (mark === 'font') {
+      const fontFamily = safeHandtypedFontFamily(value)
+      stacks.font.push(Boolean(fontFamily))
+      if (fontFamily) {
+        result += `<span style="font-family:${escapeHtml(fontFamily)}">`
+      }
+    } else if (mark === 'size') {
+      const fontSize = safeHandtypedFontSize(value)
+      stacks.size.push(Boolean(fontSize))
+      if (fontSize) {
+        result += `<span style="font-size:${fontSize}px">`
+      }
+    }
+
+    match = tokenPattern.exec(source)
+  }
+
+  return result + source.slice(cursor)
+}
+
+export function handtypedMarkdownDisplayText(markdown = '') {
+  const raw = stripHandtypedInlineMarkup(markdown).replace(/\r/g, '')
+  let text = ''
+  let index = 0
+  let atLineStart = true
+
+  while (index < raw.length) {
+    const rest = raw.slice(index)
+    if (atLineStart) {
+      const headingMatch = rest.match(/^(#{1,3})[ \t]+/)
+      if (headingMatch) {
+        index += headingMatch[0].length
+        atLineStart = false
+        continue
+      }
+    }
+
+    if (rest.startsWith('**') || rest.startsWith('__')) {
+      index += 2
+      continue
+    }
+    if ((rest[0] === '*' && rest[1] !== '*') || (rest[0] === '_' && rest[1] !== '_')) {
+      index += 1
+      continue
+    }
+
+    text += raw[index]
+    atLineStart = raw[index] === '\n'
+    index += 1
+  }
+
+  return text
+}
+
 function toAttributedChars(text, insertedAtMs) {
   return Array.from(String(text || '')).map((char) => ({ char, insertedAtMs }))
 }
@@ -596,11 +718,15 @@ function applyDeltaEntry(currentText, entry) {
   if (!Number.isInteger(entry?.pos) || typeof entry?.ins !== 'string') {
     return null
   }
-  const chars = Array.from(String(currentText || ''))
+  const current = String(currentText || '')
+  const chars = Array.from(current)
   const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
   const delCount = typeof entry.del === 'string'
     ? Array.from(entry.del).length
     : Math.max(0, Number(entry.del) || 0)
+  if (delCount === 0 && pos === 0 && current && entry.ins.startsWith(current)) {
+    return entry.ins
+  }
   chars.splice(pos, delCount, ...Array.from(entry.ins))
   return chars.join('')
 }
@@ -625,6 +751,9 @@ function nextHistoryText(currentText, entry) {
   }
   if (typeof entry.text === 'string' && !entry.op) {
     return entry.text
+  }
+  if (entry.op && typeof entry.text === 'string') {
+    return applyLegacyHistoryEntry(currentText, entry)
   }
   return applyDeltaEntry(currentText, entry) ?? applyLegacyHistoryEntry(currentText, entry)
 }
@@ -691,20 +820,20 @@ export function renderMarkdownToHtml(markdown) {
 
   const markedState = getSafeMarkedRenderer()
   if (!markedState) {
-    return renderPlainTextHtml(source)
+    return renderHandtypedInlineMarkupHtml(renderPlainTextHtml(source))
   }
 
   try {
-    return markedState.markedApi.parse(source, {
+    return renderHandtypedInlineMarkupHtml(markedState.markedApi.parse(source, {
       async: false,
       gfm: true,
       breaks: false,
       headerIds: false,
       mangle: false,
       renderer: markedState.renderer,
-    })
+    }))
   } catch {
-    return renderPlainTextHtml(source)
+    return renderHandtypedInlineMarkupHtml(renderPlainTextHtml(source))
   }
 }
 
@@ -769,7 +898,7 @@ export function buildAttributedDocument(session = {}) {
     return Number.isFinite(originWallMs) ? originWallMs + normalizedRawT : null
   }
 
-  const applySnapshot = (nextText, rawT) => {
+  const applySnapshot = (nextText, rawT, entry = null) => {
     const nextChars = Array.from(String(nextText || ''))
     const previousChars = chars.map((entry) => entry.char)
     let prefix = 0
@@ -795,7 +924,7 @@ export function buildAttributedDocument(session = {}) {
 
     chars = [
       ...chars.slice(0, prefix),
-      ...toAttributedChars(nextChars.slice(prefix, nextSuffix).join(''), absoluteFromRawT(rawT)),
+      ...toAttributedChars(nextChars.slice(prefix, nextSuffix).join(''), absoluteFromRawT(rawT, entry)),
       ...chars.slice(previousSuffix),
     ]
   }
@@ -815,7 +944,7 @@ export function buildAttributedDocument(session = {}) {
           : Math.max(0, Number(entry.del) || 0)
         chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT, entry)))
       } else {
-        applySnapshot(nextText, rawT)
+        applySnapshot(nextText, rawT, entry)
       }
     }
   }

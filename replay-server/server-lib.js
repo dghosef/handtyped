@@ -31,6 +31,8 @@ import {
   buildStudentConfig,
   createNodeEduStore,
   ensureEduSeedData,
+  removeClassroomStudent,
+  renameClassroomStudent,
 } from './edu-store.js'
 import {
   authenticateTeacher,
@@ -658,6 +660,47 @@ export function createApp(sessionsDir, config = {}) {
     }
     await eduStore.putClassroom(classroom)
     res.json(classroom)
+  })
+
+  app.post('/api/edu/classrooms/:id/students/rename', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getClassroom(req.params.id)
+    if (!existing || existing.tenant_id !== teacherTenantId(session)) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+    try {
+      const classroom = await renameClassroomStudent(
+        eduStore,
+        existing,
+        req.body?.old_name,
+        req.body?.new_name,
+      )
+      res.json(classroom)
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Could not rename student' })
+    }
+  })
+
+  app.delete('/api/edu/classrooms/:id/students/:studentName', async (req, res) => {
+    const session = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!session.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    const existing = await eduStore.getClassroom(req.params.id)
+    if (!existing || existing.tenant_id !== teacherTenantId(session)) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+    try {
+      const classroom = await removeClassroomStudent(eduStore, existing, req.params.studentName)
+      res.json({ removed: true, classroom })
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Could not remove student' })
+    }
   })
 
   app.delete('/api/edu/classrooms/:id', async (req, res) => {

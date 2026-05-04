@@ -88,6 +88,7 @@ const elements = {
   assignmentStage: document.getElementById('assignment-stage'),
   assignmentStageTitle: document.getElementById('assignment-stage-title'),
   assignmentStageMeta: document.getElementById('assignment-stage-meta'),
+  classroomRosterPanel: document.getElementById('classroom-roster-panel'),
   assignmentGrid: document.getElementById('assignment-grid'),
   sessionGrid: document.getElementById('session-grid'),
   assignmentMonitoringStatus: document.getElementById('assignment-monitoring-status'),
@@ -123,6 +124,12 @@ const elements = {
   starterDocumentField: document.getElementById('starter-document-field'),
   classroomModal: document.getElementById('classroom-modal'),
   assignmentModal: document.getElementById('assignment-modal'),
+  studentExtensionModal: document.getElementById('student-extension-modal'),
+  studentExtensionForm: document.getElementById('student-extension-form'),
+  studentExtensionTitle: document.getElementById('student-extension-title'),
+  studentExtensionDate: document.getElementById('student-extension-date'),
+  studentExtensionTime: document.getElementById('student-extension-time'),
+  studentExtensionCancel: document.getElementById('student-extension-cancel'),
   feedbackModal: document.getElementById('feedback-modal'),
   feedbackForm: document.getElementById('feedback-form'),
   feedbackFormCancel: document.getElementById('feedback-form-cancel'),
@@ -145,6 +152,7 @@ const elements = {
   reviewTeacherComment: document.getElementById('review-teacher-comment'),
   reviewReturned: document.getElementById('review-returned'),
   reviewPublishFeedback: document.getElementById('review-publish-feedback'),
+  reviewPublishConfirmation: document.getElementById('review-publish-confirmation'),
   reviewDraftMeta: document.getElementById('review-draft-meta'),
   reviewDraftSurface: document.getElementById('review-draft-surface'),
   reviewSelectionCount: document.getElementById('review-selection-count'),
@@ -179,7 +187,6 @@ const STUDENT_OVERRIDE_BOOLEAN_FIELDS = [
   ['allow_offline_editing', 'Allow offline editing'],
   ['copy_paste_allowed', 'Allow copy/paste'],
   ['export_allowed', 'Allow export'],
-  ['images_allowed', 'Allow images'],
   ['require_lockdown', 'Keep in Handtyped'],
   ['require_permission_to_rejoin', 'Require teacher re-entry'],
   ['show_rubric_to_student', 'Show rubric to student'],
@@ -649,7 +656,7 @@ async function handleReferenceDocumentUpload(fileList) {
 }
 
 function buildReviewReplayCacheEntry(replay) {
-  const documentHistory = annotateReplayHistoryWithEventTimes(replay)
+  const documentHistory = documentHistoryForReviewAttribution(replay)
   const hasReliableOrigin = replayOriginWallMs(replay) != null
   const attributedDocument = buildAttributedDocument({
     ...replay,
@@ -666,6 +673,40 @@ function buildReviewReplayCacheEntry(replay) {
     replay,
     attributedDocument,
   }
+}
+
+function documentHistoryForReviewAttribution(replay = {}) {
+  const annotatedHistory = annotateReplayHistoryWithEventTimes(replay)
+  const finalText = String(replay?.current_text || '')
+  if (!finalText || annotatedHistory.length < 2) {
+    return annotatedHistory
+  }
+
+  return annotatedHistory.flatMap((entry, index) => {
+    const entryText = String(entry?.ins ?? '')
+    if (
+      index === 0 ||
+      Number(entry?.pos) !== 0 ||
+      String(entry?.del ?? '') !== '' ||
+      !entryText
+    ) {
+      return [entry]
+    }
+    const previousText = latestTextFromHistory({ doc_history: annotatedHistory.slice(0, index), doc_text: '' })
+    if (previousText === entryText) {
+      return []
+    }
+    if (entryText.length >= 8 && previousText) {
+      return [{
+        ...entry,
+        op: 'snapshot',
+        text: entryText,
+        ins: '',
+        del: '',
+      }]
+    }
+    return entryText === finalText ? [] : [entry]
+  })
 }
 
 function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
@@ -690,6 +731,26 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
     last_activity_at: session?.last_activity_at || replay?.last_activity_at,
     updated_at: session?.updated_at || replay?.updated_at,
   }
+}
+
+function syncReviewReplayDataWithLiveSession(session = currentReviewSession()) {
+  if (!reviewState || !session?.id || reviewState.sessionId !== session.id) {
+    return null
+  }
+  let cached = reviewReplayCache.get(session.id)
+  if (!cached) {
+    return null
+  }
+  const mergedReplay = mergeReviewReplayWithLiveSession(cached.replay, session)
+  if (mergedReplay !== cached.replay) {
+    cached = buildReviewReplayCacheEntry(mergedReplay)
+    reviewReplayCache.set(session.id, cached)
+  }
+  reviewState.replayData = cached
+  if (reviewState.replayLoadState !== 'missing' && reviewState.replayLoadState !== 'error') {
+    reviewState.replayLoadState = 'ready'
+  }
+  return cached
 }
 
 function annotateReplayHistoryWithEventTimes(replay = {}) {
@@ -1347,6 +1408,9 @@ function createReviewStateFromSession(session) {
     feedbackStatus: grading.feedback_status,
     publishedAt: grading.published_at,
     updatedBy: grading.actor_name || grading.actor_email || '',
+    publishConfirmation: '',
+    publishingFeedback: false,
+    feedbackControlsClearedAfterPublish: false,
     saveState: grading.updated_at ? 'saved' : 'idle',
     dirty: false,
     deletedAnnotationIds: [],
@@ -1440,7 +1504,6 @@ function createStudentOverrideDraft(input = {}) {
       allow_offline_editing: input.policy?.allow_offline_editing || 'default',
       copy_paste_allowed: input.policy?.copy_paste_allowed || 'default',
       export_allowed: input.policy?.export_allowed || 'default',
-      images_allowed: input.policy?.images_allowed || 'default',
       require_lockdown: input.policy?.require_lockdown || 'default',
       require_permission_to_rejoin: input.policy?.require_permission_to_rejoin || 'default',
       show_rubric_to_student: input.policy?.show_rubric_to_student || 'default',
@@ -1482,7 +1545,6 @@ function currentStudentOverrideDrafts() {
         allow_offline_editing: card.querySelector('[data-override-policy="allow_offline_editing"]')?.value,
         copy_paste_allowed: card.querySelector('[data-override-policy="copy_paste_allowed"]')?.value,
         export_allowed: card.querySelector('[data-override-policy="export_allowed"]')?.value,
-        images_allowed: card.querySelector('[data-override-policy="images_allowed"]')?.value,
         require_lockdown: card.querySelector('[data-override-policy="require_lockdown"]')?.value,
         require_permission_to_rejoin: card.querySelector('[data-override-policy="require_permission_to_rejoin"]')?.value,
         show_rubric_to_student: card.querySelector('[data-override-policy="show_rubric_to_student"]')?.value,
@@ -1765,7 +1827,6 @@ function draftsFromAssignmentStudentOverrides(assignment) {
         allow_offline_editing: boolOverrideValue(settings.policy?.allow_offline_editing),
         copy_paste_allowed: boolOverrideValue(settings.policy?.copy_paste_allowed),
         export_allowed: boolOverrideValue(settings.policy?.export_allowed),
-        images_allowed: boolOverrideValue(settings.policy?.images_allowed),
         require_lockdown: boolOverrideValue(settings.policy?.require_lockdown),
         require_permission_to_rejoin: boolOverrideValue(settings.policy?.require_permission_to_rejoin),
         show_rubric_to_student: boolOverrideValue(settings.policy?.show_rubric_to_student),
@@ -1789,7 +1850,7 @@ function draftsFromAssignmentStudentOverrides(assignment) {
 }
 
 function parseTimeParts(value, fallbackHour, fallbackMinute) {
-  const parsed = parseReviewTimeInput(value)
+  const parsed = parseReviewNativeTimeInput(value) ?? parseReviewTimeInput(value)
   if (parsed == null) {
     return { hour: fallbackHour, minute: fallbackMinute }
   }
@@ -1925,6 +1986,51 @@ function selectedExtensionTarget(dateInput, timeInput, { allowPast = false, fall
     throw new Error('Choose an extension date and time after the current time.')
   }
   return target
+}
+
+function promptExtensionTarget({ studentName = '', initialTarget = null } = {}) {
+  if (!elements.studentExtensionModal || !elements.studentExtensionForm) {
+    return Promise.resolve(null)
+  }
+  const fallback = initialTarget instanceof Date && initialTarget.getTime() > Date.now()
+    ? initialTarget
+    : defaultAccessExtensionTarget()
+  elements.studentExtensionTitle.textContent = studentName ? `Extend ${studentName}` : 'Extend access'
+  elements.studentExtensionDate.value = localDateInputValue(fallback)
+  elements.studentExtensionTime.value = nativeTimeInputValue(fallback)
+  openModal(elements.studentExtensionModal)
+  elements.studentExtensionDate.focus()
+
+  return new Promise((resolve) => {
+    let settled = false
+    const cleanup = () => {
+      elements.studentExtensionForm.removeEventListener('submit', handleSubmit)
+      elements.studentExtensionCancel?.removeEventListener('click', handleCancel)
+      elements.studentExtensionModal.removeEventListener('click', handleBackdrop)
+    }
+    const finish = (target) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      closeModal(elements.studentExtensionModal)
+      resolve(target)
+    }
+    const handleSubmit = (event) => {
+      event.preventDefault()
+      try {
+        finish(selectedExtensionTarget(elements.studentExtensionDate, elements.studentExtensionTime, { fallbackTarget: null }))
+      } catch (error) {
+        window.alert(error.message)
+      }
+    }
+    const handleCancel = () => finish(null)
+    const handleBackdrop = (event) => {
+      if (event.target === elements.studentExtensionModal) finish(null)
+    }
+    elements.studentExtensionForm.addEventListener('submit', handleSubmit)
+    elements.studentExtensionCancel?.addEventListener('click', handleCancel)
+    elements.studentExtensionModal.addEventListener('click', handleBackdrop)
+  })
 }
 
 async function extendSelectedAssignmentUntil(target) {
@@ -2317,6 +2423,94 @@ function assignmentAudienceLabel(assignment) {
   return `${assignedStudents.length} assigned student${assignedStudents.length === 1 ? '' : 's'}`
 }
 
+function upsertClassroomInState(classroom) {
+  if (!dashboardState || !classroom?.id) return
+  dashboardState = {
+    ...dashboardState,
+    classrooms: (dashboardState.classrooms || []).map((item) => item.id === classroom.id ? classroom : item),
+  }
+}
+
+async function renameRosterStudent(classroom, oldName) {
+  const nextName = window.prompt('Student name', oldName)
+  if (nextName == null) return
+  const cleanName = String(nextName || '').replace(/\s+/g, ' ').trim()
+  if (!cleanName || cleanName === oldName) return
+  const updated = await request(`/api/edu/classrooms/${encodeURIComponent(classroom.id)}/students/rename`, {
+    method: 'POST',
+    body: JSON.stringify({ old_name: oldName, new_name: cleanName }),
+  })
+  upsertClassroomInState(updated)
+  renderAssignmentStage()
+}
+
+async function removeRosterStudent(classroom, studentName) {
+  if (!window.confirm(`Remove ${studentName} from ${classroom.name}? They will lose access from this device.`)) {
+    return
+  }
+  const result = await request(
+    `/api/edu/classrooms/${encodeURIComponent(classroom.id)}/students/${encodeURIComponent(studentName)}`,
+    { method: 'DELETE' },
+  )
+  if (result?.classroom) {
+    upsertClassroomInState(result.classroom)
+  }
+  renderAssignmentStage()
+}
+
+function renderClassroomRoster(classroom) {
+  if (!elements.classroomRosterPanel) return
+  if (!classroom) {
+    elements.classroomRosterPanel.innerHTML = ''
+    return
+  }
+  const students = (Array.isArray(classroom.students) ? classroom.students : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+  elements.classroomRosterPanel.innerHTML = `
+    <div class="classroom-roster-header">
+      <div>
+        <div class="section-label">Roster</div>
+        <div class="muted">${students.length ? `${students.length} student${students.length === 1 ? '' : 's'}` : 'Students appear here after they join.'}</div>
+      </div>
+    </div>
+    <div class="classroom-roster-list">
+      ${students.length
+        ? students.map((studentName) => `
+          <div class="classroom-roster-row" data-student-name="${escapeHtml(studentName)}">
+            <span>${escapeHtml(studentName)}</span>
+            <span class="classroom-roster-actions">
+              <button class="button button-secondary small-button" type="button" data-roster-rename>Rename</button>
+              <button class="button button-secondary small-button" type="button" data-roster-remove>Remove</button>
+            </span>
+          </div>
+        `).join('')
+        : '<div class="linked-assignment-empty">No students have joined this class yet.</div>'}
+    </div>
+  `
+  elements.classroomRosterPanel.querySelectorAll('[data-roster-rename]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const studentName = button.closest('[data-student-name]')?.dataset.studentName || ''
+      try {
+        await renameRosterStudent(classroom, studentName)
+      } catch (error) {
+        window.alert(`Could not rename student: ${error.message}`)
+      }
+    })
+  })
+  elements.classroomRosterPanel.querySelectorAll('[data-roster-remove]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const studentName = button.closest('[data-student-name]')?.dataset.studentName || ''
+      try {
+        await removeRosterStudent(classroom, studentName)
+      } catch (error) {
+        window.alert(`Could not remove student: ${error.message}`)
+      }
+    })
+  })
+}
+
 function renderClassroomGrid() {
   const classrooms = getClassrooms()
   if (!classrooms.length) {
@@ -2356,6 +2550,7 @@ function renderAssignmentStage() {
   const classroom = getSelectedClassroom()
   if (!classroom) {
     elements.assignmentStage.hidden = true
+    renderClassroomRoster(null)
     elements.assignmentGrid.innerHTML = ''
     return
   }
@@ -2363,6 +2558,7 @@ function renderAssignmentStage() {
   const assignments = getAssignmentsForClassroom(classroom.id)
   elements.assignmentStage.hidden = false
   elements.assignmentStageTitle.textContent = classroom.name
+  renderClassroomRoster(classroom)
   if (elements.assignmentStageMeta) {
     elements.assignmentStageMeta.textContent = `${assignments.length} assignment${assignments.length === 1 ? '' : 's'} available`
   }
@@ -2399,13 +2595,27 @@ function renderAssignmentStage() {
   })
 }
 
-function summarizeUrls(session) {
+function browserVisitDisplayLabel(item, assignment = getSelectedAssignment()) {
+  const url = item?.url || '(unknown url)'
+  const referenceDocumentId = String(url).match(/^handtyped:\/\/reference-document\/([^/?#]+)/)?.[1]
+  if (referenceDocumentId) {
+    const document = (assignment?.reference_documents || []).find((entry) => entry.id === referenceDocumentId)
+    return document?.title || 'Reference PDF'
+  }
+  return url
+}
+
+function summarizeUrls(session, assignment = getSelectedAssignment()) {
   const items = (session.url_history || []).slice(-4)
   if (!items.length) {
     return '<li>No recent browser visits.</li>'
   }
   return items
-    .map((item) => `<li class="${item?.allowed === false ? 'student-url-illegal' : ''}">${escapeHtml(item.url || '(unknown url)')}</li>`)
+    .map((item) => {
+      const url = item.url || '(unknown url)'
+      const label = browserVisitDisplayLabel(item, assignment)
+      return `<li class="${item?.allowed === false ? 'student-url-illegal' : ''}" title="${escapeHtml(url)}">${escapeHtml(label)}</li>`
+    })
     .join('')
 }
 
@@ -2513,8 +2723,77 @@ function renderReviewSyncStatus() {
   elements.reviewSyncStatus.textContent = 'Not yet saved'
 }
 
+function clearReviewPublishConfirmation() {
+  if (!reviewState) return
+  reviewState.publishConfirmation = ''
+  reviewState.publishingFeedback = false
+  reviewState.feedbackControlsClearedAfterPublish = false
+  renderReviewPublishConfirmation()
+  renderReviewPublishButton()
+}
+
+function renderReviewPublishConfirmation() {
+  if (!elements.reviewPublishConfirmation) return
+  const message = String(reviewState?.publishConfirmation || '').trim()
+  elements.reviewPublishConfirmation.hidden = !message
+  elements.reviewPublishConfirmation.textContent = message
+}
+
+function renderReviewPublishButton() {
+  if (!elements.reviewPublishFeedback) return
+  const isPublishing = Boolean(reviewState?.publishingFeedback)
+  elements.reviewPublishFeedback.disabled = isPublishing
+  elements.reviewPublishFeedback.textContent = isPublishing ? 'Publishing…' : 'Publish feedback'
+}
+
+function clearReviewFeedbackInputsAfterPublish() {
+  if (reviewState) {
+    reviewState.gradeLabel = ''
+    reviewState.gradeScore = ''
+    reviewState.teacherComment = ''
+    reviewState.returnedForRevision = false
+    reviewState.rubricScores = {}
+  }
+  if (elements.reviewGradeLabel) elements.reviewGradeLabel.value = ''
+  if (elements.reviewGradeScore) elements.reviewGradeScore.value = ''
+  if (elements.reviewTeacherComment) elements.reviewTeacherComment.value = ''
+  if (elements.reviewReturned) elements.reviewReturned.checked = false
+  elements.reviewRubricList?.querySelectorAll('[data-review-rubric-score]').forEach((select) => {
+    select.value = '0'
+  })
+  if (elements.reviewRubricTotal) {
+    const assignment = getSelectedAssignment()
+    const total = (assignment?.rubric || []).reduce(
+      (sum, criterion) => sum + Math.max(1, Number(criterion.points || 0)),
+      0,
+    )
+    elements.reviewRubricTotal.textContent = total ? `0/${total} points selected` : ''
+  }
+}
+
+function renderReviewPublishedSuccess() {
+  clearReviewFeedbackInputsAfterPublish()
+  renderReviewWorkspace(getSelectedAssignment())
+  renderReviewPublishConfirmation()
+  renderReviewPublishButton()
+}
+
+function ensureReviewStateForPublish() {
+  if (reviewState) {
+    return reviewState
+  }
+  const session = currentReviewSession()
+  if (!session) {
+    return null
+  }
+  reviewState = createReviewStateFromSession(session)
+  syncSelectedReviewSessionSnapshot(session)
+  return reviewState
+}
+
 function markReviewDirty() {
   if (!reviewState) return
+  clearReviewPublishConfirmation()
   reviewState.dirty = true
   reviewState.saveState = 'saving'
   renderReviewSyncStatus()
@@ -2588,15 +2867,22 @@ async function saveCurrentReview() {
 }
 
 async function publishCurrentReviewFeedback() {
-  if (!reviewState || reviewSaveInFlight) return
-  await flushReviewSave()
-  if (!reviewState) return
-  const sessionId = reviewState.sessionId
-  const payload = buildReviewPayload({ publishFeedback: true })
-  elements.reviewPublishFeedback.disabled = true
-  reviewState.saveState = 'saving'
-  renderReviewSyncStatus()
+  const activeReviewState = ensureReviewStateForPublish()
+  if (!activeReviewState) {
+    window.alert('Choose a student draft before publishing feedback.')
+    return
+  }
+  if (activeReviewState.publishingFeedback) return
+  reviewState.publishingFeedback = true
+  renderReviewPublishButton()
+  let sessionId = ''
   try {
+    await flushReviewSave()
+    if (!reviewState) return
+    sessionId = reviewState.sessionId
+    const payload = buildReviewPayload({ publishFeedback: true })
+    reviewState.saveState = 'saving'
+    renderReviewSyncStatus()
     const updatedSession = await request(`/api/edu/live-sessions/${encodeURIComponent(sessionId)}/grading`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -2614,19 +2900,24 @@ async function publishCurrentReviewFeedback() {
       reviewState.dirty = false
       reviewState.saveState = 'saved'
       reviewState.deletedAnnotationIds = []
+      reviewState.publishConfirmation = `Feedback published for ${updatedSession.student_name || 'this student'}.`
+      reviewState.publishingFeedback = false
+      reviewState.feedbackControlsClearedAfterPublish = true
     }
     renderReviewSyncStatus()
     renderStudentCards({ skipReviewWorkspace: true })
+    renderReviewPublishedSuccess()
   } catch (error) {
     if (reviewState?.sessionId === sessionId) {
       reviewState.saveState = 'error'
     }
+    if (reviewState) {
+      reviewState.publishingFeedback = false
+    }
     renderReviewSyncStatus()
     window.alert(`Could not publish feedback: ${error.message}`)
   } finally {
-    if (elements.reviewPublishFeedback) {
-      elements.reviewPublishFeedback.disabled = false
-    }
+    renderReviewPublishButton()
   }
 }
 
@@ -3235,6 +3526,13 @@ function reviewHighlightIndexSet(text, ranges, sourceMarkdown = '') {
   }
   const attributed = reviewState.replayData.attributedDocument
   const active = new Set()
+  const collectAttributedIndexes = (chars = attributed.chars) => {
+    chars.forEach((entry, index) => {
+      if (ranges.some((range) => range.custom ? reviewTimestampEntryMatchesHighlight(entry) : Number(entry?.insertedAtMs) >= range.startMs && Number(entry?.insertedAtMs) <= range.endMs)) {
+        active.add(index)
+      }
+    })
+  }
   const suppressCoarseFullHighlight = () =>
     ranges.some((range) => range.custom) &&
     reviewHighlightRequiresPreciseTiming() &&
@@ -3242,11 +3540,15 @@ function reviewHighlightIndexSet(text, ranges, sourceMarkdown = '') {
     active.size >= Array.from(String(text || '')).length
 
   if (attributed.text === String(text || '')) {
-    attributed.chars.forEach((entry, index) => {
-      if (ranges.some((range) => range.custom ? reviewTimestampEntryMatchesHighlight(entry) : Number(entry?.insertedAtMs) >= range.startMs && Number(entry?.insertedAtMs) <= range.endMs)) {
-        active.add(index)
-      }
-    })
+    collectAttributedIndexes()
+    if (suppressCoarseFullHighlight()) {
+      return new Set()
+    }
+    return active
+  }
+
+  if (attributed.text && String(text || '').startsWith(attributed.text)) {
+    collectAttributedIndexes()
     if (suppressCoarseFullHighlight()) {
       return new Set()
     }
@@ -3266,6 +3568,18 @@ function reviewHighlightIndexSet(text, ranges, sourceMarkdown = '') {
         active.add(displayIndex)
       }
     })
+  }
+  if (source && source.startsWith(attributed.text || '')) {
+    const attributedModel = handtypedMarkdownDisplayModel(attributed.text || '')
+    if (String(text || '').startsWith(attributedModel.text)) {
+      attributedModel.chars.forEach((entry, displayIndex) => {
+        const sourceEntry = attributed.chars[entry.sourceIndex]
+        const insertedAtMs = Number(sourceEntry?.insertedAtMs)
+        if (ranges.some((range) => range.custom ? reviewTimestampEntryMatchesHighlight(sourceEntry) : insertedAtMs >= range.startMs && insertedAtMs <= range.endMs)) {
+          active.add(displayIndex)
+        }
+      })
+    }
   }
   if (suppressCoarseFullHighlight()) {
     return new Set()
@@ -3669,9 +3983,13 @@ function handleRealtimeAssignment(payload) {
           )
         : getAssignmentAudits(),
     }
-    if (selectedSession && reviewWorkspaceOpen) {
-      selectedReviewSessionSnapshot = { ...selectedSession }
-      if (reviewState?.sessionId === selectedSession.id) {
+    const updatedSelectedSession =
+      selectedReviewSessionId && reviewWorkspaceOpen
+        ? currentReviewSession()
+        : selectedSession
+    if (updatedSelectedSession && reviewWorkspaceOpen) {
+      selectedReviewSessionSnapshot = { ...updatedSelectedSession }
+      if (reviewState?.sessionId === updatedSelectedSession.id || reviewState?.sessionId === selectedReviewSessionId) {
         renderReviewWorkspaceLiveContent(getSelectedAssignment())
       }
     }
@@ -3691,9 +4009,10 @@ function handleRealtimeAccessRequest(payload) {
 
 function handleRealtimeReplay(payload) {
   if (!payload?.id) return
-  const nextCache = buildReviewReplayCacheEntry(payload)
+  const mergedReplay = mergeReviewReplayWithLiveSession(payload, currentReviewSession())
+  const nextCache = buildReviewReplayCacheEntry(mergedReplay)
   reviewReplayCache.set(payload.id, nextCache)
-  mergeReplayIntoSessionState(payload.id, payload)
+  mergeReplayIntoSessionState(payload.id, mergedReplay)
   if (!reviewState || reviewState.sessionId !== payload.id) {
     return
   }
@@ -3772,7 +4091,7 @@ async function refreshSelectedReviewReplayData() {
     return
   }
 
-  const mergedReplay = applyLiveReplayUpdates(cached.replay, updates)
+  const mergedReplay = mergeReviewReplayWithLiveSession(applyLiveReplayUpdates(cached.replay, updates), currentReviewSession())
   const nextCache = buildReviewReplayCacheEntry(mergedReplay)
   reviewReplayCache.set(session.id, nextCache)
   mergeReplayIntoSessionState(session.id, mergedReplay)
@@ -3807,13 +4126,7 @@ async function refreshSelectedReviewSessionData() {
   syncSelectedReviewSessionSnapshot(currentReviewSession() || selectedSession)
 
   if (reviewState?.sessionId === selectedSession.id) {
-    const cached = reviewReplayCache.get(selectedSession.id)
-    if (cached) {
-      const mergedReplay = mergeReviewReplayWithLiveSession(cached.replay, selectedSession)
-      if (mergedReplay !== cached.replay) {
-        reviewReplayCache.set(selectedSession.id, buildReviewReplayCacheEntry(mergedReplay))
-      }
-    }
+    syncReviewReplayDataWithLiveSession(selectedSession)
     renderReviewWorkspaceLiveContent(getSelectedAssignment())
   } else {
     renderStudentCards({ skipReviewWorkspace: true })
@@ -4019,6 +4332,7 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
   }
   syncSelectedReviewSessionSnapshot(session)
   syncReviewResolvedAnnotationsFromSession(session)
+  syncReviewReplayDataWithLiveSession(session)
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
   const reviewText = displaySessionText(session, reviewState.replayData)
@@ -4073,13 +4387,15 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.reviewWorkspaceContent.hidden = false
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
-  elements.reviewGradeLabel.value = reviewState.gradeLabel
-  elements.reviewGradeScore.value = reviewState.gradeScore
-  elements.reviewTeacherComment.value = reviewState.teacherComment
-  elements.reviewReturned.checked = reviewState.returnedForRevision
-  if (elements.reviewPublishFeedback) {
-    elements.reviewPublishFeedback.disabled = reviewState.saveState === 'saving'
+  if (reviewState.feedbackControlsClearedAfterPublish) {
+    clearReviewFeedbackInputsAfterPublish()
+  } else {
+    elements.reviewGradeLabel.value = reviewState.gradeLabel
+    elements.reviewGradeScore.value = reviewState.gradeScore
+    elements.reviewTeacherComment.value = reviewState.teacherComment
+    elements.reviewReturned.checked = reviewState.returnedForRevision
   }
+  renderReviewPublishButton()
   const reviewText = displaySessionText(session, reviewState.replayData)
   const reviewDisplayText = handtypedMarkdownDisplayText(reviewText)
   elements.reviewDraftMeta.textContent = reviewDisplayText
@@ -4087,6 +4403,10 @@ function renderReviewWorkspace(selectedAssignment) {
     : 'The student draft is still empty.'
   renderReviewHighlightUi(session, selectedAssignment)
   renderReviewRubric(selectedAssignment)
+  if (reviewState.feedbackControlsClearedAfterPublish) {
+    clearReviewFeedbackInputsAfterPublish()
+  }
+  renderReviewPublishConfirmation()
   renderDraftSurface(reviewText, visibleReviewAnnotations(reviewState.inlineAnnotations))
   elements.reviewDraftSurface.querySelectorAll('[data-annotation-id]').forEach((node) => {
     node.addEventListener('click', () => {
@@ -4189,11 +4509,14 @@ async function selectReviewSession(sessionId) {
 }
 
 async function closeReviewWorkspace() {
-  await flushReviewSave()
+  const pendingSave = saveReviewSnapshotBeforeSwitch()
   clearSelectedReviewSession()
   elements.reviewWorkspace?.setAttribute('hidden', '')
   scheduleDashboardRefresh()
   renderStudentCards()
+  pendingSave.catch((error) => {
+    window.alert(`Could not save review changes: ${error.message}`)
+  })
 }
 
 function renderStudentCards({ skipReviewWorkspace = false } = {}) {
@@ -4290,7 +4613,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
             </div>
             <div class="student-section">
               <div class="section-label">Recent browser URLs</div>
-              <ul class="student-urls">${summarizeUrls(session)}</ul>
+              <ul class="student-urls">${summarizeUrls(session, selectedAssignment)}</ul>
             </div>
           </div>
           <div class="student-card-footer">
@@ -4339,7 +4662,14 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
       setPendingStudentAccessAction(studentName, 'extend')
       renderStudentCards({ skipReviewWorkspace: true })
       try {
-        const target = selectedExtensionTarget(elements.quickExtendDate, elements.quickExtendTime)
+        const existing = temporaryAccessUntilFor(getSelectedAssignment(), studentName)
+        const target = await promptExtensionTarget({
+          studentName,
+          initialTarget: existing ? new Date(existing) : null,
+        })
+        if (!target) {
+          return
+        }
         await extendSelectedAssignmentForStudentUntil(studentName, target)
       } finally {
         clearPendingStudentAccessAction(studentName)
@@ -4955,8 +5285,8 @@ function validateAssignmentDraft() {
   const hasDay = Object.values(days).some(Boolean)
   const rawStartTime = form.get('window_start_time')
   const rawEndTime = form.get('window_end_time')
-  const parsedStartTime = parseReviewTimeInput(rawStartTime)
-  const parsedEndTime = parseReviewTimeInput(rawEndTime)
+  const parsedStartTime = parseReviewNativeTimeInput(rawStartTime) ?? parseReviewTimeInput(rawStartTime)
+  const parsedEndTime = parseReviewNativeTimeInput(rawEndTime) ?? parseReviewTimeInput(rawEndTime)
   const start = parseTimeParts(rawStartTime, 10, 0)
   const end = parseTimeParts(rawEndTime, 11, 0)
   const startMinutes = start.hour * 60 + start.minute
@@ -4968,10 +5298,10 @@ function validateAssignmentDraft() {
     errors.push('Select at least one day of the week.')
   }
   if (parsedStartTime == null) {
-    errors.push('Enter a 12-hour start time with AM or PM, like 10:00 AM.')
+    errors.push('Choose a valid start time.')
   }
   if (parsedEndTime == null) {
-    errors.push('Enter a 12-hour end time with AM or PM, like 11:00 AM.')
+    errors.push('Choose a valid end time.')
   }
   if (parsedStartTime != null && parsedEndTime != null && endMinutes <= startMinutes) {
     errors.push('End time must be after start time.')
@@ -5006,6 +5336,44 @@ function setAssignmentFormSubmitting(isSubmitting, isEditing = false) {
     elements.assignmentFormCancel.disabled = assignmentFormSubmitting
   }
   updateAssignmentFormGuidance()
+}
+
+function initButtonPressFeedback() {
+  const pressableSelector = [
+    'button',
+    'a.button',
+    '[role="button"]',
+    '.selection-card',
+    '.student-card',
+    '[data-review-session]',
+  ].join(',')
+  let activeButton = null
+  const clearButton = () => {
+    activeButton?.classList.remove('is-pressed')
+    activeButton = null
+  }
+  const pressableFromEvent = (event) => {
+    const target = event.target instanceof Element ? event.target.closest(pressableSelector) : null
+    if (!(target instanceof HTMLElement)) return null
+    if (target.matches('button:disabled, [aria-disabled="true"], .is-disabled')) return null
+    return target
+  }
+
+  document.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return
+    clearButton()
+    activeButton = pressableFromEvent(event)
+    activeButton?.classList.add('is-pressed')
+  }, { passive: true })
+  document.addEventListener('pointerup', clearButton, { passive: true })
+  document.addEventListener('pointercancel', clearButton, { passive: true })
+  document.addEventListener('pointerleave', clearButton, { passive: true })
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== ' ' && event.key !== 'Enter') return
+    pressableFromEvent(event)?.classList.add('is-pressed')
+  })
+  document.addEventListener('keyup', clearButton)
+  window.addEventListener('blur', clearButton)
 }
 
 async function selectedAssignmentForEditing() {
@@ -5116,11 +5484,13 @@ function wireModalButtons() {
       const modalId = button.dataset.closeModal
       if (modalId === 'classroom-modal') closeModal(elements.classroomModal)
       if (modalId === 'assignment-modal') closeModal(elements.assignmentModal)
+      if (modalId === 'student-extension-modal') closeModal(elements.studentExtensionModal)
       if (modalId === 'feedback-modal') closeModal(elements.feedbackModal)
     })
   })
 
-  ;[elements.classroomModal, elements.assignmentModal, elements.feedbackModal].forEach((modal) => {
+  ;[elements.classroomModal, elements.assignmentModal, elements.studentExtensionModal, elements.feedbackModal].forEach((modal) => {
+    if (!modal) return
     modal.addEventListener('click', (event) => {
       if (event.target === modal) closeModal(modal)
     })
@@ -5235,8 +5605,8 @@ function populateAssignmentModalForEdit(assignment) {
 
   if (assignment.windows?.[0]) {
     const win = assignment.windows[0]
-    field('window_start_time').value = formatClockTime(win.start_hour, win.start_minute)
-    field('window_end_time').value = formatClockTime(win.end_hour, win.end_minute)
+    field('window_start_time').value = reviewTimeValue(win.start_hour, win.start_minute)
+    field('window_end_time').value = reviewTimeValue(win.end_hour, win.end_minute)
     field('window_end_date').value = win.end_date || ''
     field('day_monday').checked = win.days?.monday ?? true
     field('day_tuesday').checked = win.days?.tuesday ?? true
@@ -5252,7 +5622,7 @@ function populateAssignmentModalForEdit(assignment) {
     field('allow_offline_editing').checked = assignment.policy.allow_offline_editing ?? true
     field('copy_paste_allowed').checked = assignment.policy.copy_paste_allowed ?? false
     field('export_allowed').checked = assignment.policy.export_allowed ?? false
-    field('images_allowed').checked = assignment.policy.images_allowed ?? false
+    field('images_allowed').value = ''
     field('require_lockdown').checked = assignment.policy.require_lockdown ?? false
     field('require_permission_to_rejoin').checked = assignment.policy.require_permission_to_rejoin ?? false
     field('show_rubric_to_student').checked = assignment.policy.show_rubric_to_student ?? false
@@ -5369,7 +5739,7 @@ function wireForms() {
           allow_offline_editing: form.get('allow_offline_editing') === 'on',
           copy_paste_allowed: form.get('copy_paste_allowed') === 'on',
           export_allowed: form.get('export_allowed') === 'on',
-          images_allowed: form.get('images_allowed') === 'on',
+          images_allowed: false,
           require_lockdown: form.get('require_lockdown') === 'on',
           require_permission_to_rejoin: form.get('require_permission_to_rejoin') === 'on',
           require_fullscreen: form.get('require_lockdown') === 'on',
@@ -5428,27 +5798,27 @@ function wireForms() {
 
 function wireReviewWorkspace() {
   elements.reviewGradeLabel?.addEventListener('input', () => {
-    if (!reviewState) return
+    if (!ensureReviewStateForPublish()) return
     reviewState.gradeLabel = elements.reviewGradeLabel.value
     markReviewDirty()
     renderStudentCards({ skipReviewWorkspace: true })
   })
 
   elements.reviewGradeScore?.addEventListener('input', () => {
-    if (!reviewState) return
+    if (!ensureReviewStateForPublish()) return
     reviewState.gradeScore = elements.reviewGradeScore.value
     markReviewDirty()
     renderStudentCards({ skipReviewWorkspace: true })
   })
 
   elements.reviewTeacherComment?.addEventListener('input', () => {
-    if (!reviewState) return
+    if (!ensureReviewStateForPublish()) return
     reviewState.teacherComment = elements.reviewTeacherComment.value
     markReviewDirty()
   })
 
   elements.reviewReturned?.addEventListener('change', () => {
-    if (!reviewState) return
+    if (!ensureReviewStateForPublish()) return
     reviewState.returnedForRevision = elements.reviewReturned.checked
     markReviewDirty()
     renderStudentCards({ skipReviewWorkspace: true })
@@ -5588,6 +5958,7 @@ async function loadApp() {
 
   wireModalButtons()
   populateAssignmentFontSizeOptions()
+  initButtonPressFeedback()
   wireForms()
   wireReviewWorkspace()
   await refreshDashboard()

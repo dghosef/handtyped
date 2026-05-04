@@ -267,6 +267,11 @@ export function buildClassroom(input = {}) {
     join_code: String(input.join_code || 'JOINME').toUpperCase(),
     teacher_name: String(input.teacher_name || 'Teacher'),
     students: Array.isArray(input.students) ? input.students : [],
+    removed_students: Array.isArray(input.removed_students) ? input.removed_students : [],
+    student_aliases:
+      input.student_aliases && typeof input.student_aliases === 'object' && !Array.isArray(input.student_aliases)
+        ? { ...input.student_aliases }
+        : {},
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,
   }

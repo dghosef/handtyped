@@ -141,6 +141,24 @@ describe('teacher navigation', () => {
     expect(teacherStylesCss).toContain('.review-highlight-pending')
   })
 
+  it('keeps recent browser URLs visually compact while preserving the full URL', () => {
+    expect(teacherAppJs).toContain('title="${escapeHtml(url)}"')
+    expect(teacherStylesCss).toContain('.student-urls li')
+    expect(teacherStylesCss).toContain('text-overflow: ellipsis;')
+    expect(teacherStylesCss).toContain('white-space: nowrap;')
+    expect(teacherStylesCss).toContain('.student-card {\n  border: 1px solid var(--line);')
+    expect(teacherStylesCss).toContain('min-width: 0;')
+  })
+
+  it('shows reference document names instead of internal document URLs', () => {
+    expect(teacherAppJs).toContain('function browserVisitDisplayLabel(item, assignment = getSelectedAssignment())')
+    expect(teacherAppJs).toContain('handtyped:\\/\\/reference-document\\/')
+    expect(teacherAppJs).toContain('(assignment?.reference_documents || []).find((entry) => entry.id === referenceDocumentId)')
+    expect(teacherAppJs).toContain("return document?.title || 'Reference PDF'")
+    expect(teacherAppJs).toContain('${escapeHtml(label)}')
+    expect(teacherAppJs).toContain('<ul class="student-urls">${summarizeUrls(session, selectedAssignment)}</ul>')
+  })
+
   it('refreshes the dashboard promptly by default and faster when a review opens', () => {
     expect(teacherAppJs).toContain('const DASHBOARD_IDLE_REFRESH_MS = 15000')
     expect(teacherAppJs).toContain('const DASHBOARD_REVIEW_REFRESH_MS = 5000')
@@ -199,6 +217,14 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).not.toContain('form.title.value')
   })
 
+  it('hides image permissions while image support is paused', () => {
+    expect(teacherAppHtml).toContain('type="hidden" name="images_allowed"')
+    expect(teacherAppHtml).not.toContain('Allow images in the document')
+    expect(teacherAppJs).toContain('images_allowed: false')
+    expect(teacherAppJs).not.toContain("['images_allowed', 'Allow images']")
+    expect(teacherAppJs).not.toContain('data-override-policy="images_allowed"')
+  })
+
   it('loads the selected assignment before opening the edit modal when state is stale', () => {
     expect(teacherAppJs).toContain('async function selectedAssignmentForEditing()')
     expect(teacherAppJs).toContain("request(`/api/edu/assignments/${encodeURIComponent(selectedAssignmentId)}`)")
@@ -221,6 +247,14 @@ describe('teacher navigation', () => {
     expect(teacherAppJs).toContain('async function addReviewAnnotation()')
     expect(teacherAppJs).toContain('await flushReviewSave()')
     expect(teacherAppJs).toContain('Could not save comment:')
+  })
+
+  it('closes the review workspace before waiting on pending saves', () => {
+    const source = teacherAppJs.match(/async function closeReviewWorkspace\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+    expect(source).toContain('const pendingSave = saveReviewSnapshotBeforeSwitch()')
+    expect(source).toContain('clearSelectedReviewSession()')
+    expect(source).toContain('renderStudentCards()')
+    expect(source).not.toContain('await flushReviewSave()')
   })
 
   it('merges selected-student live replay updates without replaying the full document each poll', () => {

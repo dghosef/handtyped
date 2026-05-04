@@ -23,6 +23,8 @@ import {
   createD1EduStore,
   createKvEduStore,
   ensureEduSeedData,
+  removeClassroomStudent,
+  renameClassroomStudent,
 } from './edu-store.js'
 import {
   DEFAULT_TENANT_ID,
@@ -1150,6 +1152,69 @@ export default {
       await publishTeacherDashboard(env, classroom.tenant_id)
       await publishStudentBootstrapInvalidation(env, classroom, { reason: 'classroom-updated' })
       return json(classroom)
+    }
+
+    if (eduHost && request.method === 'POST' && /^\/api\/edu\/classrooms\/[^/]+\/students\/rename$/.test(url.pathname)) {
+      const store = await prepareEduStore(getEduStore(env))
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const id = url.pathname.split('/')[4]
+      const existing = id ? await store.getClassroom(id) : null
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const body = await parseJsonRequest(request)
+      try {
+        const classroom = await renameClassroomStudent(store, existing, body.old_name, body.new_name)
+        await publishTeacherDashboard(env, classroom.tenant_id)
+        await publishStudentBootstrapInvalidation(env, classroom, { reason: 'student-renamed' })
+        const assignments = await store.listAssignments(classroom.tenant_id)
+        await Promise.allSettled(
+          assignments
+            .filter((assignment) => assignment.classroom_id === classroom.id)
+            .map((assignment) => publishAssignmentSummary(env, assignment.id, assignment.tenant_id)),
+        )
+        return json(classroom)
+      } catch (error) {
+        return json(
+          { error: error instanceof Error ? error.message : 'Could not rename student' },
+          { status: 400 },
+        )
+      }
+    }
+
+    if (eduHost && request.method === 'DELETE' && /^\/api\/edu\/classrooms\/[^/]+\/students\/[^/]+$/.test(url.pathname)) {
+      const store = await prepareEduStore(getEduStore(env))
+      const session = await getTeacherSession(getEduAuthStore(env), request.headers.get('cookie'))
+      if (!session.authenticated) {
+        return json({ error: 'Unauthorized', authenticated: false }, { status: 401 })
+      }
+      const parts = url.pathname.split('/')
+      const id = parts[4]
+      const studentName = decodeURIComponent(parts[6] || '')
+      const existing = id ? await store.getClassroom(id) : null
+      if (!existing || existing.tenant_id !== teacherTenantId(session)) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      try {
+        const classroom = await removeClassroomStudent(store, existing, studentName)
+        await publishTeacherDashboard(env, classroom.tenant_id)
+        await publishStudentBootstrapInvalidation(env, classroom, { reason: 'student-removed' })
+        const assignments = await store.listAssignments(classroom.tenant_id)
+        await Promise.allSettled(
+          assignments
+            .filter((assignment) => assignment.classroom_id === classroom.id)
+            .map((assignment) => publishStudentAssignmentInvalidation(env, assignment)),
+        )
+        return json({ removed: true, classroom })
+      } catch (error) {
+        return json(
+          { error: error instanceof Error ? error.message : 'Could not remove student' },
+          { status: 400 },
+        )
+      }
     }
 
     if (eduHost && request.method === 'DELETE' && url.pathname.startsWith('/api/edu/classrooms/')) {

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { buildAttributedDocument, latestTextFromHistory } from './public/replay-view.js'
 
 function createStubElement() {
+  const listeners = new Map()
   return {
     hidden: false,
     disabled: false,
@@ -21,7 +22,17 @@ function createStubElement() {
     },
     setAttribute() {},
     removeAttribute() {},
-    addEventListener() {},
+    addEventListener(type, listener) {
+      const current = listeners.get(type) || []
+      current.push(listener)
+      listeners.set(type, current)
+    },
+    dispatchEvent(event) {
+      for (const listener of listeners.get(event.type) || []) {
+        listener(event)
+      }
+      return true
+    },
     focus() {},
     querySelector() { return null },
     querySelectorAll() { return [] },
@@ -53,6 +64,20 @@ function localNativeTimeValue(ms) {
 function teacherAppSource() {
   return fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'app.js'), 'utf8')
 }
+
+function teacherStylesSource() {
+  return fs.readFileSync(path.join(process.cwd(), 'public', 'edu', 'styles.css'), 'utf8')
+}
+
+it('wires immediate pressed feedback for all teacher button-like controls', () => {
+  const source = teacherAppSource()
+  const styles = teacherStylesSource()
+
+  expect(source).toMatch(/function initButtonPressFeedback\(\)/)
+  expect(source).toMatch(/'button',\s+'a\.button',\s+'\[role="button"\]',\s+'.selection-card',\s+'.student-card'/m)
+  expect(styles).toMatch(/\.selection-card:active,\s*\.selection-card\.is-pressed/m)
+  expect(styles).toMatch(/\.student-card:active,\s*\.student-card\.is-pressed/m)
+})
 
 function loadTeacherAppHarness({ fetchImpl } = {}) {
   const appPath = path.join(process.cwd(), 'public', 'edu', 'app.js')
@@ -105,6 +130,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
       addReviewAnnotation,
       deleteReviewAnnotation,
       saveCurrentReview,
+      publishCurrentReviewFeedback,
+      wireReviewWorkspace,
       flushReviewSave,
       selectReviewSession,
       renderReviewWorkspace,
@@ -119,6 +146,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
       reviewHighlightIndexSet,
       handtypedMarkdownDisplayText,
       buildReviewReplayCacheEntry,
+      documentHistoryForReviewAttribution,
       mergeReviewReplayWithLiveSession,
       annotateReplayHistoryWithEventTimes,
       attributedDocumentHasReliableInsertionTiming,
@@ -260,6 +288,16 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
 }
 
 describe('teacher review session regression', () => {
+  it('wires immediate pressed feedback for teacher buttons', () => {
+    const source = teacherAppSource()
+    const styles = teacherStylesSource()
+
+    expect(source).toMatch(/function initButtonPressFeedback\(\)/)
+    expect(source).toMatch(/initButtonPressFeedback\(\)/)
+    expect(source).toMatch(/document\.addEventListener\('pointerdown'/)
+    expect(styles).toMatch(/\.button:active,\s*\.button\.is-pressed,/)
+  })
+
   it('accepts AM/PM replay highlight times without treating evening as morning', () => {
     const harness = loadTeacherAppHarness()
     const highlightedAt = Date.parse('2026-05-02T18:25:00Z')
@@ -885,6 +923,282 @@ describe('teacher review session regression', () => {
     expect(harness.getElement('review-draft-meta').textContent).toContain('35 characters')
     expect(harness.getElement('review-teacher-comment').value).toBe('Keep typing here')
     expect(harness.getReviewState().teacherComment).toBe('Keep this note')
+  })
+
+  it('keeps live draft text updating while time-based highlighting is active', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = Date.parse('2026-04-29T20:00:00.000Z')
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft one',
+      document_history: [
+        { t: 0, pos: 0, del: '', ins: 'Draft ' },
+        { t: 1000, pos: 6, del: '', ins: 'one' },
+      ],
+      schedule_open: true,
+      focused: true,
+      last_activity_at: '2026-04-29T20:00:00.000Z',
+    }
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(replayOrigin),
+      highlightDates: '',
+      highlightStartTime: '8:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: null,
+      replayLoadState: 'idle',
+      replayError: '',
+      inlineAnnotations: [],
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      updatedBy: '',
+      selection: null,
+    })
+    harness.stubRenderStudentCards()
+
+    harness.handleRealtimeReplay({
+      id: 'live-selected',
+      current_text: 'Draft one',
+      created_at: '2026-04-29T20:00:00.000Z',
+      last_activity_at: '2026-04-29T20:00:00.000Z',
+      updated_at: '2026-04-29T20:00:00.000Z',
+      document_history: [
+        { t: 0, pos: 0, del: '', ins: 'Draft ' },
+        { t: 1000, pos: 6, del: '', ins: 'one' },
+      ],
+      events: [],
+      last_seq: 1,
+    })
+
+    harness.handleRealtimeAssignment({
+      assignment: { id: 'assignment-1' },
+      live_sessions: [
+        {
+          ...selectedSession,
+          current_text: 'Draft one live',
+          document_history: [
+            { t: 0, pos: 0, del: '', ins: 'Draft one' },
+            { t: 5000, pos: 9, del: '', ins: ' live' },
+          ],
+          last_activity_at: '2026-04-29T20:00:05.000Z',
+        },
+      ],
+      assignment_audits: [],
+    })
+
+    expect(harness.getDashboardState().live_sessions.find((session) => session.id === 'live-selected').current_text).toBe('Draft one live')
+    expect(harness.getElement('review-draft-meta').textContent).toContain('14 characters')
+    expect(harness.getElement('review-draft-surface').innerHTML).toContain('live')
+    expect(harness.getReviewState().replayData.attributedDocument.text).toBe('Draft one live')
+  })
+
+  it('keeps existing time highlights visible when live text arrives before replay history', () => {
+    const harness = loadTeacherAppHarness()
+    const replayOrigin = new Date(2026, 3, 29, 20, 0).getTime()
+    const replayOriginIso = new Date(replayOrigin).toISOString()
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(replayOrigin),
+      highlightDates: '',
+      highlightStartTime: '8:00 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: null,
+      replayLoadState: 'idle',
+      replayError: '',
+      inlineAnnotations: [],
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      updatedBy: '',
+      selection: null,
+    })
+    const replayData = harness.buildReviewReplayCacheEntry({
+      id: 'live-selected',
+      current_text: 'Draft one',
+      created_at: replayOriginIso,
+      last_activity_at: replayOriginIso,
+      updated_at: replayOriginIso,
+      document_history: [
+        { t: 0, pos: 0, del: '', ins: 'Draft ' },
+        { t: 1000, pos: 6, del: '', ins: 'one' },
+      ],
+      events: [],
+      last_seq: 1,
+    })
+    harness.setReviewState({
+      ...harness.getReviewState(),
+      replayData,
+      replayLoadState: 'ready',
+    })
+
+    const indexes = harness.reviewHighlightIndexSet('Draft one live', [{ custom: true }], 'Draft one live')
+    expect(indexes.size).toBeGreaterThan(0)
+    expect(indexes.has(6)).toBe(true)
+    expect(indexes.has(8)).toBe(true)
+    expect(indexes.has(9)).toBe(false)
+  })
+
+  it('ignores redundant full-document checkpoints when attributing time highlights', () => {
+    const harness = loadTeacherAppHarness()
+    const afterSevenThirty = new Date(2026, 4, 3, 19, 37).getTime()
+    const afterEight = new Date(2026, 4, 3, 20, 20).getTime()
+    const replay = {
+      id: 'live-selected',
+      current_text: 'Hello world',
+      document_history: [
+        { t: 1000, absolute_wall_ms: afterSevenThirty, pos: 0, del: '', ins: 'Hello' },
+        { t: 2000, absolute_wall_ms: afterSevenThirty + 1000, pos: 5, del: '', ins: ' world' },
+        { t: 180000, absolute_wall_ms: afterEight, pos: 0, del: '', ins: 'Hello world' },
+      ],
+    }
+    const attributionHistory = harness.documentHistoryForReviewAttribution(replay)
+    expect(attributionHistory).toHaveLength(2)
+    expect(attributionHistory.at(-1).ins).toBe(' world')
+
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterSevenThirty),
+      highlightDates: '',
+      highlightStartTime: '7:30 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: harness.buildReviewReplayCacheEntry(replay),
+      replayLoadState: 'ready',
+      replayError: '',
+    })
+    const indexes = harness.reviewHighlightIndexSet('Hello world', [{ custom: true }], 'Hello world')
+    expect(indexes.size).toBeGreaterThan(0)
+    expect(indexes.has(0)).toBe(true)
+  })
+
+  it('does not highlight the whole draft when a live checkpoint contains the full updated text', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeFilter = new Date(2026, 4, 3, 19, 20).getTime()
+    const afterFilter = new Date(2026, 4, 3, 19, 37).getTime()
+    const replay = {
+      id: 'live-selected',
+      current_text: 'Hello world',
+      document_history: [
+        { t: 1000, absolute_wall_ms: beforeFilter, pos: 0, del: '', ins: 'Hello' },
+        { t: 2000, absolute_wall_ms: beforeFilter + 1000, pos: 5, del: '', ins: ' world' },
+        { t: 180000, absolute_wall_ms: afterFilter, pos: 0, del: '', ins: 'Hello world' },
+      ],
+    }
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterFilter),
+      highlightDates: '',
+      highlightStartTime: '7:30 PM',
+      highlightEndTime: '',
+      highlightWeekdays: [],
+      replayData: harness.buildReviewReplayCacheEntry(replay),
+      replayLoadState: 'ready',
+      replayError: '',
+    })
+
+    const indexes = harness.reviewHighlightIndexSet('Hello world', [{ custom: true }], 'Hello world')
+    expect(indexes.size).toBe(0)
+  })
+
+  it('ignores older full-document checkpoints even when later edits change the final text', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeFilter = new Date(2026, 4, 3, 19, 20).getTime()
+    const afterFilter = new Date(2026, 4, 3, 20, 22).getTime()
+    const laterEdit = new Date(2026, 4, 3, 21, 39).getTime()
+    const replay = {
+      id: 'live-selected',
+      current_text: 'Hello world again',
+      document_history: [
+        { t: 1000, absolute_wall_ms: beforeFilter, pos: 0, del: '', ins: 'Hello' },
+        { t: 2000, absolute_wall_ms: beforeFilter + 1000, pos: 5, del: '', ins: ' world' },
+        { t: 180000, absolute_wall_ms: afterFilter, pos: 0, del: '', ins: 'Hello world' },
+        { t: 220000, absolute_wall_ms: laterEdit, pos: 11, del: '', ins: ' again' },
+      ],
+    }
+    const attributionHistory = harness.documentHistoryForReviewAttribution(replay)
+    expect(attributionHistory.map((entry) => entry.ins || entry.text)).toEqual(['Hello', ' world', ' again'])
+
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterFilter),
+      highlightDates: '',
+      highlightStartTime: '8:00 PM',
+      highlightEndTime: '9:00 PM',
+      highlightWeekdays: [],
+      replayData: harness.buildReviewReplayCacheEntry(replay),
+      replayLoadState: 'ready',
+      replayError: '',
+    })
+
+    const indexes = harness.reviewHighlightIndexSet('Hello world again', [{ custom: true }], 'Hello world again')
+    expect(indexes.size).toBe(0)
+  })
+
+  it('treats full-document checkpoint repairs as snapshots instead of whole-draft inserts', () => {
+    const harness = loadTeacherAppHarness()
+    const beforeFilter = new Date(2026, 4, 3, 19, 20).getTime()
+    const afterFilter = new Date(2026, 4, 3, 20, 22).getTime()
+    const replay = {
+      id: 'live-selected',
+      current_text: 'Hello world!',
+      document_history: [
+        { t: 1000, absolute_wall_ms: beforeFilter, pos: 0, del: '', ins: 'Hello' },
+        { t: 2000, absolute_wall_ms: beforeFilter + 1000, pos: 5, del: '', ins: ' world' },
+        { t: 180000, absolute_wall_ms: afterFilter, pos: 0, del: '', ins: 'Hello world!' },
+      ],
+    }
+    const attributionHistory = harness.documentHistoryForReviewAttribution(replay)
+    expect(attributionHistory.at(-1)).toMatchObject({
+      op: 'snapshot',
+      text: 'Hello world!',
+      ins: '',
+      del: '',
+    })
+
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      highlightMode: 'custom',
+      highlightDate: localDateInputValue(afterFilter),
+      highlightDates: '',
+      highlightStartTime: '8:00 PM',
+      highlightEndTime: '9:00 PM',
+      highlightWeekdays: [],
+      replayData: harness.buildReviewReplayCacheEntry(replay),
+      replayLoadState: 'ready',
+      replayError: '',
+    })
+
+    const indexes = harness.reviewHighlightIndexSet('Hello world!', [{ custom: true }], 'Hello world!')
+    expect(indexes.size).toBe(1)
+    expect(indexes.has(11)).toBe(true)
   })
 
   it('keeps the selected review draft session across a full dashboard realtime payload that omits it', () => {
@@ -1790,6 +2104,280 @@ describe('teacher review session regression', () => {
     })
 
     expect(harness.buildReviewPayload().publish_feedback).toBe(true)
+  })
+
+  it('confirms published feedback and clears the visible grading fields', async () => {
+    let savedPayload = null
+    const harness = loadTeacherAppHarness({
+      fetchImpl: async (url, options = {}) => {
+        if (!String(url).includes('/grading')) {
+          return createJsonResponse({})
+        }
+        savedPayload = JSON.parse(String(options.body || '{}'))
+        return createJsonResponse({
+          id: 'live-selected',
+          assignment_id: 'assignment-1',
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft',
+          grading: {
+            ...savedPayload,
+            updated_at: '2026-05-03T20:00:00.000Z',
+            published_at: '2026-05-03T20:00:00.000Z',
+            feedback_status: 'published',
+          },
+        })
+      },
+    })
+    harness.stubRenderStudentCards()
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [
+        {
+          id: 'live-selected',
+          assignment_id: 'assignment-1',
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft',
+        },
+      ],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      feedbackStatus: 'draft',
+      rubricScores: {},
+      gradeLabel: 'Revise',
+      gradeScore: '82',
+      teacherComment: 'Tighten the claim.',
+      returnedForRevision: true,
+      inlineAnnotations: [],
+      replayData: null,
+      selection: null,
+      dirty: false,
+      saveState: 'saved',
+      deletedAnnotationIds: [],
+    })
+    harness.getElement('review-grade-label').value = 'Revise'
+    harness.getElement('review-grade-score').value = '82'
+    harness.getElement('review-teacher-comment').value = 'Tighten the claim.'
+    harness.getElement('review-returned').checked = true
+
+    await harness.publishCurrentReviewFeedback()
+
+    expect(savedPayload.publish_feedback).toBe(true)
+    expect(harness.getElement('review-grade-label').value).toBe('')
+    expect(harness.getElement('review-grade-score').value).toBe('')
+    expect(harness.getElement('review-teacher-comment').value).toBe('')
+    expect(harness.getElement('review-returned').checked).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').hidden).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').textContent).toContain('Feedback published')
+    expect(harness.getElement('review-publish-feedback').disabled).toBe(false)
+    expect(harness.getElement('review-publish-feedback').textContent).toBe('Publish feedback')
+    expect(harness.getReviewState().feedbackControlsClearedAfterPublish).toBe(true)
+    expect(harness.getReviewState()).toMatchObject({
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: '',
+      returnedForRevision: false,
+      rubricScores: {},
+    })
+
+    harness.renderReviewWorkspace(harness.getDashboardState().assignments[0])
+
+    expect(harness.getElement('review-grade-label').value).toBe('')
+    expect(harness.getElement('review-grade-score').value).toBe('')
+    expect(harness.getElement('review-teacher-comment').value).toBe('')
+    expect(harness.getElement('review-returned').checked).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').hidden).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').textContent).toContain('Feedback published')
+  })
+
+  it('publishes feedback even when the selected review state has not been initialized yet', async () => {
+    let savedPayload = null
+    const harness = loadTeacherAppHarness({
+      fetchImpl: async (url, options = {}) => {
+        if (!String(url).includes('/grading')) {
+          return createJsonResponse({})
+        }
+        savedPayload = JSON.parse(String(options.body || '{}'))
+        return createJsonResponse({
+          id: 'history-joseph-tan-live',
+          assignment_id: 'history-assignment',
+          student_name: 'Joseph Tan',
+          current_text: 'History draft',
+          grading: {
+            ...savedPayload,
+            updated_at: '2026-05-03T20:10:00.000Z',
+            published_at: '2026-05-03T20:10:00.000Z',
+            feedback_status: 'published',
+          },
+        })
+      },
+    })
+    harness.stubRenderStudentCards()
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'history-assignment', classroom_id: 'class-history', title: 'History' }],
+      live_sessions: [
+        {
+          id: 'history-joseph-tan-live',
+          assignment_id: 'history-assignment',
+          student_name: 'Joseph Tan',
+          current_text: 'History draft',
+        },
+      ],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'history-assignment',
+      selectedReviewSessionId: 'history-joseph-tan-live',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+    })
+    harness.setReviewState(null)
+    harness.wireReviewWorkspace()
+    harness.getElement('review-teacher-comment').value = 'Primary source analysis looks stronger now.'
+    harness.getElement('review-teacher-comment').dispatchEvent({ type: 'input' })
+    await harness.publishCurrentReviewFeedback()
+
+    expect(savedPayload).toMatchObject({
+      publish_feedback: true,
+      teacher_comment: 'Primary source analysis looks stronger now.',
+    })
+    expect(harness.getElement('review-publish-feedback').disabled).toBe(false)
+    expect(harness.getElement('review-publish-feedback').textContent).toBe('Publish feedback')
+    expect(harness.getElement('review-publish-confirmation').hidden).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').textContent).toContain('Feedback published')
+    expect(harness.getReviewState().feedbackControlsClearedAfterPublish).toBe(true)
+  })
+
+  it('waits for queued review sync before publishing feedback and still confirms success', async () => {
+    let resolveDraftSave
+    const draftSaveReady = new Promise((resolve) => {
+      resolveDraftSave = resolve
+    })
+    let resolvePublish
+    const publishReady = new Promise((resolve) => {
+      resolvePublish = resolve
+    })
+    const gradingRequests = []
+    const harness = loadTeacherAppHarness({
+      fetchImpl: async (url, options = {}) => {
+        if (!String(url).includes('/grading')) {
+          return createJsonResponse({})
+        }
+        const payload = JSON.parse(String(options.body || '{}'))
+        gradingRequests.push(payload)
+        if (gradingRequests.length === 1) {
+          await draftSaveReady
+          return createJsonResponse({
+            id: 'live-selected',
+            assignment_id: 'assignment-1',
+            student_name: 'Ada Lovelace',
+            current_text: 'Draft',
+            grading: {
+              ...payload,
+              updated_at: '2026-05-03T20:00:00.000Z',
+              feedback_status: 'draft',
+            },
+          })
+        }
+        await publishReady
+        return createJsonResponse({
+          id: 'live-selected',
+          assignment_id: 'assignment-1',
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft',
+          grading: {
+            ...payload,
+            updated_at: '2026-05-03T20:01:00.000Z',
+            published_at: '2026-05-03T20:01:00.000Z',
+            feedback_status: 'published',
+          },
+        })
+      },
+    })
+    harness.stubRenderStudentCards()
+    harness.setDashboardState({
+      classrooms: [],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [
+        {
+          id: 'live-selected',
+          assignment_id: 'assignment-1',
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft',
+        },
+      ],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+    })
+    harness.setReviewState({
+      sessionId: 'live-selected',
+      feedbackStatus: 'draft',
+      rubricScores: {},
+      gradeLabel: '',
+      gradeScore: '',
+      teacherComment: 'Publish this after the draft save.',
+      returnedForRevision: false,
+      inlineAnnotations: [],
+      replayData: null,
+      selection: null,
+      dirty: true,
+      saveState: 'saving',
+      deletedAnnotationIds: [],
+    })
+    harness.getElement('review-teacher-comment').value = 'Publish this after the draft save.'
+
+    const draftSave = harness.saveCurrentReview()
+    const publish = harness.publishCurrentReviewFeedback()
+
+    expect(harness.getElement('review-publish-feedback').disabled).toBe(true)
+    expect(harness.getElement('review-publish-feedback').textContent).toBe('Publishing…')
+    expect(gradingRequests).toHaveLength(1)
+    await harness.publishCurrentReviewFeedback()
+    expect(gradingRequests).toHaveLength(1)
+
+    resolveDraftSave()
+    await draftSave
+
+    expect(gradingRequests).toHaveLength(2)
+    harness.renderReviewWorkspace(harness.getDashboardState().assignments[0])
+    expect(harness.getElement('review-publish-feedback').disabled).toBe(true)
+    expect(harness.getElement('review-publish-feedback').textContent).toBe('Publishing…')
+    await harness.publishCurrentReviewFeedback()
+    expect(gradingRequests).toHaveLength(2)
+
+    resolvePublish()
+    await publish
+
+    expect(gradingRequests).toHaveLength(2)
+    expect(gradingRequests[1].publish_feedback).toBe(true)
+    expect(harness.getElement('review-teacher-comment').value).toBe('')
+    expect(harness.getElement('review-publish-confirmation').hidden).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').textContent).toContain('Feedback published')
+    expect(harness.getElement('review-publish-feedback').disabled).toBe(false)
+    expect(harness.getElement('review-publish-feedback').textContent).toBe('Publish feedback')
+
+    harness.renderReviewWorkspace(harness.getDashboardState().assignments[0])
+
+    expect(harness.getElement('review-teacher-comment').value).toBe('')
+    expect(harness.getElement('review-publish-confirmation').hidden).toBe(false)
+    expect(harness.getElement('review-publish-confirmation').textContent).toContain('Feedback published')
   })
 
   it('shows retrying instead of failed while review feedback is still queued to sync', async () => {

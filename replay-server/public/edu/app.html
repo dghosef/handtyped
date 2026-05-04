@@ -54,6 +54,7 @@
               <button class="button" id="new-assignment-button" type="button">New assignment</button>
             </div>
           </div>
+          <section class="classroom-roster-panel" id="classroom-roster-panel"></section>
           <section class="selection-grid" id="assignment-grid"></section>
         </section>
       </section>
@@ -212,6 +213,7 @@
                 </label>
                 <div class="review-publish-actions">
                   <button class="button small-button" id="review-publish-feedback" type="button">Publish feedback</button>
+                  <div class="review-publish-confirmation" id="review-publish-confirmation" hidden role="status" aria-live="polite"></div>
                 </div>
               </section>
 
@@ -286,11 +288,11 @@
           <div class="selector-row">
             <label>
               <span>Start time</span>
-              <input name="window_start_time" type="text" inputmode="text" value="10:00 AM" placeholder="10:00 AM" required />
+              <input name="window_start_time" type="time" value="10:00" required />
             </label>
             <label>
               <span>End time</span>
-              <input name="window_end_time" type="text" inputmode="text" value="11:00 AM" placeholder="11:00 AM" required />
+              <input name="window_end_time" type="time" value="11:00" required />
             </label>
           </div>
           <label>
@@ -316,10 +318,7 @@
             <input type="checkbox" name="export_allowed" />
             <span>Allow export or print from the student app</span>
           </label>
-          <label class="checkbox-label">
-            <input type="checkbox" name="images_allowed" />
-            <span>Allow images in the document, including images copied from the study browser</span>
-          </label>
+          <input type="hidden" name="images_allowed" value="" />
           <label class="checkbox-label">
             <input type="checkbox" name="show_rubric_to_student" />
             <span>Let students see the rubric while writing</span>
@@ -480,6 +479,32 @@
         <div id="assignment-form-toast" class="form-toast" hidden></div>
         <ul class="validation-list" id="assignment-form-errors" hidden></ul>
         <ul class="validation-list validation-warnings" id="assignment-form-warnings" hidden></ul>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="student-extension-modal" hidden>
+    <div class="modal-card student-extension-card">
+      <div class="modal-header">
+        <div>
+          <div class="section-label">Extend student</div>
+          <h2 id="student-extension-title">Extend access</h2>
+        </div>
+        <button class="button button-secondary modal-close" type="button" data-close-modal="student-extension-modal">Close</button>
+      </div>
+      <form class="inline-form" id="student-extension-form">
+        <label>
+          <span>Date</span>
+          <input id="student-extension-date" type="date" required />
+        </label>
+        <label>
+          <span>Time</span>
+          <input id="student-extension-time" type="time" required />
+        </label>
+        <div class="form-actions">
+          <button class="button" type="submit">Extend access</button>
+          <button class="button button-secondary" id="student-extension-cancel" type="button">Cancel</button>
+        </div>
       </form>
     </div>
   </div>

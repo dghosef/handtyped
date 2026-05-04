@@ -56,6 +56,14 @@ textarea {
   font: inherit;
 }
 
+button,
+a.button,
+[role="button"],
+.selection-card,
+.student-card {
+  -webkit-tap-highlight-color: transparent;
+}
+
 h1,
 h2,
 h3,
@@ -77,6 +85,8 @@ p {
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
+  transition: background 0.08s ease, border-color 0.08s ease, transform 0.04s ease;
+  will-change: transform;
 }
 
 .button:hover {
@@ -92,6 +102,13 @@ p {
 
 .button-secondary:hover {
   background: #eaeaea;
+}
+
+.button:active,
+.button.is-pressed,
+a.button.is-pressed,
+[role="button"].is-pressed {
+  transform: translateY(1px);
 }
 
 .small-button {
@@ -435,6 +452,41 @@ textarea {
   gap: var(--space-4);
 }
 
+.classroom-roster-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.classroom-roster-header,
+.classroom-roster-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.classroom-roster-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.classroom-roster-row {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.classroom-roster-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .selection-card {
   width: 100%;
   display: grid;
@@ -448,11 +500,18 @@ textarea {
   cursor: pointer;
   min-height: 160px;
   align-content: start;
+  transition: border-color 0.08s ease, box-shadow 0.08s ease, transform 0.04s ease;
+  will-change: transform;
 }
 
 .selection-card:hover {
   border-color: var(--line-strong);
   box-shadow: var(--shadow);
+}
+
+.selection-card:active,
+.selection-card.is-pressed {
+  transform: translateY(1px);
 }
 
 .selection-card.is-selected {
@@ -538,10 +597,17 @@ textarea {
   display: grid;
   gap: var(--space-3);
   cursor: pointer;
+  transition: border-color 0.08s ease, box-shadow 0.08s ease, transform 0.04s ease;
+  will-change: transform;
 }
 
 .student-card:hover {
   border-color: var(--line-strong);
+}
+
+.student-card:active,
+.student-card.is-pressed {
+  transform: translateY(1px);
 }
 
 .student-card.is-selected {
@@ -646,6 +712,10 @@ textarea {
   display: grid;
   gap: var(--space-4);
   margin: auto 0;
+}
+
+.student-extension-card {
+  width: min(100%, 420px);
 }
 
 .modal-header {
@@ -964,6 +1034,30 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.review-publish-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.review-publish-confirmation {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #b7e4d8;
+  border-radius: 999px;
+  background: #effaf6;
+  color: #0f766e;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.review-publish-confirmation[hidden] {
+  display: none;
 }
 
 .review-card {
@@ -1339,6 +1433,7 @@ textarea {
   background: var(--paper);
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .student-card-header {
@@ -1360,11 +1455,13 @@ textarea {
   display: grid;
   gap: var(--space-4);
   flex: 1;
+  min-width: 0;
 }
 
 .student-section {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .edit-activity-block {
@@ -1414,6 +1511,14 @@ textarea {
   padding-left: 20px;
   font-size: 0.85rem;
   color: var(--muted);
+  min-width: 0;
+}
+
+.student-urls li {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .student-url-illegal {

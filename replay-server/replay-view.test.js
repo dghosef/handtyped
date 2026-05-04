@@ -18,6 +18,7 @@ import {
   getFocusStateAtElapsedMs,
   getRawDurationFromHistory,
   getReplayOriginWallMs,
+  handtypedMarkdownDisplayText,
   findHistoryIndex,
   latestTextFromHistory,
   parseKeydowns,
@@ -26,6 +27,8 @@ import {
   renderInsertedRangeHtml,
   renderInsertedRangesHtml,
   renderMarkdownToHtml,
+  renderHandtypedInlineMarkupHtml,
+  stripHandtypedInlineMarkup,
 } from './public/replay-view.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -125,6 +128,29 @@ describe('replay history start state', () => {
     expect(renderMarkdownToHtml('Hello <script>alert(1)</script>')).toBe(
       '<p>Hello &lt;script&gt;alert(1)&lt;/script&gt;</p>',
     )
+  })
+
+  it('renders Handtyped custom inline style tags in replay html surfaces', () => {
+    const source = 'This is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]'
+
+    expect(stripHandtypedInlineMarkup(source)).toBe('This is my essay written in Handtyped')
+    expect(handtypedMarkdownDisplayText(source)).toBe('This is my essay written in Handtyped')
+    expect(renderMarkdownToHtml(source)).toBe(
+      '<p>This is my essay written in <u><span style="font-family:&quot;Times New Roman&quot;, Times, serif"><span style="font-size:16px">Handtyped</span></span></u></p>',
+    )
+  })
+
+  it('ignores unsafe Handtyped inline style values in replay html surfaces', () => {
+    expect(renderHandtypedInlineMarkupHtml('[font=evil]Nope[/font] [size=999]Huge[/size]')).toBe(
+      'Nope Huge',
+    )
+  })
+
+  it('keeps the EDU replay page on the formatted markdown render path', () => {
+    expect(eduReplayPageHtml).toContain('renderMarkdownInto,')
+    expect(eduReplayPageHtml).toContain('renderMarkdownInto(docContentEl, text, {')
+    expect(eduReplayPageHtml).not.toContain('docContentEl.textContent = text')
+    expect(eduReplayPageHtml).not.toContain('docContentEl.textContent = handtypedMarkdownDisplayText(text)')
   })
 
   it('preserves the actual timestamp of the first parsed edit', () => {
@@ -956,6 +982,118 @@ describe('replay history start state', () => {
     )
 
     expect(history.map((entry) => entry.text)).toEqual(['go 😀😎', 'go 😎'])
+  })
+
+  it('parseHistory treats snapshot-like leading inserts as replacements instead of duplicate text', () => {
+    const history = parseHistory(
+      {
+        doc_text: 'This is my essay written in Handtyped',
+        doc_history: [
+          { t: 0, pos: 0, del: '', ins: 'This is my essay' },
+          { t: 10, pos: 0, del: '', ins: 'This is my essay written in Handtyped' },
+        ],
+      },
+      [],
+    )
+    const replay = buildCharacterReplayHistory(history, [])
+
+    expect(history.map((entry) => entry.text)).toEqual([
+      'This is my essay',
+      'This is my essay written in Handtyped',
+    ])
+    expect(replay.some((entry) => entry.text.includes('This is my essay written in HandtypedThis is my essay'))).toBe(false)
+    expect(replay.at(-1)?.text).toBe('This is my essay written in Handtyped')
+  })
+
+  it('stress tests replay reconstruction across randomized edit histories', () => {
+    function makePrng(seed) {
+      let state = seed >>> 0
+      return () => {
+        state = (state * 1664525 + 1013904223) >>> 0
+        return state / 0x100000000
+      }
+    }
+
+    function buildDelta(previous, next) {
+      const prevChars = Array.from(previous)
+      const nextChars = Array.from(next)
+      let start = 0
+      while (
+        start < prevChars.length &&
+        start < nextChars.length &&
+        prevChars[start] === nextChars[start]
+      ) {
+        start += 1
+      }
+
+      let prevEnd = prevChars.length - 1
+      let nextEnd = nextChars.length - 1
+      while (
+        prevEnd >= start &&
+        nextEnd >= start &&
+        prevChars[prevEnd] === nextChars[nextEnd]
+      ) {
+        prevEnd -= 1
+        nextEnd -= 1
+      }
+
+      const del = prevChars.slice(start, prevEnd + 1).join('')
+      const ins = nextChars.slice(start, nextEnd + 1).join('')
+      return del || ins ? { pos: start, del, ins } : null
+    }
+
+    const alphabet = Array.from('abc xyz😀é')
+    for (let seed = 1; seed <= 80; seed += 1) {
+      const random = makePrng(seed)
+      let text = ''
+      let time = 0
+      const doc_history = []
+
+      for (let step = 0; step < 120; step += 1) {
+        const chars = Array.from(text)
+        const mode = random()
+        const nextChars = chars.slice()
+
+        if (mode < 0.5 || !nextChars.length) {
+          const insertCount = 1 + Math.floor(random() * 4)
+          const insertAt = Math.floor(random() * (nextChars.length + 1))
+          const insert = Array.from({ length: insertCount }, () =>
+            alphabet[Math.floor(random() * alphabet.length)],
+          )
+          nextChars.splice(insertAt, 0, ...insert)
+        } else if (mode < 0.8) {
+          const deleteAt = Math.floor(random() * nextChars.length)
+          const deleteCount = 1 + Math.floor(random() * Math.min(4, nextChars.length - deleteAt))
+          nextChars.splice(deleteAt, deleteCount)
+        } else {
+          const replaceAt = Math.floor(random() * nextChars.length)
+          const deleteCount = Math.floor(random() * Math.min(4, nextChars.length - replaceAt))
+          const insertCount = 1 + Math.floor(random() * 3)
+          const insert = Array.from({ length: insertCount }, () =>
+            alphabet[Math.floor(random() * alphabet.length)],
+          )
+          nextChars.splice(replaceAt, deleteCount, ...insert)
+        }
+
+        const next = nextChars.join('')
+        const delta = buildDelta(text, next)
+        if (!delta) continue
+
+        time += Math.floor(random() * 4)
+        doc_history.push({ ...delta, t: time })
+        text = next
+      }
+
+      const parsed = parseHistory({ doc_text: text, doc_history }, [])
+      const replay = buildCharacterReplayHistory(parsed, [])
+
+      expect(parsed.at(-1)?.text, `seed ${seed} parsed final text`).toBe(text)
+      expect(replay.at(-1)?.text, `seed ${seed} replay final text`).toBe(text)
+      for (let index = 1; index < replay.length; index += 1) {
+        expect(replay[index].t, `seed ${seed} replay time ${index}`).toBeGreaterThan(replay[index - 1].t)
+        expect(replay[index].text, `seed ${seed} duplicate frame ${index}`).not.toBe(replay[index - 1].text)
+      }
+    }
   })
 
   it('buildRhythmSamples gives replacement edits a nonzero weight', () => {

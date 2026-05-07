@@ -6,8 +6,61 @@ pub mod bundle;
 pub mod commands;
 pub mod document;
 pub mod editor;
+#[cfg(target_os = "macos")]
 pub mod hid;
+#[cfg(not(target_os = "macos"))]
+pub mod hid {
+    use crate::session::AppState;
+    use std::sync::Arc;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum InputMonitoringAccess {
+        Granted,
+        Denied,
+        Unknown,
+    }
+
+    pub unsafe fn mach_absolute_time() -> u64 {
+        0
+    }
+
+    pub unsafe fn input_monitoring_access() -> InputMonitoringAccess {
+        InputMonitoringAccess::Unknown
+    }
+
+    pub unsafe fn request_input_monitoring_access() {}
+
+    pub fn start_hid_capture(_state: Arc<AppState>) {}
+}
+#[cfg(target_os = "macos")]
 pub mod integrity;
+#[cfg(not(target_os = "macos"))]
+pub mod integrity {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+    pub struct IntegrityReport {
+        pub sip_enabled: bool,
+        pub vm_detected: bool,
+        pub hardware_model: String,
+        pub os_version: String,
+        pub hardware_uuid: String,
+        pub app_binary_hash: String,
+        pub code_signing_valid: bool,
+        pub frida_detected: bool,
+        pub dylib_injection_detected: bool,
+        pub dyld_env_injection: bool,
+    }
+
+    pub fn deny_debugger_attach() {}
+
+    pub fn run_checks() -> IntegrityReport {
+        IntegrityReport {
+            code_signing_valid: true,
+            ..IntegrityReport::default()
+        }
+    }
+}
 pub mod lockdown;
 pub mod observability;
 pub mod preview;
@@ -33,6 +86,10 @@ fn eval_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>, script: &str) 
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.eval(script);
     }
+}
+
+fn apply_window_screenshot_protection<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    let _ = window.set_content_protected(true);
 }
 
 fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -110,6 +167,7 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
     Ok(menu)
 }
 
+#[cfg(target_os = "macos")]
 pub fn run() {
     observability::install_panic_hook();
 
@@ -181,7 +239,10 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
-        .setup(move |_app| {
+        .setup(move |app| {
+            if let Some(window) = app.get_webview_window("main") {
+                apply_window_screenshot_protection(&window);
+            }
             unsafe { hid::request_input_monitoring_access() };
             hid::start_hid_capture(state_for_hid);
             Ok(())
@@ -199,4 +260,9 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn run() {
+    panic!("handtyped native app is currently supported on macOS only");
 }

@@ -1,8 +1,9 @@
-#![cfg(target_os = "macos")]
-
+#[cfg(target_os = "macos")]
 use objc::runtime::Object;
+#[cfg(target_os = "macos")]
 use objc::*;
 
+#[cfg(target_os = "macos")]
 fn shared_application() -> *mut Object {
     unsafe { msg_send!(class!(NSApplication), sharedApplication) }
 }
@@ -17,6 +18,7 @@ fn reset_cursor_state() {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub fn enter_lockdown_mode() {
     let nsapp: *mut Object = shared_application();
     if nsapp.is_null() {
@@ -39,6 +41,7 @@ pub fn enter_lockdown_mode() {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub fn exit_lockdown_mode() {
     let nsapp: *mut Object = shared_application();
     if nsapp.is_null() {
@@ -53,6 +56,7 @@ pub fn exit_lockdown_mode() {
     reset_cursor_state();
 }
 
+#[cfg(target_os = "macos")]
 pub fn is_in_lockdown_mode() -> bool {
     let nsapp: *mut Object = shared_application();
     if nsapp.is_null() {
@@ -63,6 +67,7 @@ pub fn is_in_lockdown_mode() -> bool {
     options != 0
 }
 
+#[cfg(target_os = "macos")]
 pub fn activate_ignoring_other_apps() {
     let nsapp: *mut Object = shared_application();
     if nsapp.is_null() {

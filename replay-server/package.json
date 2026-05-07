@@ -6,6 +6,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "vitest run --maxWorkers=1",
+    "test:demo": "vitest run --maxWorkers=1 edu-classroom-demo.test.js edu-almost-e2e.test.js edu-workflow-matrix.test.js edu-realtime.test.js",
     "cf:dev": "npx wrangler dev",
     "cf:deploy": "npx wrangler deploy"
   },

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { buildStudentConfig, createD1EduStore, createNodeEduStore } from './edu-store.js'
+import { buildStudentConfig, createD1EduStore, createNodeEduStore, ensureEduSeedData } from './edu-store.js'
 import { buildAssignment, buildClassroom, buildTeacher } from './edu-schema.js'
 
 class FakeD1PreparedStatement {
@@ -212,6 +212,33 @@ class FakeD1Database {
 }
 
 describe('createD1EduStore', () => {
+  it('does not seed a shared default teacher account', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+
+    await ensureEduSeedData(store)
+
+    await expect(store.listTeachers()).resolves.toEqual([])
+    await expect(store.getTeacherByEmail('teacher@edu.handtyped.app')).resolves.toBeNull()
+  })
+
+  it('removes a persisted shared default teacher account during seed maintenance', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    await store.putTeacher(
+      buildTeacher({
+        tenant_id: 'tenant_demo',
+        id: 'teacher_default',
+        name: 'Joseph Tan',
+        email: 'teacher@edu.handtyped.app',
+        access_code: 'handtyped-edu',
+      }),
+    )
+
+    await ensureEduSeedData(store)
+
+    await expect(store.getTeacherByEmail('teacher@edu.handtyped.app')).resolves.toBeNull()
+    await expect(store.listTeachers()).resolves.toEqual([])
+  })
+
   it('stores classrooms, assignments, teachers, and sessions without KV semantics', async () => {
     const store = createD1EduStore(new FakeD1Database())
 
@@ -398,6 +425,35 @@ describe('createD1EduStore', () => {
     expect(graceConfig.assignments[0]).toMatchObject({
       id: 'assignment-personal',
       temporary_access_until: '2026-04-27T18:00:00.000Z',
+      student_temporary_access_until: {},
+    })
+  })
+
+  it('keeps the later class extension when a student has an older personal extension', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-later', name: 'English 11', join_code: 'LATER' })
+    const assignment = buildAssignment({
+      id: 'assignment-later',
+      title: 'Long extension',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      temporary_access_until: '2026-04-28T23:00:00.000Z',
+      student_temporary_access_until: {
+        'ada lovelace': '2026-04-28T15:00:00.000Z',
+      },
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(assignment)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+
+    expect(adaConfig.assignments[0]).toMatchObject({
+      id: 'assignment-later',
+      temporary_access_until: '2026-04-28T23:00:00.000Z',
       student_temporary_access_until: {},
     })
   })

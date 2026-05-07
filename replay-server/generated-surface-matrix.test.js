@@ -135,7 +135,7 @@ describe("generated edu schema matrix", () => {
   [
     { email: "TEACHER@EDU.HANDTYPED.APP", expected: "teacher@edu.handtyped.app" },
     { email: " teacher@edu.handtyped.app ", expected: "teacher@edu.handtyped.app" },
-    { email: "", expected: "teacher@edu.handtyped.app" },
+    { email: "", expected: "" },
     { email: "person@example.org", expected: "person@example.org" },
   ].forEach((value, index) => {
     it(`buildTeacher normalization ${index + 1}`, () => {
@@ -390,7 +390,7 @@ describe("generated student config matrix", () => {
                 assignedStudents.some((name) => name.toLowerCase() === normalizedStudent)
               );
               if (!joinMatches) {
-                expect(result).toEqual({ classroom: null, assignments: [] });
+                expect(result).toEqual({ classroom: null, canonical_student_name: null, assignments: [] });
                 return;
               }
               expect(result.classroom?.id).toBe(classroom.id);

@@ -13,6 +13,8 @@ const REPLAY_ATTESTATION_FORMAT_V1 = 'handtyped-replay-attestation-v1'
 const REPLAY_ATTESTATION_FORMAT_V2 = 'handtyped-replay-attestation-v2'
 const ED25519_SPKI_PREFIX_HEX = '302a300506032b6570032100'
 const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
 
 function shortId(length = 16) {
   const bytes = new Uint8Array(24)
@@ -54,14 +56,36 @@ async function request(method, path, body, headers = {}) {
   return { status: res.status, body: json }
 }
 
+let passwordTeacherReady = false
+
+async function ensurePasswordTeacher() {
+  if (passwordTeacherReady) {
+    return
+  }
+  const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Actual Teacher',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
+    }),
+  })
+  if (res.status !== 201 && res.status !== 400) {
+    throw new Error(`Could not create test teacher account: ${res.status}`)
+  }
+  passwordTeacherReady = true
+}
+
 async function teacherLogin() {
+  await ensurePasswordTeacher()
   const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'password',
-      email: 'teacher@edu.handtyped.app',
-      password: 'handtyped-edu',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
     }),
   })
   return {
@@ -294,7 +318,7 @@ describe('teacher auth', () => {
     expect(result.cookie).toContain('edu_teacher_session=')
     expect(result.body).toMatchObject({
       authenticated: true,
-      teacher_email: 'teacher@edu.handtyped.app',
+      teacher_email: TEST_TEACHER_EMAIL,
       provider: 'password',
     })
   })
@@ -408,12 +432,24 @@ describe('teacher auth', () => {
   })
 
   it('rejects duplicate teacher signup emails', async () => {
-    const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+    const duplicateEmail = `duplicate-${shortId(6).toLowerCase()}@edu.handtyped.app`
+    const first = await fetch(`${baseUrl}/api/edu/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Teacher',
-        email: 'teacher@edu.handtyped.app',
+        email: duplicateEmail,
+        password: 'longenoughpassword',
+      }),
+    })
+    expect(first.status).toBe(201)
+
+    const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Teacher Again',
+        email: duplicateEmail,
         password: 'longenoughpassword',
       }),
     })
@@ -570,7 +606,7 @@ describe('edu teacher and student flow', () => {
     expect(login.status).toBe(200)
     expect(login.body).toMatchObject({
       authenticated: true,
-      teacher_email: 'teacher@edu.handtyped.app',
+      teacher_email: TEST_TEACHER_EMAIL,
     })
 
     const createClassroom = await request(
@@ -1486,6 +1522,37 @@ describe('edu teacher and student flow', () => {
     )
     expect(graceConfig.status).toBe(200)
     expect(graceConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback: null,
+        }),
+      ]),
+    )
+
+    const deletedFeedback = await request(
+      'DELETE',
+      `/api/edu/live-sessions/${liveSessionId}/grading`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(deletedFeedback.status).toBe(200)
+    expect(deletedFeedback.body.grading).toMatchObject({
+      teacher_comment: '',
+      returned_for_revision: false,
+      grade_label: '',
+      grade_score: null,
+      inline_annotations: [],
+      feedback_status: 'draft',
+      published_at: null,
+    })
+
+    const adaConfigAfterDelete = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(adaConfigAfterDelete.status).toBe(200)
+    expect(adaConfigAfterDelete.body.assignments).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: assignment.body.id,

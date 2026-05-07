@@ -292,6 +292,25 @@ describe('edu schema bug hunt', () => {
     })
   })
 
+  it('mergeLiveSessionDraft accepts explicit blank current text as a real draft state', () => {
+    const merge = mergeLiveSessionDraft(
+      {
+        history_base_count: 1,
+        history_base_t: 100,
+        current_text: '',
+        document_history_tail: [],
+      },
+      {
+        current_text: 'Undo me',
+        document_history: [{ t: 100, pos: 0, del: '', ins: 'Undo me' }],
+      },
+    )
+
+    expect(merge.error).toBeUndefined()
+    expect(merge.session.current_text).toBe('')
+    expect(merge.session.document_history).toEqual([{ t: 100, pos: 0, del: '', ins: 'Undo me' }])
+  })
+
   it('assignment defaults are stable even when browser and editor policy payloads are nonsense', () => {
     const assignment = buildAssignment({
       browser_policy: {

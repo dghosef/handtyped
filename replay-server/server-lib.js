@@ -220,6 +220,7 @@ function liveReplayHeadFromSession(session, existingHead = null, replay = null) 
   return buildLiveReplayHead({
     ...existingHead,
     id: session.id,
+    tenant_id: session.tenant_id,
     live_session_id: session.id,
     replay_session_id: session.replay_session_id || existingHead?.replay_session_id || replay?.id || null,
     assignment_id: session.assignment_id,
@@ -346,6 +347,7 @@ async function appendLiveReplayUpdate(eduStore, session, replay = null) {
 
   const event = buildLiveReplayEvent({
     id: `${session.id}:${String(nextSeq).padStart(8, '0')}`,
+    tenant_id: session.tenant_id,
     live_session_id: session.id,
     replay_session_id: head.replay_session_id,
     assignment_id: session.assignment_id,
@@ -1059,7 +1061,7 @@ export function createApp(sessionsDir, config = {}) {
         return res.status(404).json({ error: 'Not found' })
       }
       const replay = head.replay_session_id ? await eduStore.getReplay(head.replay_session_id) : null
-      return res.json(buildLiveReplayResponse(head, await eduStore.listLiveReplayEvents(head.id), replay))
+      return res.json(buildLiveReplayResponse(head, await eduStore.listLiveReplayEvents(head.id, head.tenant_id), replay))
     }
 
     const liveSession = await eduStore.getLiveSession(req.params.id)
@@ -1082,7 +1084,7 @@ export function createApp(sessionsDir, config = {}) {
       return res.status(404).json({ error: 'Not found' })
     }
     const sinceSeq = Math.max(0, Number(req.query.since_seq ?? 0) || 0)
-    const events = (await eduStore.listLiveReplayEvents(head.id)).filter((event) => event.seq > sinceSeq)
+    const events = (await eduStore.listLiveReplayEvents(head.id, head.tenant_id)).filter((event) => event.seq > sinceSeq)
     const replay = head.replay_session_id ? await eduStore.getReplay(head.replay_session_id) : null
     res.json({
       id: head.id,
@@ -1175,6 +1177,50 @@ export function createApp(sessionsDir, config = {}) {
         }),
       )
     }
+    res.json(updated)
+  })
+
+  app.delete('/api/edu/live-sessions/:id/grading', async (req, res) => {
+    const teacherSession = await getTeacherSession(eduStore, req.headers.cookie)
+    if (!teacherSession.authenticated) {
+      return res.status(401).json({ error: 'Unauthorized', authenticated: false })
+    }
+    await ensureEduSeedData(eduStore)
+    let existing = await eduStore.getLiveSession(req.params.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const assignment = existing.assignment_id ? await eduStore.getAssignment(existing.assignment_id) : null
+    if (
+      assignment?.tenant_id &&
+      teacherSession.tenant_id &&
+      existing.tenant_id !== teacherSession.tenant_id &&
+      assignment.tenant_id === teacherSession.tenant_id
+    ) {
+      existing = buildLiveSession({ ...existing, tenant_id: assignment.tenant_id })
+    }
+    if (existing.tenant_id !== teacherTenantId(teacherSession)) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+
+    const updatedAt = nowIso()
+    const updated = buildLiveSession({
+      ...existing,
+      grading: {
+        rubric_scores: {},
+        teacher_comment: '',
+        returned_for_revision: false,
+        grade_label: '',
+        grade_score: null,
+        inline_annotations: [],
+        feedback_status: 'draft',
+        published_at: null,
+        updated_at: updatedAt,
+        actor_id: teacherSession.teacher_id || null,
+        actor_name: teacherSession.teacher_name || null,
+        actor_email: teacherSession.teacher_email || null,
+      },
+      updated_at: updatedAt,
+    })
+    await eduStore.putLiveSession(updated)
     res.json(updated)
   })
 

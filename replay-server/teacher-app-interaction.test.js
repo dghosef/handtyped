@@ -6,6 +6,9 @@ import path from 'node:path'
 import { Window } from 'happy-dom'
 import { createApp } from './server-lib.js'
 
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
+
 function stripBootstrapping(source) {
   return source
     .replace(/import\s*\{[\s\S]*?\}\s*from '\.\/app-ui\.js'\s*/m, '')
@@ -82,13 +85,21 @@ function teacherFetch(baseUrl, cookie) {
   }
 }
 
-async function createTeacherWorkspace(baseUrl) {
+async function createTeacherWorkspace(baseUrl, assignmentOverrides = {}) {
+  await apiJson(baseUrl, '/api/edu/auth/signup', {
+    method: 'POST',
+    body: {
+      name: 'Actual Teacher',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
+    },
+  })
   const login = await apiJson(baseUrl, '/api/edu/auth/login', {
     method: 'POST',
     body: {
       provider: 'password',
-      email: 'teacher@edu.handtyped.app',
-      password: 'handtyped-edu',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
     },
   })
   const cookie = login.response.headers.get('set-cookie')?.split(';')[0] || ''
@@ -111,6 +122,7 @@ async function createTeacherWorkspace(baseUrl) {
       classroom_id: classroom.body.id,
       classroom_name: classroom.body.name,
       prompt: 'Draft a claim and add one piece of evidence.',
+      ...assignmentOverrides,
     },
   })
 
@@ -430,6 +442,87 @@ describe('teacher app interactions', () => {
       expect(document.getElementById('starter-document-field').value).toBe('**Draft this claim**')
     } finally {
       app.cleanup()
+    }
+  })
+
+  it('submits the classroom name before disabling the creation form', async () => {
+    const requests = []
+    const app = loadTeacherAppInDom({
+      fetchImpl: async (input, options = {}) => {
+        requests.push({
+          input: String(input),
+          body: options.body ? JSON.parse(options.body) : null,
+        })
+        return createJsonResponse({ id: 'class-submitted', name: 'Creative Writing', join_code: 'CW101' }, { status: 201 })
+      },
+    })
+    try {
+      app.wireForms()
+      app.document.querySelector('#classroom-form [name="name"]').value = 'Creative Writing'
+      app.document.querySelector('#classroom-form [name="join_code"]').value = 'CW101'
+
+      app.document.getElementById('classroom-form')
+        .dispatchEvent(new app.window.Event('submit', { bubbles: true, cancelable: true }))
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(requests).toContainEqual({
+        input: '/api/edu/classrooms',
+        body: {
+          name: 'Creative Writing',
+          teacher_name: 'Teacher',
+          join_code: 'CW101',
+        },
+      })
+    } finally {
+      app.cleanup()
+    }
+  })
+
+  it('prefills native assignment window time inputs when editing an existing assignment', async () => {
+    const server = await startEduTestServer()
+    let app
+    try {
+      const workspace = await createTeacherWorkspace(server.baseUrl, {
+        windows: [
+          {
+            label: 'Teacher writing window',
+            days: {
+              monday: true,
+              tuesday: true,
+              wednesday: true,
+              thursday: true,
+              friday: true,
+              saturday: false,
+              sunday: false,
+            },
+            start_hour: 14,
+            start_minute: 30,
+            end_hour: 16,
+            end_minute: 5,
+          },
+        ],
+      })
+
+      app = loadTeacherAppInDom({
+        fetchImpl: teacherFetch(server.baseUrl, workspace.cookie),
+      })
+      await app.loadApp()
+
+      app.document.querySelector(`[data-classroom-id="${workspace.classroom.id}"]`)
+        .dispatchEvent(new app.window.MouseEvent('click', { bubbles: true }))
+      app.document.querySelector(`[data-assignment-id="${workspace.assignment.id}"]`)
+        .dispatchEvent(new app.window.MouseEvent('click', { bubbles: true }))
+      app.document.getElementById('edit-assignment-button')
+        .dispatchEvent(new app.window.MouseEvent('click', { bubbles: true }))
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(app.document.querySelector('[name="window_start_time"]').value).toBe('14:30')
+      expect(app.document.querySelector('[name="window_end_time"]').value).toBe('16:05')
+    } finally {
+      app?.cleanup()
+      await server.close()
     }
   })
 

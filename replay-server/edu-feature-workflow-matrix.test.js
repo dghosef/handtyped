@@ -5,12 +5,18 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
 
 let baseUrl
 let server
 let sessionsDir
 let eduStoreDir
 const JOIN_CODE_SUFFIX = randomUUID().replace(/-/g, '').slice(0, 3).toUpperCase()
+
+function utcIso(year, month, day, hour, minute = 0) {
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0)).toISOString()
+}
 
 async function request(method, path, body, headers = {}) {
   const url = `${baseUrl}${path}`
@@ -26,14 +32,32 @@ async function request(method, path, body, headers = {}) {
   return { status: res.status, body: json, headers: res.headers }
 }
 
+let passwordTeacherReady = false
+
+async function ensurePasswordTeacher() {
+  if (passwordTeacherReady) {
+    return
+  }
+  const signup = await teacherSignup({
+    name: 'Actual Teacher',
+    email: TEST_TEACHER_EMAIL,
+    password: TEST_TEACHER_PASSWORD,
+  })
+  if (signup.status !== 201 && signup.status !== 400) {
+    throw new Error(`Could not create test teacher account: ${signup.status}`)
+  }
+  passwordTeacherReady = true
+}
+
 async function teacherLogin() {
+  await ensurePasswordTeacher()
   const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'password',
-      email: 'teacher@edu.handtyped.app',
-      password: 'handtyped-edu',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
     }),
   })
   return {
@@ -638,7 +662,7 @@ describe('feature workflow matrix almost end-to-end', () => {
 
   const accessCases = Array.from({ length: 6 }, (_, index) => ({
     assignedStudents: index % 2 === 0 ? ['Ada Lovelace'] : [],
-    extensionMinute: `2026-04-28T2${index}:45:00.000Z`,
+    extensionMinute: utcIso(2026, 4, 28, 20 + index, 45),
     revokeAfterApprove: index % 3 === 0,
   }))
 
@@ -1198,7 +1222,7 @@ describe('feature workflow matrix almost end-to-end', () => {
 
       const staleConfig = await studentConfig(originalCode, scenario.studentName)
       expect(staleConfig.status).toBe(200)
-      expect(staleConfig.body).toEqual({ classroom: null, assignments: [] })
+      expect(staleConfig.body).toEqual({ classroom: null, canonical_student_name: null, assignments: [] })
 
       const refreshedConfig = await studentConfig(scenario.nextJoinCode, scenario.studentName)
       expect(refreshedConfig.status).toBe(200)
@@ -1339,7 +1363,7 @@ describe('feature workflow matrix almost end-to-end', () => {
           }),
         ]),
       )
-      expect(summaries.body.live_sessions.every((session) => session.document_history === undefined)).toBe(true)
+      expect(summaries.body.live_sessions.every((session) => Array.isArray(session.document_history))).toBe(true)
       expect(
         summaries.body.live_sessions.find((session) => session.id === firstLiveId)?.url_history?.length ?? 0,
       ).toBeLessThanOrEqual(4)

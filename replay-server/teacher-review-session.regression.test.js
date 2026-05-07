@@ -134,6 +134,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     'timeAgoLabel',
     'todayAtLocalTime',
     'todayAtLocalTimeIso',
+    'wholeClassExtensionLabel',
     'buildAttributedDocument',
     'latestTextFromHistory',
     'document',
@@ -165,6 +166,9 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
       refreshAssignmentViewData,
       refreshSelectedReviewSessionData,
       refreshSelectedReviewReplayData,
+      captureTeacherHistoryState,
+      initializeTeacherHistory,
+      recordTeacherHistoryState,
       parseReviewTimeInput,
       reviewTimeValue,
       replayTeacherDateInputValue,
@@ -174,6 +178,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
       buildReviewReplayCacheEntry,
       documentHistoryForReviewAttribution,
       mergeReviewReplayWithLiveSession,
+      displaySessionText,
+      mergeLiveSession,
       annotateReplayHistoryWithEventTimes,
       attributedDocumentHasReliableInsertionTiming,
       renderDashboard,
@@ -225,6 +231,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     return elementMap.get(key)
   }
 
+  const windowListeners = new Map()
+  const historyEntries = []
   const documentStub = {
     hidden: false,
     body: { dataset: {}, innerHTML: '' },
@@ -236,8 +244,26 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
   }
   const windowStub = {
     location: { href: '', origin: 'https://edu.handtyped.app' },
-    addEventListener() {},
-    removeEventListener() {},
+    history: {
+      state: null,
+      pushState(state, _title, url) {
+        this.state = state
+        historyEntries.push({ type: 'push', state, url })
+      },
+      replaceState(state, _title, url) {
+        this.state = state
+        historyEntries.push({ type: 'replace', state, url })
+      },
+    },
+    addEventListener(type, listener) {
+      const current = windowListeners.get(type) || []
+      current.push(listener)
+      windowListeners.set(type, current)
+    },
+    removeEventListener(type, listener) {
+      const current = windowListeners.get(type) || []
+      windowListeners.set(type, current.filter((item) => item !== listener))
+    },
     setTimeout,
     clearTimeout,
     setInterval,
@@ -258,7 +284,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     ) || null
   }
 
-  return factory(
+  const harness = factory(
     () => ({ totalEdits: 0, activeStudents: 0, buckets: [0] }),
     () => ({ totalEdits: 0, buckets: [0] }),
     () => ({ totalEdits: 0, points: [0] }),
@@ -299,6 +325,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     () => 'just now',
     () => new Date(),
     () => new Date().toISOString(),
+    () => null,
     buildAttributedDocument,
     latestTextFromHistory,
     documentStub,
@@ -313,6 +340,14 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     setInterval,
     clearInterval,
   )
+  harness.dispatchWindowEvent = (type, event = {}) => {
+    for (const listener of windowListeners.get(type) || []) {
+      listener({ type, ...event })
+    }
+  }
+  harness.historyEntries = historyEntries
+  harness.windowHistory = windowStub.history
+  return harness
 }
 
 const JOE_HISTORY_TEST_CUTOFF_MS = Date.parse('2026-05-04T17:20:00Z')
@@ -807,6 +842,47 @@ describe('teacher review session regression', () => {
     expect(replayData.attributedDocument.text).toBe(displayText)
     expect(indexes.size).toBe(1)
     expect(indexes.has(displayText.length - 1)).toBe(true)
+  })
+
+  it('keeps an explicitly blank live draft blank instead of falling back to stale replay text', () => {
+    const harness = loadTeacherAppHarness()
+    const replay = {
+      current_text: 'Undo me',
+      updated_at: '2026-05-06T19:00:00.000Z',
+      last_activity_at: '2026-05-06T19:00:00.000Z',
+      document_history: [{ t: 100, pos: 0, del: '', ins: 'Undo me', absolute_wall_ms: 1_777_748_400_000 }],
+    }
+    const liveSession = {
+      current_text: '',
+      updated_at: '2026-05-06T19:01:00.000Z',
+      last_activity_at: '2026-05-06T19:01:00.000Z',
+      document_history: replay.document_history,
+    }
+
+    const mergedReplay = harness.mergeReviewReplayWithLiveSession(replay, liveSession)
+    const replayData = harness.buildReviewReplayCacheEntry(mergedReplay)
+
+    expect(mergedReplay.current_text).toBe('')
+    expect(replayData.attributedDocument.text).toBe('')
+    expect(harness.displaySessionText(liveSession, replayData)).toBe('')
+  })
+
+  it('allows a fresh explicit blank live-session update through dashboard merging', () => {
+    const harness = loadTeacherAppHarness()
+    const existing = {
+      id: 'Evan:assignment-1',
+      current_text: 'Undo me',
+      updated_at: '2026-05-06T19:00:00.000Z',
+      last_activity_at: '2026-05-06T19:00:00.000Z',
+    }
+    const incoming = {
+      id: 'Evan:assignment-1',
+      current_text: '',
+      updated_at: '2026-05-06T19:00:01.000Z',
+      last_activity_at: '2026-05-06T19:00:01.000Z',
+    }
+
+    expect(harness.mergeLiveSession(existing, incoming).current_text).toBe('')
   })
 
   it('treats one-timestamp draft attribution as unreliable for filtered highlights', () => {
@@ -2692,7 +2768,6 @@ describe('teacher review session regression', () => {
       },
     })
 
-    harness.beginReviewComposer('comment')
     harness.getElement('review-composer-note').value = 'Open with a clearer claim.'
     await harness.addReviewAnnotation()
 
@@ -3752,5 +3827,69 @@ describe('teacher review session regression', () => {
     expect(harness.getElement('review-draft-surface').innerHTML).toContain('open-1')
     expect(harness.getElement('review-annotation-list').innerHTML).not.toContain('Already handled.')
     expect(harness.getElement('review-annotation-list').innerHTML).toContain('Still visible.')
+  })
+
+  it('restores teacher app navigation when the browser back button emits a popstate', () => {
+    const harness = loadTeacherAppHarness()
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const selectedSession = {
+      id: 'session-1',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date().toISOString(),
+    }
+    harness.renderDashboard({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      currentView: 'classes',
+      selectedClassroomId: null,
+      selectedAssignmentId: null,
+      selectedReviewSessionId: null,
+      reviewWorkspaceOpen: false,
+    })
+    harness.initializeTeacherHistory()
+
+    harness.setReviewSelection({
+      currentView: 'assignment',
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: null,
+      reviewWorkspaceOpen: false,
+    })
+    harness.recordTeacherHistoryState()
+    const assignmentState = harness.captureTeacherHistoryState()
+
+    harness.setReviewSelection({
+      currentView: 'assignment',
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+    harness.recordTeacherHistoryState()
+
+    harness.dispatchWindowEvent('popstate', { state: assignmentState })
+
+    expect(harness.getReviewSelection()).toMatchObject({
+      currentView: 'assignment',
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: null,
+      reviewWorkspaceOpen: false,
+    })
+    expect(harness.historyEntries.filter((entry) => entry.type === 'push')).toHaveLength(2)
   })
 })

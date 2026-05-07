@@ -5,6 +5,8 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
 
 let baseUrl
 let server
@@ -25,14 +27,32 @@ async function request(method, path, body, headers = {}) {
   return { status: res.status, body: json, headers: res.headers }
 }
 
+let passwordTeacherReady = false
+
+async function ensurePasswordTeacher() {
+  if (passwordTeacherReady) {
+    return
+  }
+  const signup = await teacherSignup({
+    name: 'Actual Teacher',
+    email: TEST_TEACHER_EMAIL,
+    password: TEST_TEACHER_PASSWORD,
+  })
+  if (signup.status !== 201 && signup.status !== 400) {
+    throw new Error(`Could not create test teacher account: ${signup.status}`)
+  }
+  passwordTeacherReady = true
+}
+
 async function teacherLogin() {
+  await ensurePasswordTeacher()
   const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'password',
-      email: 'teacher@edu.handtyped.app',
-      password: 'handtyped-edu',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
     }),
   })
   return {
@@ -2011,6 +2031,7 @@ describe('teacher almost end-to-end workflow', () => {
     expect(afterClassroomDelete.status).toBe(200)
     expect(afterClassroomDelete.body).toEqual({
       classroom: null,
+      canonical_student_name: null,
       assignments: [],
     })
   })
@@ -2099,6 +2120,7 @@ describe('teacher almost end-to-end workflow', () => {
     expect(oldCodeConfig.status).toBe(200)
     expect(oldCodeConfig.body).toEqual({
       classroom: null,
+      canonical_student_name: null,
       assignments: [],
     })
 
@@ -3290,7 +3312,7 @@ describe('teacher almost end-to-end workflow', () => {
       `/api/edu/student/config?join_code=${survivorCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
     )
     expect(doomedAfter.status).toBe(200)
-    expect(doomedAfter.body).toEqual({ classroom: null, assignments: [] })
+    expect(doomedAfter.body).toEqual({ classroom: null, canonical_student_name: null, assignments: [] })
     expect(survivorAfter.status).toBe(200)
     expect(survivorAfter.body.classroom).toMatchObject({ id: survivorClassroom.body.id })
     expect(survivorAfter.body.assignments).toEqual(
@@ -4255,7 +4277,7 @@ describe('teacher almost end-to-end workflow', () => {
       `/api/edu/student/config?join_code=ZZZZZZ&student_name=${encodeURIComponent('Ada Lovelace')}`,
     )
     expect(badJoinCodeConfig.status).toBe(200)
-    expect(badJoinCodeConfig.body).toEqual({ classroom: null, assignments: [] })
+    expect(badJoinCodeConfig.body).toEqual({ classroom: null, canonical_student_name: null, assignments: [] })
   })
 
   it('rejects unauthorized classroom deletion without disturbing teacher reads, student routing, or attached assignments', async () => {
@@ -4588,7 +4610,7 @@ describe('teacher almost end-to-end workflow', () => {
     expect(originalRoute.body.assignments).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: firstAssignment.body.id })]),
     )
-    expect(rejectedRoute.body).toEqual({ classroom: null, assignments: [] })
+    expect(rejectedRoute.body).toEqual({ classroom: null, canonical_student_name: null, assignments: [] })
   })
 
   it('deletes a classroom with multiple assignments by removing all of its student and teacher-visible work while leaving another classroom intact', async () => {
@@ -4680,7 +4702,7 @@ describe('teacher almost end-to-end workflow', () => {
       `/api/edu/student/config?join_code=${survivorCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
     )
     expect(doomedConfig.status).toBe(200)
-    expect(doomedConfig.body).toEqual({ classroom: null, assignments: [] })
+    expect(doomedConfig.body).toEqual({ classroom: null, canonical_student_name: null, assignments: [] })
     expect(survivorConfig.status).toBe(200)
     expect(survivorConfig.body.assignments).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: survivorAssignment.body.id })]),

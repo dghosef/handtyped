@@ -391,6 +391,7 @@ function liveReplayHeadFromSession(session, existingHead = null, replay = null) 
   return buildLiveReplayHead({
     ...existingHead,
     id: session.id,
+    tenant_id: session.tenant_id,
     live_session_id: session.id,
     replay_session_id: session.replay_session_id || existingHead?.replay_session_id || replay?.id || null,
     assignment_id: session.assignment_id,
@@ -514,6 +515,7 @@ async function appendLiveReplayUpdate(store, session, replay = null) {
   await store.appendLiveReplayEvent(
     buildLiveReplayEvent({
       id: `${session.id}:${String(nextSeq).padStart(8, '0')}`,
+      tenant_id: session.tenant_id,
       live_session_id: session.id,
       replay_session_id: head.replay_session_id,
       assignment_id: session.assignment_id,
@@ -816,15 +818,6 @@ async function resolveClassroomJoinCode(store, requestedJoinCode, excludeClassro
   throw new Error('Could not generate an unused join code')
 }
 
-function defaultTeacher(env) {
-  return {
-    id: 'teacher_default',
-    name: 'Joseph Tan',
-    email: env.EDU_TEACHER_EMAIL || 'teacher@edu.handtyped.app',
-    access_code: env.EDU_TEACHER_ACCESS_CODE || 'handtyped-edu',
-  }
-}
-
 function eduGoogleConfig(env) {
   return {
     enabled: Boolean(String(env.EDU_GOOGLE_CLIENT_ID || '').trim()),
@@ -1009,7 +1002,6 @@ export default {
     if (eduHost && request.method === 'POST' && url.pathname === '/api/edu/auth/login') {
       const authStore = getEduAuthStore(env)
       const body = await parseJsonRequest(request)
-      const fallbackTeacher = defaultTeacher(env)
       let teacher = null
       let providerName = String(body?.provider || '').trim() || 'password'
 
@@ -1027,23 +1019,14 @@ export default {
           ? await authenticateTeacherWithGoogle(getEduStore(env), profile)
           : null
       } else {
-        const normalizedEmail = String(body?.email || '').trim().toLowerCase()
-        if (
-          normalizedEmail === fallbackTeacher.email.toLowerCase() &&
-          (String(body?.password || '') === fallbackTeacher.access_code ||
-            String(body?.access_code || '') === fallbackTeacher.access_code)
-        ) {
-          teacher = fallbackTeacher
-        } else {
-          try {
-            teacher = await authenticateTeacher(getEduStore(env), {
-              email: body?.email,
-              password: body?.password,
-              accessCode: body?.access_code,
-            })
-          } catch {
-            teacher = null
-          }
+        try {
+          teacher = await authenticateTeacher(getEduStore(env), {
+            email: body?.email,
+            password: body?.password,
+            accessCode: body?.access_code,
+          })
+        } catch {
+          teacher = null
         }
         providerName = body?.password ? 'password' : 'access-code'
       }

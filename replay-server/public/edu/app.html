@@ -16,10 +16,22 @@
       <div class="teacher-topbar-actions">
         <a
           class="button button-secondary"
-          id="student-download-button"
+          id="student-download-apple-silicon-button"
           href="/downloads/Handtyped-EDU-Student-macos.dmg"
           download="Handtyped-EDU-Student-macos.dmg"
-        >Download student app</a>
+        >Apple Silicon</a>
+        <a
+          class="button button-secondary"
+          id="student-download-intel-button"
+          href="/downloads/Handtyped-EDU-Student-macos-intel.dmg"
+          download="Handtyped-EDU-Student-macos-intel.dmg"
+        >Intel Mac</a>
+        <a
+          class="button button-secondary"
+          id="student-download-windows-button"
+          href="/downloads/Handtyped-EDU-Student-windows-x86_64.zip"
+          download="Handtyped-EDU-Student-windows-x86_64.zip"
+        >Windows x86-64</a>
         <button class="button button-secondary" id="feedback-button" type="button">Send feedback</button>
         <a class="button button-secondary" href="/">Main site</a>
         <button class="button button-secondary" id="logout-button" type="button" hidden>Sign out</button>
@@ -146,51 +158,10 @@
 	                  </div>
                   <div class="review-selection-count" id="review-selection-count">No text selected</div>
                 </div>
-                <div class="review-time-tools">
-                  <div class="review-time-tools-row">
-                    <label class="review-time-field">
-                      <span>Date</span>
-                      <input id="review-highlight-date" type="date" />
-                    </label>
-                    <label class="review-time-field review-time-field-wide">
-                      <span>More dates</span>
-                      <input id="review-highlight-dates" type="text" inputmode="numeric" placeholder="YYYY-MM-DD, YYYY-MM-DD" />
-                    </label>
-                    <label class="review-time-field review-time-field-compact">
-                      <span>From</span>
-                      <input id="review-highlight-start-time" type="time" />
-                    </label>
-                    <label class="review-time-field review-time-field-compact">
-                      <span>To</span>
-                      <input id="review-highlight-end-time" type="time" />
-                    </label>
-                  </div>
-                  <div class="review-weekday-picker" aria-label="Highlight days of week">
-                    <label><input type="checkbox" name="review-highlight-weekday" value="monday" /> Mon</label>
-                    <label><input type="checkbox" name="review-highlight-weekday" value="tuesday" /> Tue</label>
-                    <label><input type="checkbox" name="review-highlight-weekday" value="wednesday" /> Wed</label>
-                    <label><input type="checkbox" name="review-highlight-weekday" value="thursday" /> Thu</label>
-                    <label><input type="checkbox" name="review-highlight-weekday" value="friday" /> Fri</label>
-                    <label><input type="checkbox" name="review-highlight-weekday" value="saturday" /> Sat</label>
-                    <label><input type="checkbox" name="review-highlight-weekday" value="sunday" /> Sun</label>
-                  </div>
-                  <div class="review-time-actions">
-                    <button class="button button-secondary small-button" id="review-highlight-preset-window" type="button">Class window</button>
-                    <button class="button button-secondary small-button" id="review-highlight-preset-after-school" type="button">After school</button>
-                    <button class="button button-secondary small-button" id="review-highlight-preset-evening" type="button">Evening</button>
-                    <button class="button button-secondary small-button" id="review-highlight-preset-weekdays" type="button">Weekdays</button>
-                    <button class="button button-secondary small-button" id="review-highlight-all" type="button">All writing</button>
-                    <button class="button button-secondary small-button" id="review-highlight-clear" type="button">Clear highlight</button>
-                  </div>
-                  <div class="student-meta" id="review-highlight-meta">Replay-based time highlighting appears here when a replay is available.</div>
-                </div>
                 <div class="review-draft-surface" id="review-draft-surface" tabindex="0" aria-label="Student draft review surface"></div>
                 <div class="review-selection-panel" id="review-selection-panel">
                   <div class="section-label">Selected text</div>
                   <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment.</div>
-                  <div class="review-selection-actions">
-                    <button class="button button-secondary small-button" id="review-comment-mode" type="button">Comment</button>
-                  </div>
                 </div>
                 <div class="review-composer" id="review-composer" hidden>
                   <div class="section-label" id="review-composer-label">New comment</div>
@@ -199,7 +170,7 @@
                     <textarea id="review-composer-note" rows="3" placeholder="What should the student notice here?"></textarea>
                   </label>
                   <div class="review-selection-actions">
-                    <button class="button small-button" id="review-add-annotation" type="button">Add to draft</button>
+                    <button class="button small-button" id="review-add-annotation" type="button">Add comment</button>
                     <button class="button button-secondary small-button" id="review-cancel-annotation" type="button">Cancel</button>
                   </div>
                 </div>
@@ -232,6 +203,7 @@
                 </label>
                 <div class="review-publish-actions">
                   <button class="button small-button" id="review-publish-feedback" type="button">Publish feedback</button>
+                  <button class="button button-secondary small-button" id="review-delete-feedback" type="button">Delete feedback</button>
                   <div class="review-publish-confirmation" id="review-publish-confirmation" hidden role="status" aria-live="polite"></div>
                 </div>
               </section>
@@ -268,7 +240,7 @@
           <span>Join code</span>
           <input name="join_code" type="text" placeholder="Optional custom code" />
         </label>
-        <button class="button" type="submit">Create class</button>
+        <button class="button" id="classroom-form-submit" type="submit">Create class</button>
       </form>
     </div>
   </div>

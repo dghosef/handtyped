@@ -3,6 +3,9 @@ import { generateKeyPairSync, sign as signDetached, randomUUID } from 'crypto'
 import { gzipSync, gunzipSync } from 'zlib'
 import worker from './worker.js'
 
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
+
 function makeEnv() {
   const kv = new Map()
   return {
@@ -68,15 +71,34 @@ function makeEnv() {
   }
 }
 
+async function ensurePasswordTeacher(env) {
+  const res = await worker.fetch(
+    new Request('https://edu.handtyped.app/api/edu/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Actual Teacher',
+        email: TEST_TEACHER_EMAIL,
+        password: TEST_TEACHER_PASSWORD,
+      }),
+    }),
+    env,
+  )
+  if (res.status !== 201 && res.status !== 400) {
+    throw new Error(`Could not create test teacher account: ${res.status}`)
+  }
+}
+
 async function loginTeacher(env) {
+  await ensurePasswordTeacher(env)
   const res = await worker.fetch(
     new Request('https://edu.handtyped.app/api/edu/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         provider: 'password',
-        email: 'teacher@edu.handtyped.app',
-        password: 'handtyped-edu',
+        email: TEST_TEACHER_EMAIL,
+        password: TEST_TEACHER_PASSWORD,
       }),
     }),
     env,
@@ -265,7 +287,7 @@ describe('worker host routing', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({
       product: { host: 'edu.handtyped.app', teacher_surface: 'web', student_surface: 'native' },
-      summary: { classrooms: 2, assignments: 2, live_sessions: 2 },
+      summary: { classrooms: 0, assignments: 0, live_sessions: 0 },
     })
   })
 
@@ -310,8 +332,30 @@ describe('worker host routing', () => {
     expect(cookie).toContain('edu_teacher_session=')
     expect(await res.json()).toMatchObject({
       authenticated: true,
-      teacher_email: 'teacher@edu.handtyped.app',
+      teacher_email: TEST_TEACHER_EMAIL,
       provider: 'password',
+    })
+  })
+
+  it('rejects the old shared teacher credentials when no account exists', async () => {
+    const env = makeEnv()
+    const res = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'password',
+          email: 'teacher@edu.handtyped.app',
+          password: 'handtyped-edu',
+        }),
+      }),
+      env,
+    )
+
+    expect(res.status).toBe(401)
+    expect(await res.json()).toMatchObject({
+      authenticated: false,
+      error: 'Invalid teacher login',
     })
   })
 
@@ -1727,13 +1771,20 @@ describe('worker host routing', () => {
     )
     expect(replayCapturePublish.status).toBe(201)
 
-    const replayUpdates = await worker.fetch(
-      new Request(`https://edu.handtyped.app/api/edu/live-replays/${encodeURIComponent(liveSessionId)}/updates`, {
-        method: 'GET',
-        headers: { Cookie: cookie },
-      }),
-      env,
-    )
+    let replayUpdates = null
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      replayUpdates = await worker.fetch(
+        new Request(`https://edu.handtyped.app/api/edu/live-replays/${encodeURIComponent(liveSessionId)}/updates`, {
+          method: 'GET',
+          headers: { Cookie: cookie },
+        }),
+        env,
+      )
+      if (replayUpdates.status === 200) {
+        break
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
     expect(replayUpdates.status).toBe(200)
     expect(await replayUpdates.json()).toMatchObject({
       id: liveSessionId,

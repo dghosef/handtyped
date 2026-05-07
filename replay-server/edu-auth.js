@@ -16,12 +16,12 @@ function randomTenantId() {
   return `tenant_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-function isDemoTeacherAccount(teacher) {
-  return teacher?.id === 'teacher_default' || teacher?.email === 'teacher@edu.handtyped.app'
+function isLegacyDefaultTeacherAccount(teacher) {
+  return teacher?.id === 'teacher_default'
 }
 
 async function ensureTeacherHasPrivateTenant(store, teacher) {
-  if (!teacher || teacher.tenant_id !== DEFAULT_TENANT_ID || isDemoTeacherAccount(teacher)) {
+  if (!teacher || teacher.tenant_id !== DEFAULT_TENANT_ID || isLegacyDefaultTeacherAccount(teacher)) {
     return teacher
   }
   const updatedTeacher = buildTeacher({
@@ -59,7 +59,7 @@ export function clearTeacherSessionCookie() {
 
 export async function authenticateTeacher(store, { email, accessCode, password }) {
   const teacher = await store.getTeacherByEmail(normalizeTeacherEmail(email))
-  if (!teacher) {
+  if (!teacher || isLegacyDefaultTeacherAccount(teacher)) {
     return null
   }
 
@@ -82,7 +82,10 @@ export async function authenticateTeacherWithGoogle(store, profile) {
   }
 
   const teacher = await store.getTeacherByEmail(normalizedEmail)
-  if (!teacher) {
+  if (!teacher || isLegacyDefaultTeacherAccount(teacher)) {
+    if (isLegacyDefaultTeacherAccount(teacher)) {
+      await store.deleteTeacher?.(teacher.id)
+    }
     const nextTeacher = buildTeacher({
       tenant_id: randomTenantId(),
       name: String(profile?.name || '').trim() || normalizedEmail,
@@ -157,6 +160,11 @@ export async function getTeacherSession(store, rawCookieHeader) {
 
   const record = await store.getTeacherSession(sessionId)
   if (!record) {
+    return buildTeacherAuthSession({ authenticated: false })
+  }
+
+  if (isLegacyDefaultTeacherAccount({ id: record.teacher_id })) {
+    await store.deleteTeacherSession(sessionId)
     return buildTeacherAuthSession({ authenticated: false })
   }
 

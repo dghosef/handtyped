@@ -30,6 +30,7 @@ const REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_INSERT_CHARS = 80
 const REVIEW_LIVE_ATTRIBUTION_MAX_SYNTHETIC_DELETE_CHARS = 20
 const REVIEW_SYNC_RETRY_MS = 2000
 const COMMENT_CONTEXT_WINDOW = 24
+const TEACHER_HISTORY_APP_KEY = 'handtyped-teacher'
 
 let dashboardState = null
 let refreshTimer = null
@@ -67,8 +68,12 @@ let teacherRealtimeKey = ''
 let assignmentRealtimeKey = ''
 let replayRealtimeKey = ''
 let assignmentFormSubmitting = false
+let classroomFormSubmitting = false
 let assignmentFormToastTimer = null
 let reviewDraftSurfaceHtml = ''
+let teacherHistoryInitialized = false
+let teacherHistoryRestoring = false
+let lastTeacherHistoryKey = ''
 
 const realtimeDebugState = {
   teacher: 'idle',
@@ -108,6 +113,7 @@ const elements = {
   quickExtendTime: document.getElementById('quick-extend-time'),
   quickExtendStatus: document.getElementById('quick-extend-status'),
   classroomForm: document.getElementById('classroom-form'),
+  classroomFormSubmit: document.getElementById('classroom-form-submit'),
   assignmentForm: document.getElementById('assignment-form'),
   assignmentIdInput: document.getElementById('assignment-id-input'),
   assignmentModalLabel: document.getElementById('assignment-modal-label'),
@@ -162,6 +168,7 @@ const elements = {
   reviewTeacherComment: document.getElementById('review-teacher-comment'),
   reviewReturned: document.getElementById('review-returned'),
   reviewPublishFeedback: document.getElementById('review-publish-feedback'),
+  reviewDeleteFeedback: document.getElementById('review-delete-feedback'),
   reviewPublishConfirmation: document.getElementById('review-publish-confirmation'),
   reviewDraftMeta: document.getElementById('review-draft-meta'),
   reviewDraftSurface: document.getElementById('review-draft-surface'),
@@ -180,7 +187,6 @@ const elements = {
   reviewHighlightAll: document.getElementById('review-highlight-all'),
   reviewHighlightClear: document.getElementById('review-highlight-clear'),
   reviewHighlightMeta: document.getElementById('review-highlight-meta'),
-  reviewCommentMode: document.getElementById('review-comment-mode'),
   reviewComposer: document.getElementById('review-composer'),
   reviewComposerLabel: document.getElementById('review-composer-label'),
   reviewComposerNote: document.getElementById('review-composer-note'),
@@ -668,11 +674,12 @@ async function handleReferenceDocumentUpload(fileList) {
 function buildReviewReplayCacheEntry(replay) {
   const documentHistory = documentHistoryForReviewAttribution(replay)
   const hasReliableOrigin = replayOriginWallMs(replay) != null
+  const hasExplicitCurrentText = Object.hasOwn(replay || {}, 'current_text')
   const attributedDocument = buildAttributedDocument({
     ...replay,
     ...(hasReliableOrigin ? {} : { created_at: '' }),
-    doc_history: documentHistory,
-    doc_text: replay.current_text || '',
+    doc_history: hasExplicitCurrentText && String(replay?.current_text || '') === '' ? [] : documentHistory,
+    doc_text: hasExplicitCurrentText ? String(replay?.current_text || '') : '',
   }) || {
     text: String(replay?.current_text || ''),
     runs: [],
@@ -770,6 +777,7 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
     return replay
   }
   const replayHistory = Array.isArray(replay?.document_history) ? replay.document_history : []
+  const sessionHasCurrentText = Object.hasOwn(session || {}, 'current_text')
   const sessionText = String(session?.current_text || '')
   const replayText = String(replay?.current_text || '')
   const reviewTimestampMs = (value) => {
@@ -788,7 +796,7 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   const sessionHasNewerHistory = sessionHistory.length > replayHistory.length && sessionIsAtLeastAsFresh
   const sessionHasMatchingNewerText =
     sessionIsAtLeastAsFresh &&
-    sessionText &&
+    sessionHasCurrentText &&
     sessionText !== replayText &&
     sessionHistory.length >= replayHistory.length
   const replayCanUseSessionBaseHistory =
@@ -872,7 +880,7 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   }
   return {
     ...replay,
-    current_text: sessionText || replayText,
+    current_text: sessionHasCurrentText ? sessionText : replayText,
     document_history: documentHistory,
     focus_events: Array.isArray(session?.focus_events) ? session.focus_events : replay?.focus_events,
     url_history: Array.isArray(session?.url_history) ? session.url_history : replay?.url_history,
@@ -1382,6 +1390,7 @@ function mergeLiveSession(existing, incoming) {
   } else if (
     existingText !== null &&
     incomingText !== null &&
+    incomingText.length > 0 &&
     incomingText.length < existingText.length &&
     existingText.startsWith(incomingText) &&
     freshnessDeltaMs <= 3000
@@ -1439,13 +1448,15 @@ function preserveSelectedReviewSessionInDashboardPayload(payload) {
 }
 
 function displaySessionText(session, replayData = null) {
+  const hasDirect = Object.hasOwn(session || {}, 'current_text')
   const direct = String(session?.current_text || '')
+  const hasSessionHistory = Array.isArray(session?.document_history) && session.document_history.length > 0
   const replayText = String(replayData?.attributedDocument?.text || '')
   const historyText = latestTextFromHistory({
     doc_history: Array.isArray(session?.document_history) ? session.document_history : [],
     doc_text: '',
   })
-  if (direct) {
+  if (direct || (hasDirect && hasSessionHistory)) {
     return textWithPreservedParagraphSpacing(direct, replayText || historyText)
   }
   return replayText || historyText
@@ -1672,6 +1683,93 @@ function syncSelectionState() {
   if (previousAssignmentId !== selectedAssignmentId) {
     resetAssignmentViewRefreshState()
   }
+}
+
+function captureTeacherHistoryState() {
+  return {
+    app: TEACHER_HISTORY_APP_KEY,
+    currentView,
+    selectedClassroomId: selectedClassroomId || null,
+    selectedAssignmentId: selectedAssignmentId || null,
+    selectedReviewSessionId: reviewWorkspaceOpen && selectedReviewSessionId ? selectedReviewSessionId : null,
+    reviewWorkspaceOpen: Boolean(reviewWorkspaceOpen && selectedReviewSessionId),
+  }
+}
+
+function teacherHistoryStateKey(state = captureTeacherHistoryState()) {
+  return JSON.stringify({
+    app: state?.app || TEACHER_HISTORY_APP_KEY,
+    currentView: state?.currentView || 'classes',
+    selectedClassroomId: state?.selectedClassroomId || null,
+    selectedAssignmentId: state?.selectedAssignmentId || null,
+    selectedReviewSessionId: state?.selectedReviewSessionId || null,
+    reviewWorkspaceOpen: Boolean(state?.reviewWorkspaceOpen && state?.selectedReviewSessionId),
+  })
+}
+
+function replaceTeacherHistoryState() {
+  if (!window.history?.replaceState) {
+    return
+  }
+  const state = captureTeacherHistoryState()
+  lastTeacherHistoryKey = teacherHistoryStateKey(state)
+  window.history.replaceState(state, '')
+}
+
+function recordTeacherHistoryState() {
+  if (teacherHistoryRestoring || !window.history?.pushState) {
+    return
+  }
+  if (!teacherHistoryInitialized) {
+    initializeTeacherHistory()
+  }
+  const state = captureTeacherHistoryState()
+  const key = teacherHistoryStateKey(state)
+  if (key === lastTeacherHistoryKey) {
+    return
+  }
+  lastTeacherHistoryKey = key
+  window.history.pushState(state, '')
+}
+
+function applyTeacherHistoryState(state) {
+  if (!state || state.app !== TEACHER_HISTORY_APP_KEY) {
+    return
+  }
+  teacherHistoryRestoring = true
+  try {
+    const previousAssignmentId = selectedAssignmentId
+    currentView = state.currentView || 'classes'
+    selectedClassroomId = state.selectedClassroomId || null
+    selectedAssignmentId = state.selectedAssignmentId || null
+    if (state.reviewWorkspaceOpen && state.selectedReviewSessionId) {
+      reviewWorkspaceOpen = true
+      selectedReviewSessionId = state.selectedReviewSessionId
+      selectedReviewSessionSnapshot =
+        getLiveSessions().find((session) => session.id === selectedReviewSessionId) || selectedReviewSessionSnapshot || null
+    } else {
+      clearSelectedReviewSession()
+    }
+    if (previousAssignmentId !== selectedAssignmentId) {
+      resetAssignmentViewRefreshState()
+    }
+    renderView()
+    scheduleDashboardRefresh()
+    lastTeacherHistoryKey = teacherHistoryStateKey(captureTeacherHistoryState())
+  } finally {
+    teacherHistoryRestoring = false
+  }
+}
+
+function initializeTeacherHistory() {
+  if (teacherHistoryInitialized) {
+    return
+  }
+  teacherHistoryInitialized = true
+  replaceTeacherHistoryState()
+  window.addEventListener('popstate', (event) => {
+    applyTeacherHistoryState(event.state)
+  })
 }
 
 function badge(text, tone = 'default') {
@@ -2253,7 +2351,20 @@ function studentSpecificExtensionFor(assignment, studentName) {
 }
 
 function temporaryAccessUntilFor(assignment, studentName) {
-  return studentSpecificExtensionFor(assignment, studentName) || assignment?.temporary_access_until || null
+  const candidates = [
+    studentSpecificExtensionFor(assignment, studentName),
+    assignment?.temporary_access_until,
+  ].filter(Boolean)
+  return candidates.reduce((latest, value) => {
+    const parsed = Date.parse(String(value || ''))
+    if (!Number.isFinite(parsed)) {
+      return latest
+    }
+    if (!latest || parsed > latest.time) {
+      return { value, time: parsed }
+    }
+    return latest
+  }, null)?.value || null
 }
 
 function specialAccessBadgeFor(assignment, studentName, now = Date.now()) {
@@ -2263,6 +2374,10 @@ function specialAccessBadgeFor(assignment, studentName, now = Date.now()) {
   }
   const accessTime = Date.parse(studentSpecificAccessUntil)
   if (!Number.isFinite(accessTime) || accessTime <= now) {
+    return ''
+  }
+  const classAccessTime = Date.parse(String(assignment?.temporary_access_until || ''))
+  if (Number.isFinite(classAccessTime) && classAccessTime >= accessTime) {
     return ''
   }
   return badge(`Special access until ${accessExtensionTargetLabel(accessTime)}`, 'good')
@@ -2753,6 +2868,7 @@ function renderClassroomGrid() {
       selectedAssignmentId = null
       currentView = 'assignments'
       renderView()
+      recordTeacherHistoryState()
     })
   })
 }
@@ -2965,6 +3081,11 @@ function renderReviewPublishButton() {
   const isPublishing = Boolean(reviewState?.publishingFeedback)
   elements.reviewPublishFeedback.disabled = isPublishing
   elements.reviewPublishFeedback.textContent = isPublishing ? 'Publishing…' : 'Publish feedback'
+  if (elements.reviewDeleteFeedback) {
+    const isDeleting = Boolean(reviewState?.deletingFeedback)
+    elements.reviewDeleteFeedback.disabled = isPublishing || isDeleting || !reviewState?.updatedAt
+    elements.reviewDeleteFeedback.textContent = isDeleting ? 'Deleting…' : 'Delete feedback'
+  }
 }
 
 function clearReviewFeedbackInputsAfterPublish() {
@@ -3142,6 +3263,64 @@ async function publishCurrentReviewFeedback() {
   }
 }
 
+async function deleteCurrentReviewFeedback() {
+  const activeReviewState = ensureReviewStateForPublish()
+  if (!activeReviewState) {
+    window.alert('Choose a student draft before deleting feedback.')
+    return
+  }
+  if (activeReviewState.deletingFeedback) return
+  reviewState.deletingFeedback = true
+  renderReviewPublishButton()
+  const sessionId = reviewState.sessionId
+  try {
+    if (reviewSaveTimer) {
+      clearTimeout(reviewSaveTimer)
+      reviewSaveTimer = null
+    }
+    const updatedSession = await request(`/api/edu/live-sessions/${encodeURIComponent(sessionId)}/grading`, {
+      method: 'DELETE',
+    })
+    dashboardState = {
+      ...dashboardState,
+      live_sessions: mergeLiveSessions(getLiveSessions(), [updatedSession]),
+    }
+    if (reviewState?.sessionId === sessionId) {
+      const grading = normalizedSessionGrading(updatedSession)
+      reviewState.gradeLabel = ''
+      reviewState.gradeScore = ''
+      reviewState.teacherComment = ''
+      reviewState.returnedForRevision = false
+      reviewState.rubricScores = {}
+      reviewState.inlineAnnotations = []
+      reviewState.updatedAt = grading.updated_at
+      reviewState.feedbackStatus = grading.feedback_status
+      reviewState.publishedAt = grading.published_at
+      reviewState.updatedBy = grading.actor_name || grading.actor_email || ''
+      reviewState.dirty = false
+      reviewState.saveState = 'saved'
+      reviewState.deletedAnnotationIds = []
+      reviewState.publishConfirmation = `Feedback deleted for ${updatedSession.student_name || 'this student'}.`
+      reviewState.deletingFeedback = false
+      selectedAnnotationId = null
+    }
+    clearReviewFeedbackInputsAfterPublish()
+    renderReviewSyncStatus()
+    renderStudentCards({ skipReviewWorkspace: true })
+    renderReviewWorkspace(getSelectedAssignment())
+    renderReviewPublishConfirmation()
+  } catch (error) {
+    if (reviewState?.sessionId === sessionId) {
+      reviewState.saveState = 'error'
+      reviewState.deletingFeedback = false
+    }
+    renderReviewSyncStatus()
+    window.alert(`Could not delete feedback: ${error.message}`)
+  } finally {
+    renderReviewPublishButton()
+  }
+}
+
 async function flushReviewSave() {
   if (reviewSaveTimer) {
     clearTimeout(reviewSaveTimer)
@@ -3215,6 +3394,7 @@ function saveReviewSnapshotBeforeSwitch() {
 
 function clearReviewComposer() {
   if (!reviewState) return
+  reviewState.selection = null
   reviewState.composerMode = ''
   reviewState.composerNote = ''
   if (elements.reviewComposerNote) elements.reviewComposerNote.value = ''
@@ -3230,14 +3410,12 @@ function renderReviewSelectionUi() {
   elements.reviewSelectionQuote.textContent = selection
     ? selection.text
     : 'Select text in the draft to add a comment.'
-  const composerOpen = Boolean(selection && reviewState.composerMode)
+  const composerOpen = Boolean(selection)
   elements.reviewComposer.hidden = !composerOpen
   elements.reviewComposerLabel.textContent = 'New comment'
   if (elements.reviewComposerNote && elements.reviewComposerNote.value !== reviewState.composerNote) {
     elements.reviewComposerNote.value = reviewState.composerNote
   }
-  elements.reviewCommentMode.classList.toggle('is-selected', reviewState.composerMode === 'comment')
-  elements.reviewCommentMode.disabled = !selection
   elements.reviewAddAnnotation.disabled = !selection
 }
 
@@ -3380,7 +3558,7 @@ function annotationsOverlap(start, end, excludeId = null) {
 }
 
 async function addReviewAnnotation() {
-  if (!reviewState?.selection || !reviewState.composerMode) return
+  if (!reviewState?.selection) return
   const { start, end, text } = reviewState.selection
   const reviewText = handtypedMarkdownDisplayText(displaySessionText(currentReviewSession(), reviewState.replayData))
   if (annotationsOverlap(start, end)) {
@@ -3596,6 +3774,12 @@ function reviewHighlightFilterForState() {
 
 function reviewTimeValue(hour = 0, minute = 0) {
   return formatClockTime(hour, minute)
+}
+
+function assignmentTimeInputValue(hour = 0, minute = 0) {
+  const normalizedHour = Number.isFinite(Number(hour)) ? Number(hour) : 0
+  const normalizedMinute = Number.isFinite(Number(minute)) ? Number(minute) : 0
+  return `${String(normalizedHour).padStart(2, '0')}:${String(normalizedMinute).padStart(2, '0')}`
 }
 
 function setReviewHighlightModeFromControls() {
@@ -4468,7 +4652,7 @@ function renderReviewAnnotationList(session) {
 
   if (!annotations.length) {
     elements.reviewAnnotationList.innerHTML =
-      '<div class="review-annotation-empty">Use Comment on selected text to anchor feedback directly in the draft.</div>'
+      '<div class="review-annotation-empty">Select text to anchor feedback directly in the draft.</div>'
     return
   }
 
@@ -4716,8 +4900,23 @@ function readReviewDraftSelection() {
 
 function handleReviewDraftSelection() {
   if (!reviewState) return
-  reviewState.selection = readReviewDraftSelection()
+  const nextSelection = readReviewDraftSelection()
+  const selectionChanged =
+    nextSelection &&
+    (!reviewState.selection ||
+      reviewState.selection.start !== nextSelection.start ||
+      reviewState.selection.end !== nextSelection.end ||
+      reviewState.selection.text !== nextSelection.text)
+  reviewState.selection = nextSelection
+  reviewState.composerMode = nextSelection ? 'comment' : ''
+  if (selectionChanged) {
+    reviewState.composerNote = ''
+    if (elements.reviewComposerNote) elements.reviewComposerNote.value = ''
+  }
   renderReviewWorkspace(getSelectedAssignment())
+  if (reviewState.selection) {
+    elements.reviewComposerNote?.focus()
+  }
 }
 
 function dashboardRefreshMs() {
@@ -4768,6 +4967,7 @@ async function selectReviewSession(sessionId) {
   syncRealtimeSubscriptions()
   scheduleDashboardRefresh()
   renderStudentCards()
+  recordTeacherHistoryState()
   if (sameSession) {
     syncSelectedReviewSessionSnapshot()
   }
@@ -4785,6 +4985,7 @@ async function closeReviewWorkspace() {
   elements.reviewWorkspace?.setAttribute('hidden', '')
   scheduleDashboardRefresh()
   renderStudentCards()
+  recordTeacherHistoryState()
   pendingSave.catch((error) => {
     window.alert(`Could not save review changes: ${error.message}`)
   })
@@ -5009,6 +5210,9 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
           class="student-card student-card-risk-${risk.score >= 45 ? 'high' : risk.score >= 20 ? 'medium' : 'low'}${selectedReviewSessionId === session.id ? ' is-selected' : ''}"
           data-review-session="${escapeHtml(session.id)}"
           data-special-access-active="${specialAccessBadge ? 'true' : 'false'}"
+          role="button"
+          tabindex="0"
+          aria-label="Open ${escapeHtml(session.student_name)} draft review"
         >
           <div class="student-card-header">
             <div>
@@ -5037,13 +5241,6 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
               ${accessActionPending ? 'disabled' : ''}
             >
               ${extendActionPending ? 'Extending…' : 'Extend this student'}
-            </button>
-            <button
-              class="button button-secondary small-button"
-              type="button"
-              data-open-review="${escapeHtml(session.id)}"
-            >
-              Review draft
             </button>
             ${replayLink}
           </div>
@@ -5090,25 +5287,25 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
     })
   })
 
-  elements.sessionGrid.querySelectorAll('[data-open-review]').forEach((button) => {
-    button.addEventListener('click', async () => {
+  elements.sessionGrid.querySelectorAll('[data-review-session]').forEach((card) => {
+    const openCardReview = async () => {
       try {
-        await selectReviewSession(button.dataset.openReview)
+        await selectReviewSession(card.dataset.reviewSession)
       } catch (error) {
         window.alert(`Could not switch review sessions: ${error.message}`)
       }
-    })
-  })
-
-  elements.sessionGrid.querySelectorAll('[data-review-session]').forEach((card) => {
-    card.addEventListener('click', (event) => {
+    }
+    card.addEventListener('click', async (event) => {
       if (event.target.closest('button, a')) return
-      selectedReviewSessionId = card.dataset.reviewSession || null
-      selectedAnnotationId = null
-      if (reviewWorkspaceOpen) {
-        reviewState = selectedReviewSessionId ? createReviewStateFromSession(currentReviewSession()) : null
+      await openCardReview()
+    })
+    card.addEventListener('keydown', async (event) => {
+      if (event.target.closest('button, a')) return
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return
       }
-      renderStudentCards({ skipReviewWorkspace: true })
+      event.preventDefault()
+      await openCardReview()
     })
   })
 
@@ -5586,6 +5783,7 @@ function showAssignmentView() {
   currentView = 'assignment'
   resetAssignmentViewRefreshState()
   renderView()
+  recordTeacherHistoryState()
 }
 
 function showClassesView() {
@@ -5593,12 +5791,14 @@ function showClassesView() {
   selectedAssignmentId = null
   resetAssignmentViewRefreshState()
   renderView()
+  recordTeacherHistoryState()
 }
 
 function showAssignmentsView() {
   currentView = getSelectedClassroom() ? 'assignments' : 'classes'
   resetAssignmentViewRefreshState()
   renderView()
+  recordTeacherHistoryState()
 }
 
 async function refreshDashboard() {
@@ -5780,6 +5980,22 @@ function setAssignmentFormSubmitting(isSubmitting, isEditing = false) {
     elements.assignmentFormCancel.disabled = assignmentFormSubmitting
   }
   updateAssignmentFormGuidance()
+}
+
+function setClassroomFormSubmitting(isSubmitting) {
+  classroomFormSubmitting = Boolean(isSubmitting)
+  if (elements.classroomFormSubmit) {
+    elements.classroomFormSubmit.textContent = classroomFormSubmitting ? 'Creating...' : 'Create class'
+    elements.classroomFormSubmit.disabled = classroomFormSubmitting
+  }
+  elements.classroomForm
+    ?.querySelectorAll('input, button')
+    .forEach((control) => {
+      if (control === elements.classroomFormSubmit) {
+        return
+      }
+      control.disabled = classroomFormSubmitting
+    })
 }
 
 function initButtonPressFeedback() {
@@ -6060,8 +6276,8 @@ function populateAssignmentModalForEdit(assignment) {
 
   if (assignment.windows?.[0]) {
     const win = assignment.windows[0]
-    field('window_start_time').value = reviewTimeValue(win.start_hour, win.start_minute)
-    field('window_end_time').value = reviewTimeValue(win.end_hour, win.end_minute)
+    field('window_start_time').value = assignmentTimeInputValue(win.start_hour, win.start_minute)
+    field('window_end_time').value = assignmentTimeInputValue(win.end_hour, win.end_minute)
     field('window_end_date').value = win.end_date || ''
     field('day_monday').checked = win.days?.monday ?? true
     field('day_tuesday').checked = win.days?.tuesday ?? true
@@ -6110,9 +6326,13 @@ function populateAssignmentModalForEdit(assignment) {
 function wireForms() {
   elements.classroomForm.addEventListener('submit', async (event) => {
     event.preventDefault()
+    if (classroomFormSubmitting) {
+      return
+    }
     const formEl = event.currentTarget
+    const form = new FormData(formEl)
+    setClassroomFormSubmitting(true)
     try {
-      const form = new FormData(formEl)
       await request('/api/edu/classrooms', {
         method: 'POST',
         body: JSON.stringify({
@@ -6127,6 +6347,8 @@ function wireForms() {
       await refreshDashboard()
     } catch (error) {
       window.alert(`Could not create class: ${error.message}`)
+    } finally {
+      setClassroomFormSubmitting(false)
     }
   })
 
@@ -6283,6 +6505,10 @@ function wireReviewWorkspace() {
     publishCurrentReviewFeedback().catch(() => {})
   })
 
+  elements.reviewDeleteFeedback?.addEventListener('click', () => {
+    deleteCurrentReviewFeedback().catch(() => {})
+  })
+
   elements.reviewHighlightDate?.addEventListener('input', () => {
     if (!reviewState) return
     reviewState.highlightDate = elements.reviewHighlightDate.value
@@ -6366,7 +6592,6 @@ function wireReviewWorkspace() {
   elements.reviewDraftSurface?.addEventListener('mouseup', handleReviewDraftSelection)
   elements.reviewDraftSurface?.addEventListener('keyup', handleReviewDraftSelection)
 
-  elements.reviewCommentMode?.addEventListener('click', () => beginReviewComposer('comment'))
   elements.reviewCancelAnnotation?.addEventListener('click', clearReviewComposer)
   elements.reviewAddAnnotation?.addEventListener('click', addReviewAnnotation)
   elements.reviewCloseButton?.addEventListener('click', (event) => {
@@ -6417,6 +6642,7 @@ async function loadApp() {
   wireForms()
   wireReviewWorkspace()
   await refreshDashboard()
+  initializeTeacherHistory()
   startDashboardRefresh()
 }
 

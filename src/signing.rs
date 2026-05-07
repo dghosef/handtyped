@@ -1,5 +1,6 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
+#[cfg(target_os = "macos")]
 use security_framework::passwords::{get_generic_password, set_generic_password};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -10,6 +11,7 @@ use std::sync::mpsc;
 use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
+#[cfg(target_os = "macos")]
 use zeroize::Zeroizing;
 
 const SERVICE: &str = "com.handtyped.app";
@@ -70,12 +72,16 @@ fn create_and_store_local_key() -> Result<SigningKey, String> {
     Ok(key)
 }
 
+#[cfg(target_os = "macos")]
 fn mirror_key_to_keychain_in_background(key_bytes: [u8; 32]) {
     thread::spawn(move || {
         let raw: Zeroizing<[u8; 32]> = Zeroizing::new(key_bytes);
         let _ = set_generic_password(SERVICE, ACCOUNT, &*raw);
     });
 }
+
+#[cfg(not(target_os = "macos"))]
+fn mirror_key_to_keychain_in_background(_key_bytes: [u8; 32]) {}
 
 /// Load the signing key from Keychain, or generate and store a new one.
 /// Raw key bytes are wrapped in Zeroizing so they are wiped from memory on drop.
@@ -90,6 +96,7 @@ pub fn load_or_create_key() -> Result<SigningKey, String> {
         return Ok(key);
     }
 
+    #[cfg(target_os = "macos")]
     match get_generic_password(SERVICE, ACCOUNT)
         .or_else(|_| get_generic_password(LEGACY_SERVICE, ACCOUNT))
     {
@@ -103,6 +110,11 @@ pub fn load_or_create_key() -> Result<SigningKey, String> {
             Ok(key)
         }
         Err(_) => create_and_store_local_key(),
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        create_and_store_local_key()
     }
 }
 

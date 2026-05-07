@@ -310,10 +310,17 @@ export async function removeClassroomStudent(store, classroom, studentName) {
 
 function effectiveStudentTemporaryAccessUntil(assignment, studentName) {
   const key = normalizeStudentOverrideKey(studentName)
+  const classUntil = assignment?.temporary_access_until ?? null
   if (!key) {
-    return assignment?.temporary_access_until ?? null
+    return classUntil
   }
-  return assignment?.student_temporary_access_until?.[key] ?? assignment?.temporary_access_until ?? null
+  const studentUntil = assignment?.student_temporary_access_until?.[key] ?? null
+  const classDate = parseDateOrNull(classUntil)
+  const studentDate = parseDateOrNull(studentUntil)
+  if (studentDate && (!classDate || studentDate >= classDate)) {
+    return studentUntil
+  }
+  return classUntil
 }
 
 function parseDateOrNull(value) {
@@ -716,6 +723,13 @@ export function createNodeEduStore(baseDir) {
       const scoped = tenantId ? filterByTenant(teachers, tenantId) : teachers
       return scoped.find((item) => item.email === email) || null
     },
+    async deleteTeacher(id) {
+      const teachers = readCollection('teachers')
+      writeCollection(
+        'teachers',
+        teachers.filter((item) => item.id !== id),
+      )
+    },
     async putTeacherSession(session) {
       const sessions = readCollection('teacher_sessions')
       const next = sessions.filter((item) => item.id !== session.id)
@@ -933,6 +947,9 @@ export function createKvEduStore(kv) {
       const teachers = await listByPrefix(TEACHER_PREFIX)
       const scoped = tenantId ? filterByTenant(teachers, tenantId) : teachers
       return scoped.find((item) => item.email === email) || null
+    },
+    async deleteTeacher(id) {
+      await kv.delete(`${TEACHER_PREFIX}${id}`)
     },
     async putTeacherSession(session) {
       await kv.put(`${TEACHER_SESSION_PREFIX}${session.id}`, JSON.stringify(session))
@@ -1341,6 +1358,10 @@ export function createD1EduStore(db) {
         .first()
       return row ? hydrateRow(row) : null
     },
+    async deleteTeacher(id) {
+      await ensureSchema()
+      await db.prepare('DELETE FROM edu_records WHERE kind = ? AND id = ?').bind('teacher', id).run()
+    },
     async putTeacherSession(session) {
       await putRecord('teacher_session', session.id, session, {
         tenant_id: session.tenant_id,
@@ -1464,17 +1485,10 @@ export async function ensureEduSeedData(store) {
   const liveSessions = await store.listLiveSessions(tenantId)
   const teachers = await store.listTeachers(tenantId)
 
-  if (!teachers.length) {
-    const runtimeEnv = globalThis.process?.env || {}
-    await store.putTeacher(
-      buildTeacher({
-        tenant_id: tenantId,
-        id: 'teacher_default',
-        name: 'Joseph Tan',
-        email: runtimeEnv.EDU_TEACHER_EMAIL || 'teacher@edu.handtyped.app',
-        access_code: runtimeEnv.EDU_TEACHER_ACCESS_CODE || 'handtyped-edu',
-      }),
-    )
+  for (const teacher of teachers) {
+    if (teacher?.id === 'teacher_default') {
+      await store.deleteTeacher?.(teacher.id)
+    }
   }
 
   if (classrooms.length || assignments.length || liveSessions.length) {

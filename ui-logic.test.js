@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 
 import {
   LIVE_SESSION_STALE_MS,
@@ -14,7 +17,16 @@ import {
   reconcileBootstrapSelection,
 } from '../handtyped-edu/frontend/bootstrap-ui.js'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
 describe('teacher dashboard UI logic', () => {
+  it('keeps the regular Tauri window content protected against screenshots', () => {
+    const handtypedLibRs = readFileSync(join(__dirname, 'src', 'lib.rs'), 'utf8')
+    expect(handtypedLibRs).toMatch(/fn apply_window_screenshot_protection<R: tauri::Runtime>\(window: &tauri::WebviewWindow<R>\)/)
+    expect(handtypedLibRs).toMatch(/let _ = window\.set_content_protected\(true\);/)
+    expect(handtypedLibRs).toMatch(/apply_window_screenshot_protection\(&window\);/)
+  })
+
   it('parses timestamps defensively and returns null for bad values', () => {
     expect(parseTimestamp('2026-04-26T02:30:00.000Z')).toBe(Date.parse('2026-04-26T02:30:00.000Z'))
     expect(parseTimestamp('not-a-date')).toBeNull()

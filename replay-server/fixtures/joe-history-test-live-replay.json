@@ -1,0 +1,4089 @@
+{
+  "id": "Joe:assignment_29c33975ea644515",
+  "tenant_id": "tenant_demo",
+  "live_session_id": "Joe:assignment_29c33975ea644515",
+  "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+  "assignment_id": "assignment_29c33975ea644515",
+  "assignment_title": "test",
+  "course": "History",
+  "classroom": "History",
+  "student_name": "Joe",
+  "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test more tetsadfkasfdasdfkadsfh",
+  "document_history": [
+    {
+      "t": 19926,
+      "pos": 0,
+      "del": "",
+      "ins": "Hello",
+      "absolute_wall_ms": 1777850884326
+    },
+    {
+      "t": 23024,
+      "pos": 5,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777850887424
+    },
+    {
+      "t": 25340,
+      "pos": 5,
+      "del": " ",
+      "ins": " This is my essay",
+      "absolute_wall_ms": 1777850889741
+    },
+    {
+      "t": 112116,
+      "pos": 22,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777850976518
+    },
+    {
+      "t": 113513,
+      "pos": 22,
+      "del": " ",
+      "ins": " hihi",
+      "absolute_wall_ms": 1777850977915
+    },
+    {
+      "t": 149308,
+      "pos": 27,
+      "del": "",
+      "ins": "H",
+      "absolute_wall_ms": 1777851013711
+    },
+    {
+      "t": 322247,
+      "pos": 14,
+      "del": "my",
+      "ins": "**my**",
+      "absolute_wall_ms": 1777851186654
+    },
+    {
+      "t": 325175,
+      "pos": 16,
+      "del": "my",
+      "ins": "*my*",
+      "absolute_wall_ms": 1777851189582
+    },
+    {
+      "t": 326989,
+      "pos": 16,
+      "del": "*my*",
+      "ins": "[u]my[/u]",
+      "absolute_wall_ms": 1777851191396
+    },
+    {
+      "t": 330655,
+      "pos": 40,
+      "del": "",
+      "ins": "\n\nSaid",
+      "absolute_wall_ms": 1777851442361
+    },
+    {
+      "t": 358051,
+      "pos": 46,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777851595969
+    },
+    {
+      "t": 359564,
+      "pos": 40,
+      "del": "\n\nSaid ",
+      "ins": "",
+      "absolute_wall_ms": 1777851597483
+    },
+    {
+      "t": 365531,
+      "pos": 40,
+      "del": "",
+      "ins": "\n\nHello",
+      "absolute_wall_ms": 1777851603449
+    },
+    {
+      "t": 369216,
+      "pos": 40,
+      "del": "\n\nHello",
+      "ins": "",
+      "absolute_wall_ms": 1777851607134
+    },
+    {
+      "t": 370861,
+      "pos": 40,
+      "del": "",
+      "ins": "\n\nThis is my ",
+      "absolute_wall_ms": 1777851608779
+    },
+    {
+      "t": 372400,
+      "pos": 52,
+      "del": "",
+      "ins": " essay",
+      "absolute_wall_ms": 1777851610319
+    },
+    {
+      "t": 376412,
+      "pos": 58,
+      "del": " ",
+      "ins": " written a",
+      "absolute_wall_ms": 1777851614331
+    },
+    {
+      "t": 378374,
+      "pos": 67,
+      "del": "a",
+      "ins": "in Handtyped",
+      "absolute_wall_ms": 1777851616292
+    },
+    {
+      "t": 449862,
+      "pos": 70,
+      "del": "Handtyped",
+      "ins": "[font=mono]Handtyped[/font]",
+      "absolute_wall_ms": 1777851687782
+    },
+    {
+      "t": 451080,
+      "pos": 70,
+      "del": "[font=mono]Handtyped[/font]",
+      "ins": "Handtyped",
+      "absolute_wall_ms": 1777851689000
+    },
+    {
+      "t": 452607,
+      "pos": 70,
+      "del": "Handtyped",
+      "ins": "[font=mono]Handtyped[/font]",
+      "absolute_wall_ms": 1777851690527
+    },
+    {
+      "t": 454816,
+      "pos": 42,
+      "del": "",
+      "ins": "# ",
+      "absolute_wall_ms": 1777851692736
+    },
+    {
+      "t": 457104,
+      "pos": 42,
+      "del": "# ",
+      "ins": "",
+      "absolute_wall_ms": 1777851695024
+    },
+    {
+      "t": 459168,
+      "pos": 76,
+      "del": "mono",
+      "ins": "times",
+      "absolute_wall_ms": 1777851697088
+    },
+    {
+      "t": 460769,
+      "pos": 82,
+      "del": "Handtyped",
+      "ins": "[size=24]Handtyped[/size]",
+      "absolute_wall_ms": 1777851698689
+    },
+    {
+      "t": 463335,
+      "pos": 88,
+      "del": "24",
+      "ins": "16",
+      "absolute_wall_ms": 1777851701255
+    },
+    {
+      "t": 485198,
+      "pos": 71,
+      "del": "font=times][size=16]Handtyped[/size][/font",
+      "ins": "u][font=times][size=16]Handtyped[/size][/font][/u",
+      "absolute_wall_ms": 1777851723119
+    },
+    {
+      "t": 488731,
+      "pos": 74,
+      "del": "font=times][size=16]Handtyped[/size][/fon",
+      "ins": "highlight][font=times][size=16]Handtyped[/size][/font][/highligh",
+      "absolute_wall_ms": 1777851726652
+    },
+    {
+      "t": 490537,
+      "pos": 74,
+      "del": "highlight][font=times][size=16]Handtyped[/size][/font][/highligh",
+      "ins": "font=times][size=16]Handtyped[/size][/fon",
+      "absolute_wall_ms": 1777851728458
+    },
+    {
+      "t": 500357,
+      "pos": 50,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777854032278
+    },
+    {
+      "t": 501787,
+      "pos": 50,
+      "del": " ",
+      "ins": "",
+      "absolute_wall_ms": 1777854033708
+    },
+    {
+      "t": 2596634,
+      "pos": 0,
+      "del": "",
+      "ins": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+      "absolute_wall_ms": 1777854149796
+    },
+    {
+      "t": 2601856,
+      "pos": 121,
+      "del": "",
+      "ins": "\n\nand",
+      "absolute_wall_ms": 1777858755491
+    },
+    {
+      "t": 2603395,
+      "pos": 123,
+      "del": "and",
+      "ins": "And ",
+      "absolute_wall_ms": 1777858757029
+    },
+    {
+      "t": 4203196,
+      "pos": 126,
+      "del": " ",
+      "ins": " it",
+      "absolute_wall_ms": 1777860356941
+    },
+    {
+      "t": 4206133,
+      "pos": 129,
+      "del": "",
+      "ins": " is",
+      "absolute_wall_ms": 1777860359877
+    },
+    {
+      "t": 4209930,
+      "pos": 132,
+      "del": "",
+      "ins": " really good",
+      "absolute_wall_ms": 1777860363674
+    },
+    {
+      "t": 4220918,
+      "pos": 144,
+      "del": "",
+      "ins": "\n\noh wow it works",
+      "absolute_wall_ms": 1777860374662
+    },
+    {
+      "t": 4259383,
+      "pos": 161,
+      "del": "",
+      "ins": "\n\n[test](https://gooogle.com)",
+      "absolute_wall_ms": 1777863155055
+    },
+    {
+      "t": 4269649,
+      "pos": 167,
+      "del": "",
+      "ins": "sdfsdf",
+      "absolute_wall_ms": 1777863165321
+    },
+    {
+      "t": 4274415,
+      "pos": 161,
+      "del": "\n\n[tessdfsdft](https://gooogle.com)",
+      "ins": "",
+      "absolute_wall_ms": 1777863170087
+    },
+    {
+      "t": 4290615,
+      "pos": 161,
+      "del": "",
+      "ins": "\n\n* 324\n\n* 234\n\n  1. 234234\n\n  2. ",
+      "absolute_wall_ms": 1777863186286
+    },
+    {
+      "t": 4300263,
+      "pos": 163,
+      "del": "* 324\n\n* 234\n\n  1. 234234\n\n  2",
+      "ins": "1. 234\n\n2. 234\n\n3",
+      "absolute_wall_ms": 1777863195934
+    },
+    {
+      "t": 4305335,
+      "pos": 0,
+      "del": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]\n\nAnd it is really good\n\noh wow it works\n\n1. 234\n\n2. 234\n\n3",
+      "ins": "1",
+      "absolute_wall_ms": 1777863201006
+    },
+    {
+      "t": 4307447,
+      "pos": 0,
+      "del": "1. ",
+      "ins": "",
+      "absolute_wall_ms": 1777863203118
+    },
+    {
+      "t": 4310944,
+      "pos": 0,
+      "del": "",
+      "ins": "asjkdf",
+      "absolute_wall_ms": 1777865440257
+    },
+    {
+      "t": 4313907,
+      "pos": 0,
+      "del": "asjkdf",
+      "ins": "",
+      "absolute_wall_ms": 1777865443220
+    },
+    {
+      "t": 4320924,
+      "pos": 0,
+      "del": "",
+      "ins": "\naksjdfhjk\n\nasdfjhakjsdf\n\na",
+      "absolute_wall_ms": 1777865450237
+    },
+    {
+      "t": 4327592,
+      "pos": 0,
+      "del": "\n",
+      "ins": "",
+      "absolute_wall_ms": 1777865614919
+    },
+    {
+      "t": 4336127,
+      "pos": 26,
+      "del": "",
+      "ins": "\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\nasd\n\nf",
+      "absolute_wall_ms": 1777865832049
+    },
+    {
+      "t": 4362589,
+      "pos": 88,
+      "del": "",
+      "ins": "df\n\n",
+      "absolute_wall_ms": 1777866155941
+    },
+    {
+      "t": 4369245,
+      "pos": 92,
+      "del": "",
+      "ins": "df\n\n",
+      "absolute_wall_ms": 1777866162597
+    },
+    {
+      "t": 4371802,
+      "pos": 23,
+      "del": "",
+      "ins": "sdf",
+      "absolute_wall_ms": 1777903269038
+    },
+    {
+      "t": 4374705,
+      "pos": 0,
+      "del": "aksjdfhjk\n\nasdfjhakjsdfsdf\n\na\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\ndf\n\ndf\n\nasd\n\nf",
+      "ins": "",
+      "absolute_wall_ms": 1777908848047
+    },
+    {
+      "t": 4382404,
+      "pos": 0,
+      "del": "",
+      "ins": "Hello my name is joe",
+      "absolute_wall_ms": 1777908855746
+    },
+    {
+      "t": 4386605,
+      "pos": 17,
+      "del": "j",
+      "ins": "J",
+      "absolute_wall_ms": 1777908859947
+    },
+    {
+      "t": 4392709,
+      "pos": 20,
+      "del": "",
+      "ins": " fsg",
+      "absolute_wall_ms": 1777908866050
+    },
+    {
+      "t": 4405498,
+      "pos": 20,
+      "del": " fsg",
+      "ins": " ",
+      "absolute_wall_ms": 1777908878839
+    },
+    {
+      "t": 4415787,
+      "pos": 20,
+      "del": " ",
+      "ins": " and sdf",
+      "absolute_wall_ms": 1777908889127
+    },
+    {
+      "t": 4418516,
+      "pos": 25,
+      "del": "sdf",
+      "ins": "jkh",
+      "absolute_wall_ms": 1777908891857
+    },
+    {
+      "t": 4420672,
+      "pos": 28,
+      "del": "",
+      "ins": "[u]sfd[/u]",
+      "absolute_wall_ms": 1777908894013
+    },
+    {
+      "t": 4488517,
+      "pos": 28,
+      "del": "[u]sfd[/u]",
+      "ins": "",
+      "absolute_wall_ms": 1777908961854
+    },
+    {
+      "t": 4526524,
+      "pos": 28,
+      "del": "",
+      "ins": "sdf",
+      "absolute_wall_ms": 1777909097006
+    },
+    {
+      "t": 4534395,
+      "pos": 59,
+      "del": "",
+      "ins": "\n\nhello my nameis Joe",
+      "absolute_wall_ms": 1777909266102
+    },
+    {
+      "t": 4564397,
+      "pos": 80,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777909296107
+    },
+    {
+      "t": 4566409,
+      "pos": 80,
+      "del": "",
+      "ins": " and",
+      "absolute_wall_ms": 1777909298119
+    },
+    {
+      "t": 4570470,
+      "pos": 84,
+      "del": " ",
+      "ins": " I am the goat",
+      "absolute_wall_ms": 1777909302180
+    },
+    {
+      "t": 4579668,
+      "pos": 98,
+      "del": "",
+      "ins": " and",
+      "absolute_wall_ms": 1777909966755
+    },
+    {
+      "t": 4586890,
+      "pos": 102,
+      "del": "",
+      "ins": " this is",
+      "absolute_wall_ms": 1777909973977
+    },
+    {
+      "t": 4596633,
+      "pos": 110,
+      "del": " ",
+      "ins": " ok test",
+      "absolute_wall_ms": 1777909983719
+    },
+    {
+      "t": 4630237,
+      "pos": 118,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777910017322
+    },
+    {
+      "t": 4632281,
+      "pos": 118,
+      "del": "",
+      "ins": " ok",
+      "absolute_wall_ms": 1777910019366
+    },
+    {
+      "t": 4896388,
+      "pos": 121,
+      "del": "",
+      "ins": " southampton",
+      "absolute_wall_ms": 1777910283518
+    },
+    {
+      "t": 4904460,
+      "pos": 134,
+      "del": "",
+      "ins": "is goated",
+      "absolute_wall_ms": 1777910291590
+    },
+    {
+      "t": 5286630,
+      "pos": 143,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777910673749
+    },
+    {
+      "t": 5292088,
+      "pos": 143,
+      "del": " ",
+      "ins": " a",
+      "absolute_wall_ms": 1777910679207
+    },
+    {
+      "t": 5293923,
+      "pos": 145,
+      "del": "",
+      "ins": "nd",
+      "absolute_wall_ms": 1777910681042
+    },
+    {
+      "t": 5295946,
+      "pos": 147,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777910683065
+    },
+    {
+      "t": 5337821,
+      "pos": 147,
+      "del": " ",
+      "ins": " red",
+      "absolute_wall_ms": 1777910724939
+    },
+    {
+      "t": 5447928,
+      "pos": 151,
+      "del": "",
+      "ins": "asdf",
+      "absolute_wall_ms": 1777910835043
+    },
+    {
+      "t": 5478387,
+      "pos": 155,
+      "del": "",
+      "ins": "a",
+      "absolute_wall_ms": 1777910865502
+    },
+    {
+      "t": 5480006,
+      "pos": 156,
+      "del": "",
+      "ins": "kjhsdfkj",
+      "absolute_wall_ms": 1777910867120
+    },
+    {
+      "t": 5482037,
+      "pos": 164,
+      "del": "",
+      "ins": "\n\naksjdhf\n\nkadjshfkj",
+      "absolute_wall_ms": 1777910869152
+    },
+    {
+      "t": 5484303,
+      "pos": 184,
+      "del": "",
+      "ins": "\n\nkadhkj",
+      "absolute_wall_ms": 1777910871417
+    },
+    {
+      "t": 5485883,
+      "pos": 192,
+      "del": "",
+      "ins": "\n\nkadshfjk",
+      "absolute_wall_ms": 1777910872997
+    },
+    {
+      "t": 5493080,
+      "pos": 194,
+      "del": "k",
+      "ins": "K",
+      "absolute_wall_ms": 1777910880194
+    },
+    {
+      "t": 5793179,
+      "pos": 0,
+      "del": "Hello my name is Joe and jkhsdfsdkjhfkjshdfkjhsjkdhfjkshdjf\n\nhello my nameis Joe and I am the goat and this is ok test ok southampton is goated and redasdfakjhsdfkj\n\naksjdhf\n\nkadjshfkj\n\nkadhkj\n\nKadshfjk",
+      "ins": "",
+      "absolute_wall_ms": 1777911180332
+    },
+    {
+      "t": 5795020,
+      "pos": 0,
+      "del": "",
+      "ins": "test ",
+      "absolute_wall_ms": 1777911182173
+    },
+    {
+      "t": 5837175,
+      "pos": 5,
+      "del": "",
+      "ins": "\n\nasdkjfh",
+      "absolute_wall_ms": 1777911224327
+    },
+    {
+      "t": 5839037,
+      "pos": 7,
+      "del": "a",
+      "ins": "A",
+      "absolute_wall_ms": 1777911226189
+    },
+    {
+      "t": 5840370,
+      "pos": 14,
+      "del": "",
+      "ins": "kadjsfh",
+      "absolute_wall_ms": 1777911227523
+    },
+    {
+      "t": 5842011,
+      "pos": 21,
+      "del": "",
+      "ins": "kjh",
+      "absolute_wall_ms": 1777911229163
+    },
+    {
+      "t": 5850068,
+      "pos": 24,
+      "del": "",
+      "ins": "kasdjfhkj",
+      "absolute_wall_ms": 1777911237220
+    },
+    {
+      "t": 5859593,
+      "pos": 33,
+      "del": "",
+      "ins": "kadjfhkjsadhfkj",
+      "absolute_wall_ms": 1777911246744
+    },
+    {
+      "t": 5941569,
+      "pos": 48,
+      "del": "",
+      "ins": "kasdhfkj",
+      "absolute_wall_ms": 1777911328719
+    },
+    {
+      "t": 5945618,
+      "pos": 56,
+      "del": "",
+      "ins": "khsajdk",
+      "absolute_wall_ms": 1777911332768
+    },
+    {
+      "t": 6205337,
+      "pos": 63,
+      "del": "",
+      "ins": "\n\nasdfkj",
+      "absolute_wall_ms": 1777911592483
+    },
+    {
+      "t": 6208327,
+      "pos": 71,
+      "del": "",
+      "ins": "hkjhkj",
+      "absolute_wall_ms": 1777911595473
+    },
+    {
+      "t": 6210143,
+      "pos": 77,
+      "del": "",
+      "ins": "k",
+      "absolute_wall_ms": 1777911597288
+    },
+    {
+      "t": 6212892,
+      "pos": 78,
+      "del": "",
+      "ins": "skjadfhkjh",
+      "absolute_wall_ms": 1777911600038
+    },
+    {
+      "t": 6215479,
+      "pos": 88,
+      "del": "",
+      "ins": "kjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjk",
+      "absolute_wall_ms": 1777911602624
+    },
+    {
+      "t": 6217402,
+      "pos": 131,
+      "del": "",
+      "ins": "h\n\nhell",
+      "absolute_wall_ms": 1777911604547
+    },
+    {
+      "t": 6219045,
+      "pos": 138,
+      "del": "",
+      "ins": "o",
+      "absolute_wall_ms": 1777911606190
+    },
+    {
+      "t": 6221788,
+      "pos": 134,
+      "del": "hello",
+      "ins": "Hello ",
+      "absolute_wall_ms": 1777911608933
+    },
+    {
+      "t": 6223557,
+      "pos": 139,
+      "del": " ",
+      "ins": " aksdfhjhsdkj",
+      "absolute_wall_ms": 1777911610702
+    },
+    {
+      "t": 6232154,
+      "pos": 152,
+      "del": "",
+      "ins": "khkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjaf",
+      "absolute_wall_ms": 1777911619299
+    },
+    {
+      "t": 6236831,
+      "pos": 323,
+      "del": "",
+      "ins": "kasdjhfjk",
+      "absolute_wall_ms": 1777911623976
+    },
+    {
+      "t": 6238881,
+      "pos": 332,
+      "del": "",
+      "ins": "ksjadhkfjh",
+      "absolute_wall_ms": 1777911626026
+    },
+    {
+      "t": 6242672,
+      "pos": 342,
+      "del": "",
+      "ins": "asdjkfhjk",
+      "absolute_wall_ms": 1777911629817
+    },
+    {
+      "t": 6244855,
+      "pos": 351,
+      "del": "",
+      "ins": "asdkfjhasdkjfh",
+      "absolute_wall_ms": 1777911631999
+    },
+    {
+      "t": 6246841,
+      "pos": 365,
+      "del": "",
+      "ins": "skjhkjkfkdjf",
+      "absolute_wall_ms": 1777911633986
+    },
+    {
+      "t": 6257411,
+      "pos": 377,
+      "del": "",
+      "ins": "The southampton fc ",
+      "absolute_wall_ms": 1777911644556
+    },
+    {
+      "t": 6260277,
+      "pos": 395,
+      "del": "",
+      "ins": " people are goated",
+      "absolute_wall_ms": 1777911647421
+    },
+    {
+      "t": 6285962,
+      "pos": 377,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777911673105
+    },
+    {
+      "t": 6288495,
+      "pos": 140,
+      "del": "aksdfhjhsdkjkhkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjafkasdjhfjkksjadhkfjhasdjkfhjkasdkfjhasdkjfhskjhkjkfkdjf",
+      "ins": "",
+      "absolute_wall_ms": 1777911675639
+    },
+    {
+      "t": 6290138,
+      "pos": 140,
+      "del": "",
+      "ins": "ajksdhfkj",
+      "absolute_wall_ms": 1777911677281
+    },
+    {
+      "t": 6291749,
+      "pos": 150,
+      "del": "",
+      "ins": "\n\n",
+      "absolute_wall_ms": 1777911678893
+    },
+    {
+      "t": 6295910,
+      "pos": 152,
+      "del": "",
+      "ins": "ksjadhfjkhasdkj\n\nasfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\n",
+      "absolute_wall_ms": 1777911683054
+    },
+    {
+      "t": 6297922,
+      "pos": 169,
+      "del": "a",
+      "ins": "A",
+      "absolute_wall_ms": 1777911685065
+    },
+    {
+      "t": 6301357,
+      "pos": 275,
+      "del": "",
+      "ins": "kfdsjh",
+      "absolute_wall_ms": 1777911688500
+    },
+    {
+      "t": 6307686,
+      "pos": 4,
+      "del": " \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj \n\nksjadhfjkhasdkj\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated ",
+      "ins": "\n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj\n\nksjadhfjkhasdkjsadfjkh\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated",
+      "absolute_wall_ms": 1777912074792
+    },
+    {
+      "t": 6309355,
+      "pos": 172,
+      "del": "",
+      "ins": "kj",
+      "absolute_wall_ms": 1777912076461
+    },
+    {
+      "t": 6311101,
+      "pos": 174,
+      "del": "",
+      "ins": "ksdjf",
+      "absolute_wall_ms": 1777912078206
+    },
+    {
+      "t": 6311375,
+      "pos": 174,
+      "del": "",
+      "ins": "sdfs",
+      "absolute_wall_ms": 1777912118034
+    },
+    {
+      "t": 6313209,
+      "pos": 178,
+      "del": "",
+      "ins": "dfs",
+      "absolute_wall_ms": 1777912119869
+    },
+    {
+      "t": 6317407,
+      "pos": 299,
+      "del": "",
+      "ins": "\n\nbet this ",
+      "absolute_wall_ms": 1777912124066
+    },
+    {
+      "t": 6319266,
+      "pos": 309,
+      "del": " ",
+      "ins": " i",
+      "absolute_wall_ms": 1777912125925
+    },
+    {
+      "t": 6320805,
+      "pos": 311,
+      "del": "",
+      "ins": "s so",
+      "absolute_wall_ms": 1777912127464
+    },
+    {
+      "t": 6322217,
+      "pos": 315,
+      "del": "",
+      "ins": "rta co",
+      "absolute_wall_ms": 1777912128876
+    },
+    {
+      "t": 6324064,
+      "pos": 321,
+      "del": "",
+      "ins": "l",
+      "absolute_wall_ms": 1777912130723
+    },
+    {
+      "t": 6325652,
+      "pos": 321,
+      "del": "",
+      "ins": "o",
+      "absolute_wall_ms": 1777912132311
+    },
+    {
+      "t": 6327101,
+      "pos": 323,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777912133760
+    },
+    {
+      "t": 6328777,
+      "pos": 323,
+      "del": " ",
+      "ins": " askdfhkjasdhfjkhaskjdfhjkahsdjkfhjkasdhfjkhasdjkhfjk",
+      "absolute_wall_ms": 1777912135436
+    },
+    {
+      "t": 6330396,
+      "pos": 376,
+      "del": "",
+      "ins": "ashdjkfhaksjdhfkjashdkjfhakjsdhfkhasjkdfhajksdhfjkahs",
+      "absolute_wall_ms": 1777912137055
+    },
+    {
+      "t": 6331765,
+      "pos": 429,
+      "del": "",
+      "ins": "djkfhajksdhfjkashdfjkhasjkdfhjkasdhjfhasjkd",
+      "absolute_wall_ms": 1777912138424
+    },
+    {
+      "t": 6333398,
+      "pos": 472,
+      "del": "",
+      "ins": "hfjkashdjkfhasjdkfhkjasdhfjkahsdjkfhasjkdhfjakshfdjk",
+      "absolute_wall_ms": 1777912140057
+    },
+    {
+      "t": 6334780,
+      "pos": 524,
+      "del": "",
+      "ins": "hsjkdhfkjashdfkjhaskjdfhjkasdhfjkashdjkfha",
+      "absolute_wall_ms": 1777912141439
+    },
+    {
+      "t": 6336502,
+      "pos": 566,
+      "del": "",
+      "ins": "sdjkfhjasdkhfkjhasdfkjhasdkjfhkajshfjkasdhfjkhsdjkfh",
+      "absolute_wall_ms": 1777912143161
+    },
+    {
+      "t": 6338110,
+      "pos": 618,
+      "del": "",
+      "ins": "adkjshfkjahsdfjkhaskjdhfkjasdhfkjashdfkjhasdkjfh",
+      "absolute_wall_ms": 1777912144768
+    },
+    {
+      "t": 6339704,
+      "pos": 666,
+      "del": "",
+      "ins": "aksjdhfkjashdfkjhjk",
+      "absolute_wall_ms": 1777912146363
+    },
+    {
+      "t": 6343901,
+      "pos": 685,
+      "del": "",
+      "ins": "asdhfj",
+      "absolute_wall_ms": 1777912150560
+    },
+    {
+      "t": 6345482,
+      "pos": 691,
+      "del": "",
+      "ins": "kshadkjfhajksdhfkjhasjkdfhjkahsdkhfjkashdjkf",
+      "absolute_wall_ms": 1777912152141
+    },
+    {
+      "t": 6347104,
+      "pos": 735,
+      "del": "",
+      "ins": "hajksdhfkjhasjdkfhjksdhfjkahs",
+      "absolute_wall_ms": 1777912153763
+    },
+    {
+      "t": 6351048,
+      "pos": 764,
+      "del": "",
+      "ins": "kj",
+      "absolute_wall_ms": 1777912157707
+    },
+    {
+      "t": 6352942,
+      "pos": 766,
+      "del": "",
+      "ins": "jkj    ",
+      "absolute_wall_ms": 1777912159600
+    },
+    {
+      "t": 6452742,
+      "pos": 773,
+      "del": "",
+      "ins": "\n\nasdjfh",
+      "absolute_wall_ms": 1777912259399
+    },
+    {
+      "t": 6487247,
+      "pos": 781,
+      "del": "",
+      "ins": "sadf",
+      "absolute_wall_ms": 1777912293904
+    },
+    {
+      "t": 6546349,
+      "pos": 785,
+      "del": "",
+      "ins": " a",
+      "absolute_wall_ms": 1777912353005
+    },
+    {
+      "t": 6548014,
+      "pos": 787,
+      "del": "",
+      "ins": "fsdkjh",
+      "absolute_wall_ms": 1777912354670
+    },
+    {
+      "t": 6566664,
+      "pos": 793,
+      "del": "",
+      "ins": "sadkfjhkjsdhf",
+      "absolute_wall_ms": 1777912373319
+    },
+    {
+      "t": 6596193,
+      "pos": 806,
+      "del": "",
+      "ins": "dsfa",
+      "absolute_wall_ms": 1777912402848
+    },
+    {
+      "t": 6611226,
+      "pos": 810,
+      "del": "",
+      "ins": "asdf",
+      "absolute_wall_ms": 1777912417881
+    },
+    {
+      "t": 6622853,
+      "pos": 769,
+      "del": "    \n\nAsdjfhsadf afsdkjhsadkfjhkjsdhfdsfaasd",
+      "ins": "\n\nAsdjfhsadf afsdkjhsadkfjhkjsdhfdsfaasdfasdj",
+      "absolute_wall_ms": 1777912445118
+    },
+    {
+      "t": 6903156,
+      "pos": 0,
+      "del": "test\n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj\n\nksjadhfjkhasdkjsadfjkhkjsdfsdfs\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated\n\nbet this is sorta cool askdfhkjasdhfjkhaskjdfhjkahsdjkfhjkasdhfjkhasdjkhfjkashdjkfhaksjdhfkjashdkjfhakjsdhfkhasjkdfhajksdhfjkahsdjkfhajksdhfjkashdfjkhasjkdfhjkasdhjfhasjkdhfjkashdjkfhasjdkfhkjasdhfjkahsdjkfhasjkdhfjakshfdjkhsjkdhfkjashdfkjhaskjdfhjkasdhfjkashdjkfhasdjkfhjasdkhfkjhasdfkjhasdkjfhkajshfjkasdhfjkhsdjkfhadkjshfkjahsdfjkhaskjdhfkjasdhfkjashdfkjhasdkjfhaksjdhfkjashdfkjhjkasdhfjkshadkjfhajksdhfkjhasjkdfhjkahsdkhfjkashdjkfhajksdhfkjhasjdkfhjksdhfjkahskjjkj\n\nAsdjfhsadf afsdkjhsadkfjhkjsdhfdsfaasdfasdjf",
+      "ins": "",
+      "absolute_wall_ms": 1777913668288
+    },
+    {
+      "t": 6908607,
+      "pos": 0,
+      "del": "",
+      "ins": "hello darkness",
+      "absolute_wall_ms": 1777913673739
+    },
+    {
+      "t": 7001809,
+      "pos": 28,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777913766940
+    },
+    {
+      "t": 7005757,
+      "pos": 28,
+      "del": "",
+      "ins": " i’ve come to",
+      "absolute_wall_ms": 1777913770888
+    },
+    {
+      "t": 7010950,
+      "pos": 41,
+      "del": "",
+      "ins": " talk",
+      "absolute_wall_ms": 1777913776081
+    },
+    {
+      "t": 7022346,
+      "pos": 59,
+      "del": "",
+      "ins": "fds",
+      "absolute_wall_ms": 1777913787477
+    },
+    {
+      "t": 7030016,
+      "pos": 62,
+      "del": "",
+      "ins": "kajshkdjshdkj",
+      "absolute_wall_ms": 1777913795147
+    },
+    {
+      "t": 7032614,
+      "pos": 75,
+      "del": "",
+      "ins": "fhkasjdhf",
+      "absolute_wall_ms": 1777913797745
+    },
+    {
+      "t": 7502197,
+      "pos": 84,
+      "del": "",
+      "ins": "alksdjf",
+      "absolute_wall_ms": 1777914267341
+    },
+    {
+      "t": 7504026,
+      "pos": 91,
+      "del": "",
+      "ins": "klj",
+      "absolute_wall_ms": 1777914269169
+    },
+    {
+      "t": 7513796,
+      "pos": 70,
+      "del": "",
+      "ins": "asdf",
+      "absolute_wall_ms": 1777914288988
+    },
+    {
+      "t": 7519704,
+      "pos": 74,
+      "del": "",
+      "ins": "kj",
+      "absolute_wall_ms": 1777914294897
+    },
+    {
+      "t": 7529844,
+      "pos": 108,
+      "del": "",
+      "ins": "\n\nhello",
+      "absolute_wall_ms": 1777914305036
+    },
+    {
+      "t": 7537151,
+      "pos": 110,
+      "del": "h",
+      "ins": "H",
+      "absolute_wall_ms": 1777914312343
+    },
+    {
+      "t": 7542737,
+      "pos": 115,
+      "del": "",
+      "ins": " but why isn’t it showing up",
+      "absolute_wall_ms": 1777914317929
+    },
+    {
+      "t": 8178033,
+      "pos": 143,
+      "del": "",
+      "ins": "adsf",
+      "absolute_wall_ms": 1777914953178
+    },
+    {
+      "t": 8183749,
+      "pos": 147,
+      "del": "",
+      "ins": "asdf",
+      "absolute_wall_ms": 1777914973873
+    },
+    {
+      "t": 8188397,
+      "pos": 151,
+      "del": "",
+      "ins": "asdf",
+      "absolute_wall_ms": 1777914978521
+    },
+    {
+      "t": 8190092,
+      "pos": 155,
+      "del": "",
+      "ins": "asfdasdf",
+      "absolute_wall_ms": 1777914980215
+    },
+    {
+      "t": 8200288,
+      "pos": 163,
+      "del": "",
+      "ins": "\n\nhello ",
+      "absolute_wall_ms": 1777914990411
+    },
+    {
+      "t": 8206644,
+      "pos": 170,
+      "del": " ",
+      "ins": " the",
+      "absolute_wall_ms": 1777914996768
+    },
+    {
+      "t": 8208349,
+      "pos": 174,
+      "del": "",
+      "ins": " goat is me",
+      "absolute_wall_ms": 1777914998472
+    },
+    {
+      "t": 8221907,
+      "pos": 185,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777915012031
+    },
+    {
+      "t": 8223692,
+      "pos": 185,
+      "del": " ",
+      "ins": " t",
+      "absolute_wall_ms": 1777915013815
+    },
+    {
+      "t": 8230660,
+      "pos": 187,
+      "del": "",
+      "ins": "jksafh",
+      "absolute_wall_ms": 1777915020783
+    },
+    {
+      "t": 8246792,
+      "pos": 193,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777915036915
+    },
+    {
+      "t": 8248713,
+      "pos": 194,
+      "del": "",
+      "ins": "red",
+      "absolute_wall_ms": 1777915038836
+    },
+    {
+      "t": 8566487,
+      "pos": 197,
+      "del": "",
+      "ins": "asdkfhkj",
+      "absolute_wall_ms": 1777915356607
+    },
+    {
+      "t": 8568176,
+      "pos": 205,
+      "del": "",
+      "ins": "h",
+      "absolute_wall_ms": 1777915358296
+    },
+    {
+      "t": 8570125,
+      "pos": 206,
+      "del": "",
+      "ins": "kjhaksjdhfkjahs",
+      "absolute_wall_ms": 1777915360245
+    },
+    {
+      "t": 8580081,
+      "pos": 221,
+      "del": "",
+      "ins": "\n\nhello",
+      "absolute_wall_ms": 1777915370201
+    },
+    {
+      "t": 8581650,
+      "pos": 223,
+      "del": "h",
+      "ins": "H",
+      "absolute_wall_ms": 1777915371770
+    },
+    {
+      "t": 8591132,
+      "pos": 228,
+      "del": "",
+      "ins": " m",
+      "absolute_wall_ms": 1777915381252
+    },
+    {
+      "t": 8593181,
+      "pos": 230,
+      "del": "",
+      "ins": "y name",
+      "absolute_wall_ms": 1777915383301
+    },
+    {
+      "t": 8627221,
+      "pos": 236,
+      "del": "",
+      "ins": " h",
+      "absolute_wall_ms": 1777915417341
+    },
+    {
+      "t": 8629142,
+      "pos": 237,
+      "del": "h",
+      "ins": "si",
+      "absolute_wall_ms": 1777915419261
+    },
+    {
+      "t": 8641951,
+      "pos": 239,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777915432071
+    },
+    {
+      "t": 8643696,
+      "pos": 240,
+      "del": "",
+      "ins": "the ",
+      "absolute_wall_ms": 1777915433815
+    },
+    {
+      "t": 8913277,
+      "pos": 243,
+      "del": " ",
+      "ins": " goat",
+      "absolute_wall_ms": 1777915703394
+    },
+    {
+      "t": 8931451,
+      "pos": 248,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777915721567
+    },
+    {
+      "t": 8936449,
+      "pos": 248,
+      "del": " ",
+      "ins": " and",
+      "absolute_wall_ms": 1777915726566
+    },
+    {
+      "t": 8948559,
+      "pos": 252,
+      "del": "",
+      "ins": "fsd",
+      "absolute_wall_ms": 1777915738676
+    },
+    {
+      "t": 8955723,
+      "pos": 255,
+      "del": "",
+      "ins": " h",
+      "absolute_wall_ms": 1777915745839
+    },
+    {
+      "t": 8957671,
+      "pos": 257,
+      "del": "",
+      "ins": "ello",
+      "absolute_wall_ms": 1777915747788
+    },
+    {
+      "t": 9113715,
+      "pos": 261,
+      "del": "",
+      "ins": " te",
+      "absolute_wall_ms": 1777915903829
+    },
+    {
+      "t": 9115386,
+      "pos": 264,
+      "del": "",
+      "ins": "st",
+      "absolute_wall_ms": 1777915905501
+    },
+    {
+      "t": 9128262,
+      "pos": 266,
+      "del": "",
+      "ins": " mor",
+      "absolute_wall_ms": 1777915918377
+    },
+    {
+      "t": 9129931,
+      "pos": 270,
+      "del": "",
+      "ins": "e",
+      "absolute_wall_ms": 1777915920046
+    },
+    {
+      "t": 9132948,
+      "pos": 271,
+      "del": "",
+      "ins": " ",
+      "absolute_wall_ms": 1777915923062
+    },
+    {
+      "t": 9134754,
+      "pos": 271,
+      "del": " ",
+      "ins": " tet",
+      "absolute_wall_ms": 1777915924868
+    },
+    {
+      "t": 9428683,
+      "pos": 275,
+      "del": "",
+      "ins": "sadfk",
+      "absolute_wall_ms": 1777916218795
+    },
+    {
+      "t": 9443999,
+      "pos": 280,
+      "del": "",
+      "ins": "asfd",
+      "absolute_wall_ms": 1777916234111
+    },
+    {
+      "t": 9447046,
+      "pos": 284,
+      "del": "",
+      "ins": "asdf",
+      "absolute_wall_ms": 1777916237157
+    },
+    {
+      "t": 9469405,
+      "pos": 288,
+      "del": "",
+      "ins": "kadsfh",
+      "absolute_wall_ms": 1777916259517
+    }
+  ],
+  "focus_events": [],
+  "keystroke_log": "",
+  "current_url": null,
+  "current_url_title": null,
+  "url_history": [
+    {
+      "t": 1777854022472000000,
+      "url": "about:blank",
+      "allowed": false,
+      "source": "blocked_navigation"
+    }
+  ],
+  "violation_count": 6,
+  "violations": [
+    {
+      "t": 1777854022472000000,
+      "kind": "blocked_url",
+      "detail": "Blocked navigation to about:blank"
+    },
+    {
+      "t": 1777865441122000000,
+      "kind": "clipboard_blocked",
+      "detail": "Copy and paste are disabled for this assignment."
+    },
+    {
+      "t": 1777865442087000000,
+      "kind": "clipboard_blocked",
+      "detail": "Paste is disabled for this assignment."
+    },
+    {
+      "t": 1777865826182000000,
+      "kind": "clipboard_blocked",
+      "detail": "Copy and paste are disabled for this assignment."
+    },
+    {
+      "t": 1777865827083000000,
+      "kind": "clipboard_blocked",
+      "detail": "Paste is disabled for this assignment."
+    },
+    {
+      "t": 1777903266493000000,
+      "kind": "blocked_url",
+      "detail": "Blocked navigation to about:blank"
+    }
+  ],
+  "last_activity_at": "2026-05-04T17:37:39.401Z",
+  "focused": true,
+  "hid_active": true,
+  "start_wall_ns": 0,
+  "replay_origin_wall_ms": null,
+  "recorded_timezone_offset_minutes": null,
+  "recorded_timezone": null,
+  "snapshot_history_count": 207,
+  "snapshot_url_history_count": 1,
+  "last_event_seq": 56,
+  "created_at": "2026-05-03T23:28:12.541Z",
+  "updated_at": "2026-05-04T17:37:44.635Z",
+  "events": [
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000001",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 1,
+      "current_text": "Hello This is my essay",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 19926,
+          "pos": 0,
+          "del": "",
+          "ins": "Hello",
+          "absolute_wall_ms": 1777850884326
+        },
+        {
+          "t": 23024,
+          "pos": 5,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777850887424
+        },
+        {
+          "t": 25340,
+          "pos": 5,
+          "del": " ",
+          "ins": " This is my essay",
+          "absolute_wall_ms": 1777850889741
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:28:09.489Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:28:12.260Z",
+      "updated_at": "2026-05-03T23:28:12.260Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000002",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 2,
+      "current_text": "Hello This is **my** essay hihiHi",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 112116,
+          "pos": 22,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777850976518
+        },
+        {
+          "t": 113513,
+          "pos": 22,
+          "del": " ",
+          "ins": " hihi",
+          "absolute_wall_ms": 1777850977915
+        },
+        {
+          "t": 149308,
+          "pos": 27,
+          "del": "",
+          "ins": "H",
+          "absolute_wall_ms": 1777851013711
+        },
+        {
+          "t": 322247,
+          "pos": 14,
+          "del": "my",
+          "ins": "**my**",
+          "absolute_wall_ms": 1777851186654
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:33:06.403Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:33:09.200Z",
+      "updated_at": "2026-05-03T23:33:09.200Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000003",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 3,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nSaid",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 325175,
+          "pos": 16,
+          "del": "my",
+          "ins": "*my*",
+          "absolute_wall_ms": 1777851189582
+        },
+        {
+          "t": 326989,
+          "pos": 16,
+          "del": "*my*",
+          "ins": "[u]my[/u]",
+          "absolute_wall_ms": 1777851191396
+        },
+        {
+          "t": 330655,
+          "pos": 40,
+          "del": "",
+          "ins": "\n\nSaid",
+          "absolute_wall_ms": 1777851442361
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:37:22.112Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:37:25.394Z",
+      "updated_at": "2026-05-03T23:37:25.394Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000004",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 4,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 358051,
+          "pos": 46,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777851595969
+        },
+        {
+          "t": 359564,
+          "pos": 40,
+          "del": "\n\nSaid ",
+          "ins": "",
+          "absolute_wall_ms": 1777851597483
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:39:57.231Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:40:02.621Z",
+      "updated_at": "2026-05-03T23:40:02.621Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000005",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 5,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nHello",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 365531,
+          "pos": 40,
+          "del": "",
+          "ins": "\n\nHello",
+          "absolute_wall_ms": 1777851603449
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:40:03.199Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:40:06.170Z",
+      "updated_at": "2026-05-03T23:40:06.170Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000006",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 6,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\n# This is my essay written in [font=mono]Handtyped[/font]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 369216,
+          "pos": 40,
+          "del": "\n\nHello",
+          "ins": "",
+          "absolute_wall_ms": 1777851607134
+        },
+        {
+          "t": 370861,
+          "pos": 40,
+          "del": "",
+          "ins": "\n\nThis is my ",
+          "absolute_wall_ms": 1777851608779
+        },
+        {
+          "t": 372400,
+          "pos": 52,
+          "del": "",
+          "ins": " essay",
+          "absolute_wall_ms": 1777851610319
+        },
+        {
+          "t": 376412,
+          "pos": 58,
+          "del": " ",
+          "ins": " written a",
+          "absolute_wall_ms": 1777851614331
+        },
+        {
+          "t": 378374,
+          "pos": 67,
+          "del": "a",
+          "ins": "in Handtyped",
+          "absolute_wall_ms": 1777851616292
+        },
+        {
+          "t": 449862,
+          "pos": 70,
+          "del": "Handtyped",
+          "ins": "[font=mono]Handtyped[/font]",
+          "absolute_wall_ms": 1777851687782
+        },
+        {
+          "t": 451080,
+          "pos": 70,
+          "del": "[font=mono]Handtyped[/font]",
+          "ins": "Handtyped",
+          "absolute_wall_ms": 1777851689000
+        },
+        {
+          "t": 452607,
+          "pos": 70,
+          "del": "Handtyped",
+          "ins": "[font=mono]Handtyped[/font]",
+          "absolute_wall_ms": 1777851690527
+        },
+        {
+          "t": 454816,
+          "pos": 42,
+          "del": "",
+          "ins": "# ",
+          "absolute_wall_ms": 1777851692736
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:41:32.485Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:41:35.337Z",
+      "updated_at": "2026-05-03T23:41:35.337Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000007",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 7,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [font=times][size=24]Handtyped[/size][/font]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 457104,
+          "pos": 42,
+          "del": "# ",
+          "ins": "",
+          "absolute_wall_ms": 1777851695024
+        },
+        {
+          "t": 459168,
+          "pos": 76,
+          "del": "mono",
+          "ins": "times",
+          "absolute_wall_ms": 1777851697088
+        },
+        {
+          "t": 460769,
+          "pos": 82,
+          "del": "Handtyped",
+          "ins": "[size=24]Handtyped[/size]",
+          "absolute_wall_ms": 1777851698689
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:41:38.438Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:41:41.337Z",
+      "updated_at": "2026-05-03T23:41:41.337Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000008",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 8,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 463335,
+          "pos": 88,
+          "del": "24",
+          "ins": "16",
+          "absolute_wall_ms": 1777851701255
+        },
+        {
+          "t": 485198,
+          "pos": 71,
+          "del": "font=times][size=16]Handtyped[/size][/font",
+          "ins": "u][font=times][size=16]Handtyped[/size][/font][/u",
+          "absolute_wall_ms": 1777851723119
+        },
+        {
+          "t": 488731,
+          "pos": 74,
+          "del": "font=times][size=16]Handtyped[/size][/fon",
+          "ins": "highlight][font=times][size=16]Handtyped[/size][/font][/highligh",
+          "absolute_wall_ms": 1777851726652
+        },
+        {
+          "t": 490537,
+          "pos": 74,
+          "del": "highlight][font=times][size=16]Handtyped[/size][/font][/highligh",
+          "ins": "font=times][size=16]Handtyped[/size][/fon",
+          "absolute_wall_ms": 1777851728458
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:42:08.208Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:42:11.538Z",
+      "updated_at": "2026-05-03T23:42:11.538Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000009",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 9,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-03T23:42:20.222Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-03T23:42:23.358Z",
+      "updated_at": "2026-05-03T23:42:23.358Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000010",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 10,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [
+        {
+          "t": 1777854022472000000,
+          "url": "about:blank",
+          "allowed": false,
+          "source": "blocked_navigation"
+        }
+      ],
+      "last_activity_at": "2026-05-04T00:06:16.973Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T00:20:26.198Z",
+      "updated_at": "2026-05-04T00:20:26.198Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000011",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 11,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 500357,
+          "pos": 50,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777854032278
+        },
+        {
+          "t": 501787,
+          "pos": 50,
+          "del": " ",
+          "ins": "",
+          "absolute_wall_ms": 1777854033708
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T00:20:34.553Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T00:20:37.577Z",
+      "updated_at": "2026-05-04T00:20:37.577Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000012",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 12,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 2596634,
+          "pos": 0,
+          "del": "",
+          "ins": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]",
+          "absolute_wall_ms": 1777854149796
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T00:20:34.553Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T00:22:30.555Z",
+      "updated_at": "2026-05-04T00:22:30.555Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000013",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 13,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]\n\nAnd ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 2601856,
+          "pos": 121,
+          "del": "",
+          "ins": "\n\nand",
+          "absolute_wall_ms": 1777858755491
+        },
+        {
+          "t": 2603395,
+          "pos": 123,
+          "del": "and",
+          "ins": "And ",
+          "absolute_wall_ms": 1777858757029
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T01:39:16.778Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T01:39:20.380Z",
+      "updated_at": "2026-05-04T01:39:20.380Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000014",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 14,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]\n\nAnd it",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4203196,
+          "pos": 126,
+          "del": " ",
+          "ins": " it",
+          "absolute_wall_ms": 1777860356941
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T02:05:56.688Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T02:05:59.846Z",
+      "updated_at": "2026-05-04T02:05:59.846Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000015",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 15,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]\n\nAnd it is",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4206133,
+          "pos": 129,
+          "del": "",
+          "ins": " is",
+          "absolute_wall_ms": 1777860359877
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T02:05:59.625Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T02:06:03.242Z",
+      "updated_at": "2026-05-04T02:06:03.242Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000016",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 16,
+      "current_text": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]\n\nAnd it is really good\n\noh wow it works",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4209930,
+          "pos": 132,
+          "del": "",
+          "ins": " really good",
+          "absolute_wall_ms": 1777860363674
+        },
+        {
+          "t": 4220918,
+          "pos": 144,
+          "del": "",
+          "ins": "\n\noh wow it works",
+          "absolute_wall_ms": 1777860374662
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T02:06:14.410Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T02:06:17.861Z",
+      "updated_at": "2026-05-04T02:06:17.861Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000017",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 17,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4259383,
+          "pos": 161,
+          "del": "",
+          "ins": "\n\n[test](https://gooogle.com)",
+          "absolute_wall_ms": 1777863155055
+        },
+        {
+          "t": 4269649,
+          "pos": 167,
+          "del": "",
+          "ins": "sdfsdf",
+          "absolute_wall_ms": 1777863165321
+        },
+        {
+          "t": 4274415,
+          "pos": 161,
+          "del": "\n\n[tessdfsdft](https://gooogle.com)",
+          "ins": "",
+          "absolute_wall_ms": 1777863170087
+        },
+        {
+          "t": 4290615,
+          "pos": 161,
+          "del": "",
+          "ins": "\n\n* 324\n\n* 234\n\n  1. 234234\n\n  2. ",
+          "absolute_wall_ms": 1777863186286
+        },
+        {
+          "t": 4300263,
+          "pos": 163,
+          "del": "* 324\n\n* 234\n\n  1. 234234\n\n  2",
+          "ins": "1. 234\n\n2. 234\n\n3",
+          "absolute_wall_ms": 1777863195934
+        },
+        {
+          "t": 4305335,
+          "pos": 0,
+          "del": "Hello This is **[u]my[/u]** essay hihiHi\n\nThis is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]\n\nAnd it is really good\n\noh wow it works\n\n1. 234\n\n2. 234\n\n3",
+          "ins": "1",
+          "absolute_wall_ms": 1777863201006
+        },
+        {
+          "t": 4307447,
+          "pos": 0,
+          "del": "1. ",
+          "ins": "",
+          "absolute_wall_ms": 1777863203118
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:10:58.045Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:11:01.271Z",
+      "updated_at": "2026-05-04T03:11:01.271Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000018",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 18,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:12:44.784Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:12:49.630Z",
+      "updated_at": "2026-05-04T03:12:49.630Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000019",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 19,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:17:31.496Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:17:34.551Z",
+      "updated_at": "2026-05-04T03:17:34.551Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000020",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 20,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:18:09.663Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:18:14.536Z",
+      "updated_at": "2026-05-04T03:18:14.536Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000021",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 21,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:20:59.184Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:21:02.946Z",
+      "updated_at": "2026-05-04T03:21:02.946Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000022",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 22,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:26:11.280Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:26:14.313Z",
+      "updated_at": "2026-05-04T03:26:14.313Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000023",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 23,
+      "current_text": "",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:26:32.768Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:26:38.049Z",
+      "updated_at": "2026-05-04T03:26:38.049Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000024",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 24,
+      "current_text": "aksjdfhjk\n\nasdfjhakjsdf\n\na\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\nasd\n\nf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4310944,
+          "pos": 0,
+          "del": "",
+          "ins": "asjkdf",
+          "absolute_wall_ms": 1777865440257
+        },
+        {
+          "t": 4313907,
+          "pos": 0,
+          "del": "asjkdf",
+          "ins": "",
+          "absolute_wall_ms": 1777865443220
+        },
+        {
+          "t": 4320924,
+          "pos": 0,
+          "del": "",
+          "ins": "\naksjdfhjk\n\nasdfjhakjsdf\n\na",
+          "absolute_wall_ms": 1777865450237
+        },
+        {
+          "t": 4327592,
+          "pos": 0,
+          "del": "\n",
+          "ins": "",
+          "absolute_wall_ms": 1777865614919
+        },
+        {
+          "t": 4336127,
+          "pos": 26,
+          "del": "",
+          "ins": "\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\nasd\n\nf",
+          "absolute_wall_ms": 1777865832049
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:37:11.797Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:37:16.377Z",
+      "updated_at": "2026-05-04T03:37:16.377Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000025",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 25,
+      "current_text": "aksjdfhjk\n\nasdfjhakjsdf\n\na\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\ndf\n\nasd\n\nf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4362589,
+          "pos": 88,
+          "del": "",
+          "ins": "df\n\n",
+          "absolute_wall_ms": 1777866155941
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T03:42:35.689Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T03:42:40.330Z",
+      "updated_at": "2026-05-04T03:42:40.330Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000026",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 26,
+      "current_text": "aksjdfhjk\n\nasdfjhakjsdfsdf\n\na\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\ndf\n\ndf\n\nasd\n\nf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4369245,
+          "pos": 92,
+          "del": "",
+          "ins": "df\n\n",
+          "absolute_wall_ms": 1777866162597
+        },
+        {
+          "t": 4371802,
+          "pos": 23,
+          "del": "",
+          "ins": "sdf",
+          "absolute_wall_ms": 1777903269038
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T14:01:18.521Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T14:01:20.688Z",
+      "updated_at": "2026-05-04T14:01:20.688Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000027",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 27,
+      "current_text": "Hello my name is Joe and jkhsdfsdkjhfkjshdfkjhsjkdhfjkshdjf\n\nhello my nameis Joe and I am the goat and this is ok test ok southampton is goated and red",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 4374705,
+          "pos": 0,
+          "del": "aksjdfhjk\n\nasdfjhakjsdfsdf\n\na\n\nasf\n\nsd\n\nf\n\nas\n\ndfa\n\ndf\n\na\n\nsdf\n\na\n\ndf\n\na\n\ndsf\n\nad\n\nfa\n\ndf\n\ndf\n\ndf\n\nasd\n\nf",
+          "ins": "",
+          "absolute_wall_ms": 1777908848047
+        },
+        {
+          "t": 4382404,
+          "pos": 0,
+          "del": "",
+          "ins": "Hello my name is joe",
+          "absolute_wall_ms": 1777908855746
+        },
+        {
+          "t": 4386605,
+          "pos": 17,
+          "del": "j",
+          "ins": "J",
+          "absolute_wall_ms": 1777908859947
+        },
+        {
+          "t": 4392709,
+          "pos": 20,
+          "del": "",
+          "ins": " fsg",
+          "absolute_wall_ms": 1777908866050
+        },
+        {
+          "t": 4405498,
+          "pos": 20,
+          "del": " fsg",
+          "ins": " ",
+          "absolute_wall_ms": 1777908878839
+        },
+        {
+          "t": 4415787,
+          "pos": 20,
+          "del": " ",
+          "ins": " and sdf",
+          "absolute_wall_ms": 1777908889127
+        },
+        {
+          "t": 4418516,
+          "pos": 25,
+          "del": "sdf",
+          "ins": "jkh",
+          "absolute_wall_ms": 1777908891857
+        },
+        {
+          "t": 4420672,
+          "pos": 28,
+          "del": "",
+          "ins": "[u]sfd[/u]",
+          "absolute_wall_ms": 1777908894013
+        },
+        {
+          "t": 4488517,
+          "pos": 28,
+          "del": "[u]sfd[/u]",
+          "ins": "",
+          "absolute_wall_ms": 1777908961854
+        },
+        {
+          "t": 4526524,
+          "pos": 28,
+          "del": "",
+          "ins": "sdf",
+          "absolute_wall_ms": 1777909097006
+        },
+        {
+          "t": 4534395,
+          "pos": 59,
+          "del": "",
+          "ins": "\n\nhello my nameis Joe",
+          "absolute_wall_ms": 1777909266102
+        },
+        {
+          "t": 4564397,
+          "pos": 80,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777909296107
+        },
+        {
+          "t": 4566409,
+          "pos": 80,
+          "del": "",
+          "ins": " and",
+          "absolute_wall_ms": 1777909298119
+        },
+        {
+          "t": 4570470,
+          "pos": 84,
+          "del": " ",
+          "ins": " I am the goat",
+          "absolute_wall_ms": 1777909302180
+        },
+        {
+          "t": 4579668,
+          "pos": 98,
+          "del": "",
+          "ins": " and",
+          "absolute_wall_ms": 1777909966755
+        },
+        {
+          "t": 4586890,
+          "pos": 102,
+          "del": "",
+          "ins": " this is",
+          "absolute_wall_ms": 1777909973977
+        },
+        {
+          "t": 4596633,
+          "pos": 110,
+          "del": " ",
+          "ins": " ok test",
+          "absolute_wall_ms": 1777909983719
+        },
+        {
+          "t": 4630237,
+          "pos": 118,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777910017322
+        },
+        {
+          "t": 4632281,
+          "pos": 118,
+          "del": "",
+          "ins": " ok",
+          "absolute_wall_ms": 1777910019366
+        },
+        {
+          "t": 4896388,
+          "pos": 121,
+          "del": "",
+          "ins": " southampton",
+          "absolute_wall_ms": 1777910283518
+        },
+        {
+          "t": 4904460,
+          "pos": 134,
+          "del": "",
+          "ins": "is goated",
+          "absolute_wall_ms": 1777910291590
+        },
+        {
+          "t": 5286630,
+          "pos": 143,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777910673749
+        },
+        {
+          "t": 5292088,
+          "pos": 143,
+          "del": " ",
+          "ins": " a",
+          "absolute_wall_ms": 1777910679207
+        },
+        {
+          "t": 5293923,
+          "pos": 145,
+          "del": "",
+          "ins": "nd",
+          "absolute_wall_ms": 1777910681042
+        },
+        {
+          "t": 5295946,
+          "pos": 147,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777910683065
+        },
+        {
+          "t": 5337821,
+          "pos": 147,
+          "del": " ",
+          "ins": " red",
+          "absolute_wall_ms": 1777910724939
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:05:24.688Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:05:30.131Z",
+      "updated_at": "2026-05-04T16:05:30.131Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000028",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 28,
+      "current_text": "Hello my name is Joe and jkhsdfsdkjhfkjshdfkjhsjkdhfjkshdjf\n\nhello my nameis Joe and I am the goat and this is ok test ok southampton is goated and redasdf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5447928,
+          "pos": 151,
+          "del": "",
+          "ins": "asdf",
+          "absolute_wall_ms": 1777910835043
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:07:14.793Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:07:18.638Z",
+      "updated_at": "2026-05-04T16:07:18.638Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000029",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 29,
+      "current_text": "Hello my name is Joe and jkhsdfsdkjhfkjshdfkjhsjkdhfjkshdjf\n\nhello my nameis Joe and I am the goat and this is ok test ok southampton is goated and redasdfakjhsdfkj\n\naksjdhf\n\nkadjshfkj\n\nkadhkj\n\nkadshfjk",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5478387,
+          "pos": 155,
+          "del": "",
+          "ins": "a",
+          "absolute_wall_ms": 1777910865502
+        },
+        {
+          "t": 5480006,
+          "pos": 156,
+          "del": "",
+          "ins": "kjhsdfkj",
+          "absolute_wall_ms": 1777910867120
+        },
+        {
+          "t": 5482037,
+          "pos": 164,
+          "del": "",
+          "ins": "\n\naksjdhf\n\nkadjshfkj",
+          "absolute_wall_ms": 1777910869152
+        },
+        {
+          "t": 5484303,
+          "pos": 184,
+          "del": "",
+          "ins": "\n\nkadhkj",
+          "absolute_wall_ms": 1777910871417
+        },
+        {
+          "t": 5485883,
+          "pos": 192,
+          "del": "",
+          "ins": "\n\nkadshfjk",
+          "absolute_wall_ms": 1777910872997
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:07:51.893Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:07:57.223Z",
+      "updated_at": "2026-05-04T16:07:57.223Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000030",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 30,
+      "current_text": "test ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5493080,
+          "pos": 194,
+          "del": "k",
+          "ins": "K",
+          "absolute_wall_ms": 1777910880194
+        },
+        {
+          "t": 5793179,
+          "pos": 0,
+          "del": "Hello my name is Joe and jkhsdfsdkjhfkjshdfkjhsjkdhfjkshdjf\n\nhello my nameis Joe and I am the goat and this is ok test ok southampton is goated and redasdfakjhsdfkj\n\naksjdhf\n\nkadjshfkj\n\nkadhkj\n\nKadshfjk",
+          "ins": "",
+          "absolute_wall_ms": 1777911180332
+        },
+        {
+          "t": 5795020,
+          "pos": 0,
+          "del": "",
+          "ins": "test ",
+          "absolute_wall_ms": 1777911182173
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:13:00.891Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:13:04.934Z",
+      "updated_at": "2026-05-04T16:13:04.934Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000031",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 31,
+      "current_text": "test ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:13:06.876Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:13:13.864Z",
+      "updated_at": "2026-05-04T16:13:13.864Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000032",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 32,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjh",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5837175,
+          "pos": 5,
+          "del": "",
+          "ins": "\n\nasdkjfh",
+          "absolute_wall_ms": 1777911224327
+        },
+        {
+          "t": 5839037,
+          "pos": 7,
+          "del": "a",
+          "ins": "A",
+          "absolute_wall_ms": 1777911226189
+        },
+        {
+          "t": 5840370,
+          "pos": 14,
+          "del": "",
+          "ins": "kadjsfh",
+          "absolute_wall_ms": 1777911227523
+        },
+        {
+          "t": 5842011,
+          "pos": 21,
+          "del": "",
+          "ins": "kjh",
+          "absolute_wall_ms": 1777911229163
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:13:47.818Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:13:51.707Z",
+      "updated_at": "2026-05-04T16:13:51.707Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000033",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 33,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkj",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5850068,
+          "pos": 24,
+          "del": "",
+          "ins": "kasdjfhkj",
+          "absolute_wall_ms": 1777911237220
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:13:56.968Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:14:00.800Z",
+      "updated_at": "2026-05-04T16:14:00.800Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000034",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 34,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkj",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5859593,
+          "pos": 33,
+          "del": "",
+          "ins": "kadjfhkjsadhfkj",
+          "absolute_wall_ms": 1777911246744
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:14:06.493Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:14:09.700Z",
+      "updated_at": "2026-05-04T16:14:09.700Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000035",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 35,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 5941569,
+          "pos": 48,
+          "del": "",
+          "ins": "kasdhfkj",
+          "absolute_wall_ms": 1777911328719
+        },
+        {
+          "t": 5945618,
+          "pos": 56,
+          "del": "",
+          "ins": "khsajdk",
+          "absolute_wall_ms": 1777911332768
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:15:32.517Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:15:36.817Z",
+      "updated_at": "2026-05-04T16:15:36.817Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000036",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 36,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nhello",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6205337,
+          "pos": 63,
+          "del": "",
+          "ins": "\n\nasdfkj",
+          "absolute_wall_ms": 1777911592483
+        },
+        {
+          "t": 6208327,
+          "pos": 71,
+          "del": "",
+          "ins": "hkjhkj",
+          "absolute_wall_ms": 1777911595473
+        },
+        {
+          "t": 6210143,
+          "pos": 77,
+          "del": "",
+          "ins": "k",
+          "absolute_wall_ms": 1777911597288
+        },
+        {
+          "t": 6212892,
+          "pos": 78,
+          "del": "",
+          "ins": "skjadfhkjh",
+          "absolute_wall_ms": 1777911600038
+        },
+        {
+          "t": 6215479,
+          "pos": 88,
+          "del": "",
+          "ins": "kjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjk",
+          "absolute_wall_ms": 1777911602624
+        },
+        {
+          "t": 6217402,
+          "pos": 131,
+          "del": "",
+          "ins": "h\n\nhell",
+          "absolute_wall_ms": 1777911604547
+        },
+        {
+          "t": 6219045,
+          "pos": 138,
+          "del": "",
+          "ins": "o",
+          "absolute_wall_ms": 1777911606190
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:20:04.590Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:20:09.885Z",
+      "updated_at": "2026-05-04T16:20:09.885Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000037",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 37,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello aksdfhjhsdkjkhkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjaf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6221788,
+          "pos": 134,
+          "del": "hello",
+          "ins": "Hello ",
+          "absolute_wall_ms": 1777911608933
+        },
+        {
+          "t": 6223557,
+          "pos": 139,
+          "del": " ",
+          "ins": " aksdfhjhsdkj",
+          "absolute_wall_ms": 1777911610702
+        },
+        {
+          "t": 6232154,
+          "pos": 152,
+          "del": "",
+          "ins": "khkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjaf",
+          "absolute_wall_ms": 1777911619299
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:20:19.047Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:20:24.202Z",
+      "updated_at": "2026-05-04T16:20:24.202Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000038",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 38,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello aksdfhjhsdkjkhkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjafkasdjhfjkksjadhkfjhasdjkfhjkasdkfjhasdkjfhskjhkjkfkdjf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6236831,
+          "pos": 323,
+          "del": "",
+          "ins": "kasdjhfjk",
+          "absolute_wall_ms": 1777911623976
+        },
+        {
+          "t": 6238881,
+          "pos": 332,
+          "del": "",
+          "ins": "ksjadhkfjh",
+          "absolute_wall_ms": 1777911626026
+        },
+        {
+          "t": 6242672,
+          "pos": 342,
+          "del": "",
+          "ins": "asdjkfhjk",
+          "absolute_wall_ms": 1777911629817
+        },
+        {
+          "t": 6244855,
+          "pos": 351,
+          "del": "",
+          "ins": "asdkfjhasdkjfh",
+          "absolute_wall_ms": 1777911631999
+        },
+        {
+          "t": 6246841,
+          "pos": 365,
+          "del": "",
+          "ins": "skjhkjkfkdjf",
+          "absolute_wall_ms": 1777911633986
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:20:33.735Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:20:36.853Z",
+      "updated_at": "2026-05-04T16:20:36.853Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000039",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 39,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello aksdfhjhsdkjkhkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjafkasdjhfjkksjadhkfjhasdjkfhjkasdkfjhasdkjfhskjhkjkfkdjfThe southampton fc people are goated ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6257411,
+          "pos": 377,
+          "del": "",
+          "ins": "The southampton fc ",
+          "absolute_wall_ms": 1777911644556
+        },
+        {
+          "t": 6260277,
+          "pos": 395,
+          "del": "",
+          "ins": " people are goated",
+          "absolute_wall_ms": 1777911647421
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:20:47.169Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:20:51.884Z",
+      "updated_at": "2026-05-04T16:20:51.884Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000040",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 40,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj \n\nksjadhfjkhasdkj\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6285962,
+          "pos": 377,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777911673105
+        },
+        {
+          "t": 6288495,
+          "pos": 140,
+          "del": "aksdfhjhsdkjkhkjjkhkjjkjkjdsahfjkahsdjkfhjkasdhfjkhdsajkfhjksadhjkfhskjadhfksdahjkfhjskadfjksdjkfhjkasdhfkjhsdkjfhksdjahfjksdhajkfhasdkjfhjkasdhfjkhasdjkfhsdafhaskdfsahfkjhasdjkhfkjafkasdjhfjkksjadhkfjhasdjkfhjkasdkfjhasdkjfhskjhkjkfkdjf",
+          "ins": "",
+          "absolute_wall_ms": 1777911675639
+        },
+        {
+          "t": 6290138,
+          "pos": 140,
+          "del": "",
+          "ins": "ajksdhfkj",
+          "absolute_wall_ms": 1777911677281
+        },
+        {
+          "t": 6291749,
+          "pos": 150,
+          "del": "",
+          "ins": "\n\n",
+          "absolute_wall_ms": 1777911678893
+        },
+        {
+          "t": 6295910,
+          "pos": 152,
+          "del": "",
+          "ins": "ksjadhfjkhasdkj\n\nasfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\n",
+          "absolute_wall_ms": 1777911683054
+        },
+        {
+          "t": 6297922,
+          "pos": 169,
+          "del": "a",
+          "ins": "A",
+          "absolute_wall_ms": 1777911685065
+        },
+        {
+          "t": 6301357,
+          "pos": 275,
+          "del": "",
+          "ins": "kfdsjh",
+          "absolute_wall_ms": 1777911688500
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:21:28.250Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:21:31.127Z",
+      "updated_at": "2026-05-04T16:21:31.127Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000041",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 41,
+      "current_text": "test \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj \n\nksjadhfjkhasdkj\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:21:57.129Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:22:00.934Z",
+      "updated_at": "2026-05-04T16:22:00.934Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000042",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 42,
+      "current_text": "test\n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj\n\nksjadhfjkhasdkjsadfjkhkjsdfsdfs\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated\n\nbet this is sorta cool askdfhkjasdhfjkhaskjdfhjkahsdjkfhjkasdhfjkhasdjkhfjkashdjkfhaksjdhfkjashdkjfhakjsdhfkhasjkdfhajksdhfjkahsdjkfhajksdhfjkashdfjkhasjkdfhjkasdhjfhasjkdhfjkashdjkfhasjdkfhkjasdhfjkahsdjkfhasjkdhfjakshfdjkhsjkdhfkjashdfkjhaskjdfhjkasdhfjkashdjkfhasdjkfhjasdkhfkjhasdfkjhasdkjfhkajshfjkasdhfjkhsdjkfhadkjshfkjahsdfjkhaskjdhfkjasdhfkjashdfkjhasdkjfhaksjdhfkjashdfkjhjkasdhfjkshadkjfhajksdhfkjhasjkdfhjkahsdkhfjkashdjkfhajksdhfkjhasjdkfhjksdhfjkahskjjkj    \n\nAsdjfhsadf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6307686,
+          "pos": 4,
+          "del": " \n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj \n\nksjadhfjkhasdkj\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated ",
+          "ins": "\n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj\n\nksjadhfjkhasdkjsadfjkh\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated",
+          "absolute_wall_ms": 1777912074792
+        },
+        {
+          "t": 6309355,
+          "pos": 172,
+          "del": "",
+          "ins": "kj",
+          "absolute_wall_ms": 1777912076461
+        },
+        {
+          "t": 6311101,
+          "pos": 174,
+          "del": "",
+          "ins": "ksdjf",
+          "absolute_wall_ms": 1777912078206
+        },
+        {
+          "t": 6311375,
+          "pos": 174,
+          "del": "",
+          "ins": "sdfs",
+          "absolute_wall_ms": 1777912118034
+        },
+        {
+          "t": 6313209,
+          "pos": 178,
+          "del": "",
+          "ins": "dfs",
+          "absolute_wall_ms": 1777912119869
+        },
+        {
+          "t": 6317407,
+          "pos": 299,
+          "del": "",
+          "ins": "\n\nbet this ",
+          "absolute_wall_ms": 1777912124066
+        },
+        {
+          "t": 6319266,
+          "pos": 309,
+          "del": " ",
+          "ins": " i",
+          "absolute_wall_ms": 1777912125925
+        },
+        {
+          "t": 6320805,
+          "pos": 311,
+          "del": "",
+          "ins": "s so",
+          "absolute_wall_ms": 1777912127464
+        },
+        {
+          "t": 6322217,
+          "pos": 315,
+          "del": "",
+          "ins": "rta co",
+          "absolute_wall_ms": 1777912128876
+        },
+        {
+          "t": 6324064,
+          "pos": 321,
+          "del": "",
+          "ins": "l",
+          "absolute_wall_ms": 1777912130723
+        },
+        {
+          "t": 6325652,
+          "pos": 321,
+          "del": "",
+          "ins": "o",
+          "absolute_wall_ms": 1777912132311
+        },
+        {
+          "t": 6327101,
+          "pos": 323,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777912133760
+        },
+        {
+          "t": 6328777,
+          "pos": 323,
+          "del": " ",
+          "ins": " askdfhkjasdhfjkhaskjdfhjkahsdjkfhjkasdhfjkhasdjkhfjk",
+          "absolute_wall_ms": 1777912135436
+        },
+        {
+          "t": 6330396,
+          "pos": 376,
+          "del": "",
+          "ins": "ashdjkfhaksjdhfkjashdkjfhakjsdhfkhasjkdfhajksdhfjkahs",
+          "absolute_wall_ms": 1777912137055
+        },
+        {
+          "t": 6331765,
+          "pos": 429,
+          "del": "",
+          "ins": "djkfhajksdhfjkashdfjkhasjkdfhjkasdhjfhasjkd",
+          "absolute_wall_ms": 1777912138424
+        },
+        {
+          "t": 6333398,
+          "pos": 472,
+          "del": "",
+          "ins": "hfjkashdjkfhasjdkfhkjasdhfjkahsdjkfhasjkdhfjakshfdjk",
+          "absolute_wall_ms": 1777912140057
+        },
+        {
+          "t": 6334780,
+          "pos": 524,
+          "del": "",
+          "ins": "hsjkdhfkjashdfkjhaskjdfhjkasdhfjkashdjkfha",
+          "absolute_wall_ms": 1777912141439
+        },
+        {
+          "t": 6336502,
+          "pos": 566,
+          "del": "",
+          "ins": "sdjkfhjasdkhfkjhasdfkjhasdkjfhkajshfjkasdhfjkhsdjkfh",
+          "absolute_wall_ms": 1777912143161
+        },
+        {
+          "t": 6338110,
+          "pos": 618,
+          "del": "",
+          "ins": "adkjshfkjahsdfjkhaskjdhfkjasdhfkjashdfkjhasdkjfh",
+          "absolute_wall_ms": 1777912144768
+        },
+        {
+          "t": 6339704,
+          "pos": 666,
+          "del": "",
+          "ins": "aksjdhfkjashdfkjhjk",
+          "absolute_wall_ms": 1777912146363
+        },
+        {
+          "t": 6343901,
+          "pos": 685,
+          "del": "",
+          "ins": "asdhfj",
+          "absolute_wall_ms": 1777912150560
+        },
+        {
+          "t": 6345482,
+          "pos": 691,
+          "del": "",
+          "ins": "kshadkjfhajksdhfkjhasjkdfhjkahsdkhfjkashdjkf",
+          "absolute_wall_ms": 1777912152141
+        },
+        {
+          "t": 6347104,
+          "pos": 735,
+          "del": "",
+          "ins": "hajksdhfkjhasjdkfhjksdhfjkahs",
+          "absolute_wall_ms": 1777912153763
+        },
+        {
+          "t": 6351048,
+          "pos": 764,
+          "del": "",
+          "ins": "kj",
+          "absolute_wall_ms": 1777912157707
+        },
+        {
+          "t": 6352942,
+          "pos": 766,
+          "del": "",
+          "ins": "jkj    ",
+          "absolute_wall_ms": 1777912159600
+        },
+        {
+          "t": 6452742,
+          "pos": 773,
+          "del": "",
+          "ins": "\n\nasdjfh",
+          "absolute_wall_ms": 1777912259399
+        },
+        {
+          "t": 6487247,
+          "pos": 781,
+          "del": "",
+          "ins": "sadf",
+          "absolute_wall_ms": 1777912293904
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:31:33.702Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:31:37.414Z",
+      "updated_at": "2026-05-04T16:31:37.414Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000043",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 43,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjshdkjfhkasjdhf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 6546349,
+          "pos": 785,
+          "del": "",
+          "ins": " a",
+          "absolute_wall_ms": 1777912353005
+        },
+        {
+          "t": 6548014,
+          "pos": 787,
+          "del": "",
+          "ins": "fsdkjh",
+          "absolute_wall_ms": 1777912354670
+        },
+        {
+          "t": 6566664,
+          "pos": 793,
+          "del": "",
+          "ins": "sadkfjhkjsdhf",
+          "absolute_wall_ms": 1777912373319
+        },
+        {
+          "t": 6596193,
+          "pos": 806,
+          "del": "",
+          "ins": "dsfa",
+          "absolute_wall_ms": 1777912402848
+        },
+        {
+          "t": 6611226,
+          "pos": 810,
+          "del": "",
+          "ins": "asdf",
+          "absolute_wall_ms": 1777912417881
+        },
+        {
+          "t": 6622853,
+          "pos": 769,
+          "del": "    \n\nAsdjfhsadf afsdkjhsadkfjhkjsdhfdsfaasd",
+          "ins": "\n\nAsdjfhsadf afsdkjhsadkfjhkjsdhfdsfaasdfasdj",
+          "absolute_wall_ms": 1777912445118
+        },
+        {
+          "t": 6903156,
+          "pos": 0,
+          "del": "test\n\nAsdkjfhkadjsfhkjhkasdjfhkjkadjfhkjsadhfkjkasdhfkjkhsajdk\n\nasdfkjhkjhkjkskjadfhkjhkjhsakjdfhjkhasdjkfhkajsdhfjaskdfhjkasdhfjkh\n\nHello ajksdhfkj\n\nksjadhfjkhasdkjsadfjkhkjsdfsdfs\n\nAsfjkshadkjfhjksadhfsjkadhfjkashdkjfhjksadhfkjahsdjhfjkasdhfkjhasdkjfhjk\n\nThe southampton fc people are gokfdsjhated\n\nbet this is sorta cool askdfhkjasdhfjkhaskjdfhjkahsdjkfhjkasdhfjkhasdjkhfjkashdjkfhaksjdhfkjashdkjfhakjsdhfkhasjkdfhajksdhfjkahsdjkfhajksdhfjkashdfjkhasjkdfhjkasdhjfhasjkdhfjkashdjkfhasjdkfhkjasdhfjkahsdjkfhasjkdhfjakshfdjkhsjkdhfkjashdfkjhaskjdfhjkasdhfjkashdjkfhasdjkfhjasdkhfkjhasdfkjhasdkjfhkajshfjkasdhfjkhsdjkfhadkjshfkjahsdfjkhaskjdhfkjasdhfkjashdfkjhasdkjfhaksjdhfkjashdfkjhjkasdhfjkshadkjfhajksdhfkjhasjkdfhjkahsdkhfjkashdjkfhajksdhfkjhasjdkfhjksdhfjkahskjjkj\n\nAsdjfhsadf afsdkjhsadkfjhkjsdhfdsfaasdfasdjf",
+          "ins": "",
+          "absolute_wall_ms": 1777913668288
+        },
+        {
+          "t": 6908607,
+          "pos": 0,
+          "del": "",
+          "ins": "hello darkness",
+          "absolute_wall_ms": 1777913673739
+        },
+        {
+          "t": 7001809,
+          "pos": 28,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777913766940
+        },
+        {
+          "t": 7005757,
+          "pos": 28,
+          "del": "",
+          "ins": " i’ve come to",
+          "absolute_wall_ms": 1777913770888
+        },
+        {
+          "t": 7010950,
+          "pos": 41,
+          "del": "",
+          "ins": " talk",
+          "absolute_wall_ms": 1777913776081
+        },
+        {
+          "t": 7022346,
+          "pos": 59,
+          "del": "",
+          "ins": "fds",
+          "absolute_wall_ms": 1777913787477
+        },
+        {
+          "t": 7030016,
+          "pos": 62,
+          "del": "",
+          "ins": "kajshkdjshdkj",
+          "absolute_wall_ms": 1777913795147
+        },
+        {
+          "t": 7032614,
+          "pos": 75,
+          "del": "",
+          "ins": "fhkasjdhf",
+          "absolute_wall_ms": 1777913797745
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T16:56:36.284Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T16:56:40.439Z",
+      "updated_at": "2026-05-04T16:56:40.439Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000044",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 44,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 7502197,
+          "pos": 84,
+          "del": "",
+          "ins": "alksdjf",
+          "absolute_wall_ms": 1777914267341
+        },
+        {
+          "t": 7504026,
+          "pos": 91,
+          "del": "",
+          "ins": "klj",
+          "absolute_wall_ms": 1777914269169
+        },
+        {
+          "t": 7513796,
+          "pos": 70,
+          "del": "",
+          "ins": "asdf",
+          "absolute_wall_ms": 1777914288988
+        },
+        {
+          "t": 7519704,
+          "pos": 74,
+          "del": "",
+          "ins": "kj",
+          "absolute_wall_ms": 1777914294897
+        },
+        {
+          "t": 7529844,
+          "pos": 108,
+          "del": "",
+          "ins": "\n\nhello",
+          "absolute_wall_ms": 1777914305036
+        },
+        {
+          "t": 7537151,
+          "pos": 110,
+          "del": "h",
+          "ins": "H",
+          "absolute_wall_ms": 1777914312343
+        },
+        {
+          "t": 7542737,
+          "pos": 115,
+          "del": "",
+          "ins": " but why isn’t it showing up",
+          "absolute_wall_ms": 1777914317929
+        },
+        {
+          "t": 8178033,
+          "pos": 143,
+          "del": "",
+          "ins": "adsf",
+          "absolute_wall_ms": 1777914953178
+        },
+        {
+          "t": 8183749,
+          "pos": 147,
+          "del": "",
+          "ins": "asdf",
+          "absolute_wall_ms": 1777914973873
+        },
+        {
+          "t": 8188397,
+          "pos": 151,
+          "del": "",
+          "ins": "asdf",
+          "absolute_wall_ms": 1777914978521
+        },
+        {
+          "t": 8190092,
+          "pos": 155,
+          "del": "",
+          "ins": "asfdasdf",
+          "absolute_wall_ms": 1777914980215
+        },
+        {
+          "t": 8200288,
+          "pos": 163,
+          "del": "",
+          "ins": "\n\nhello ",
+          "absolute_wall_ms": 1777914990411
+        },
+        {
+          "t": 8206644,
+          "pos": 170,
+          "del": " ",
+          "ins": " the",
+          "absolute_wall_ms": 1777914996768
+        },
+        {
+          "t": 8208349,
+          "pos": 174,
+          "del": "",
+          "ins": " goat is me",
+          "absolute_wall_ms": 1777914998472
+        },
+        {
+          "t": 8221907,
+          "pos": 185,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777915012031
+        },
+        {
+          "t": 8223692,
+          "pos": 185,
+          "del": " ",
+          "ins": " t",
+          "absolute_wall_ms": 1777915013815
+        },
+        {
+          "t": 8230660,
+          "pos": 187,
+          "del": "",
+          "ins": "jksafh",
+          "absolute_wall_ms": 1777915020783
+        },
+        {
+          "t": 8246792,
+          "pos": 193,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777915036915
+        },
+        {
+          "t": 8248713,
+          "pos": 194,
+          "del": "",
+          "ins": "red",
+          "absolute_wall_ms": 1777915038836
+        },
+        {
+          "t": 8566487,
+          "pos": 197,
+          "del": "",
+          "ins": "asdkfhkj",
+          "absolute_wall_ms": 1777915356607
+        },
+        {
+          "t": 8568176,
+          "pos": 205,
+          "del": "",
+          "ins": "h",
+          "absolute_wall_ms": 1777915358296
+        },
+        {
+          "t": 8570125,
+          "pos": 206,
+          "del": "",
+          "ins": "kjhaksjdhfkjahs",
+          "absolute_wall_ms": 1777915360245
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:22:39.749Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:22:45.105Z",
+      "updated_at": "2026-05-04T17:22:45.105Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000045",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 45,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8580081,
+          "pos": 221,
+          "del": "",
+          "ins": "\n\nhello",
+          "absolute_wall_ms": 1777915370201
+        },
+        {
+          "t": 8581650,
+          "pos": 223,
+          "del": "h",
+          "ins": "H",
+          "absolute_wall_ms": 1777915371770
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:22:52.762Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:22:55.495Z",
+      "updated_at": "2026-05-04T17:22:55.495Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000046",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 46,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8591132,
+          "pos": 228,
+          "del": "",
+          "ins": " m",
+          "absolute_wall_ms": 1777915381252
+        },
+        {
+          "t": 8593181,
+          "pos": 230,
+          "del": "",
+          "ins": "y name",
+          "absolute_wall_ms": 1777915383301
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:23:01.747Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:23:06.514Z",
+      "updated_at": "2026-05-04T17:23:06.514Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000047",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 47,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8627221,
+          "pos": 236,
+          "del": "",
+          "ins": " h",
+          "absolute_wall_ms": 1777915417341
+        },
+        {
+          "t": 8629142,
+          "pos": 237,
+          "del": "h",
+          "ins": "si",
+          "absolute_wall_ms": 1777915419261
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:23:37.915Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:23:42.792Z",
+      "updated_at": "2026-05-04T17:23:42.792Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000048",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 48,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8641951,
+          "pos": 239,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777915432071
+        },
+        {
+          "t": 8643696,
+          "pos": 240,
+          "del": "",
+          "ins": "the ",
+          "absolute_wall_ms": 1777915433815
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:23:52.649Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:23:57.527Z",
+      "updated_at": "2026-05-04T17:23:57.527Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000049",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 49,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8913277,
+          "pos": 243,
+          "del": " ",
+          "ins": " goat",
+          "absolute_wall_ms": 1777915703394
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:28:23.378Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:28:27.885Z",
+      "updated_at": "2026-05-04T17:28:27.885Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000050",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 50,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat ",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8931451,
+          "pos": 248,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777915721567
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:28:41.316Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:28:45.779Z",
+      "updated_at": "2026-05-04T17:28:45.779Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000051",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 51,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8936449,
+          "pos": 248,
+          "del": " ",
+          "ins": " and",
+          "absolute_wall_ms": 1777915726566
+        },
+        {
+          "t": 8948559,
+          "pos": 252,
+          "del": "",
+          "ins": "fsd",
+          "absolute_wall_ms": 1777915738676
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:28:58.472Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:29:05.003Z",
+      "updated_at": "2026-05-04T17:29:05.003Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000052",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 52,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 8955723,
+          "pos": 255,
+          "del": "",
+          "ins": " h",
+          "absolute_wall_ms": 1777915745839
+        },
+        {
+          "t": 8957671,
+          "pos": 257,
+          "del": "",
+          "ins": "ello",
+          "absolute_wall_ms": 1777915747788
+        },
+        {
+          "t": 9113715,
+          "pos": 261,
+          "del": "",
+          "ins": " te",
+          "absolute_wall_ms": 1777915903829
+        },
+        {
+          "t": 9115386,
+          "pos": 264,
+          "del": "",
+          "ins": "st",
+          "absolute_wall_ms": 1777915905501
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:31:43.900Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:31:48.189Z",
+      "updated_at": "2026-05-04T17:31:48.189Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000053",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 53,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test more",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 9128262,
+          "pos": 266,
+          "del": "",
+          "ins": " mor",
+          "absolute_wall_ms": 1777915918377
+        },
+        {
+          "t": 9129931,
+          "pos": 270,
+          "del": "",
+          "ins": "e",
+          "absolute_wall_ms": 1777915920046
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:31:58.444Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:32:03.698Z",
+      "updated_at": "2026-05-04T17:32:03.698Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000054",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 54,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test more tetsadfk",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 9132948,
+          "pos": 271,
+          "del": "",
+          "ins": " ",
+          "absolute_wall_ms": 1777915923062
+        },
+        {
+          "t": 9134754,
+          "pos": 271,
+          "del": " ",
+          "ins": " tet",
+          "absolute_wall_ms": 1777915924868
+        },
+        {
+          "t": 9428683,
+          "pos": 275,
+          "del": "",
+          "ins": "sadfk",
+          "absolute_wall_ms": 1777916218795
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:36:58.667Z",
+      "focused": false,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:37:03.208Z",
+      "updated_at": "2026-05-04T17:37:03.208Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000055",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 55,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test more tetsadfkasfdasdf",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 9443999,
+          "pos": 280,
+          "del": "",
+          "ins": "asfd",
+          "absolute_wall_ms": 1777916234111
+        },
+        {
+          "t": 9447046,
+          "pos": 284,
+          "del": "",
+          "ins": "asdf",
+          "absolute_wall_ms": 1777916237157
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:37:17.042Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:37:21.869Z",
+      "updated_at": "2026-05-04T17:37:21.869Z"
+    },
+    {
+      "id": "Joe:assignment_29c33975ea644515:00000056",
+      "tenant_id": "tenant_demo",
+      "live_session_id": "Joe:assignment_29c33975ea644515",
+      "replay_session_id": "replay:Joe:assignment_29c33975ea644515",
+      "assignment_id": "assignment_29c33975ea644515",
+      "student_name": "Joe",
+      "seq": 56,
+      "current_text": "hello darkness my old friend i’ve come to talk to you agianfdskajshkdjasdfkjshdkjfhkasjdhfalksdjfkljlaksdjkf\n\nHello but why isn’t it showing upadsfasdfasdfasfdasdf\n\nhello the goat is me tjksafh redasdkfhkjhkjhaksjdhfkjahs\n\nHello my name si the goat andfsd hello test more tetsadfkasfdasdfkadsfh",
+      "current_url": null,
+      "current_url_title": null,
+      "document_history_tail": [
+        {
+          "t": 9469405,
+          "pos": 288,
+          "del": "",
+          "ins": "kadsfh",
+          "absolute_wall_ms": 1777916259517
+        }
+      ],
+      "url_history_tail": [],
+      "last_activity_at": "2026-05-04T17:37:39.401Z",
+      "focused": true,
+      "hid_active": true,
+      "created_at": "2026-05-04T17:37:42.782Z",
+      "updated_at": "2026-05-04T17:37:42.782Z"
+    }
+  ],
+  "last_seq": 56
+}

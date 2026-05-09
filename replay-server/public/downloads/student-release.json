@@ -1,0 +1,21 @@
+{
+  "studentReleaseId": "0.1.1-20260508.1858-webview-compat-windows-signed",
+  "version": "0.1.1",
+  "downloads": {
+    "macosAppleSilicon": {
+      "href": "/downloads/Handtyped-EDU-Student-macos.dmg",
+      "filename": "Handtyped-EDU-Student-macos.dmg",
+      "sha256": "cbe09ac054f3cc5e6cc8e79757829fd5448b1d2bb9fff08d55597a83aef8ab93"
+    },
+    "macosIntel": {
+      "href": "/downloads/Handtyped-EDU-Student-macos-intel.dmg",
+      "filename": "Handtyped-EDU-Student-macos-intel.dmg",
+      "sha256": "cbe09ac054f3cc5e6cc8e79757829fd5448b1d2bb9fff08d55597a83aef8ab93"
+    },
+    "windowsX64": {
+      "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
+      "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
+      "sha256": "c5670ae695ae457ada8d16bd34415499440e8dd14e7c35865905bfc7abb48514"
+    }
+  }
+}

@@ -55,7 +55,7 @@ function targetFromMacArchitecture(architecture, confidence = 'high') {
 export function detectMacTargetFromRenderer(renderer) {
   const normalized = normalize(renderer)
   if (!normalized) return null
-  if (/\bapple\b|apple gpu|apple m\d/.test(normalized) && !/intel|amd|radeon|nvidia/.test(normalized)) {
+  if (/\bapple silicon\b|\bapple m\d/.test(normalized) && !/intel|amd|radeon|nvidia/.test(normalized)) {
     return { key: 'macosAppleSilicon', confidence: 'medium', source: 'webgl-renderer' }
   }
   if (/intel|amd|radeon|nvidia/.test(normalized)) {
@@ -107,6 +107,9 @@ function targetFromUserAgent(navigatorLike) {
   if (combined.includes('windows')) {
     return { key: 'windowsX64', confidence: 'high', source: 'user-agent' }
   }
+  if (platform.includes('macintel')) {
+    return { key: 'macosIntel', confidence: 'low', source: 'user-agent' }
+  }
   if (combined.includes('macintosh') || combined.includes('mac os') || combined.includes('macintel')) {
     return { key: DEFAULT_DOWNLOAD_KEY, confidence: 'low', source: 'user-agent' }
   }
@@ -121,7 +124,7 @@ export async function detectStudentDownloadTarget(environment = globalThis) {
   const userAgentTarget = targetFromUserAgent(navigatorLike)
   if (userAgentTarget?.key === 'windowsX64') return userAgentTarget
 
-  if (userAgentTarget?.key === DEFAULT_DOWNLOAD_KEY) {
+  if (userAgentTarget?.key === 'macosAppleSilicon' || userAgentTarget?.key === 'macosIntel') {
     const renderer = typeof environment.webglRenderer === 'function'
       ? environment.webglRenderer()
       : environment.webglRenderer || readWebglRenderer(environment.document || globalThis.document)

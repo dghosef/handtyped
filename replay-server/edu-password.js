@@ -30,7 +30,7 @@ export function buildTeacherPasswordFields(input = {}) {
     }
   }
 
-  const rawPassword = input.password ?? input.access_code ?? 'handtyped-edu'
+  const rawPassword = input.password ?? input.access_code ?? ''
   const salt = generateTeacherPasswordSalt()
   return {
     password_hash: hashTeacherPassword(rawPassword, salt),

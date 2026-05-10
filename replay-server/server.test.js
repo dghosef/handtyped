@@ -13,6 +13,8 @@ const REPLAY_ATTESTATION_FORMAT_V1 = 'handtyped-replay-attestation-v1'
 const REPLAY_ATTESTATION_FORMAT_V2 = 'handtyped-replay-attestation-v2'
 const ED25519_SPKI_PREFIX_HEX = '302a300506032b6570032100'
 const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
 
 function shortId(length = 16) {
   const bytes = new Uint8Array(24)
@@ -54,14 +56,36 @@ async function request(method, path, body, headers = {}) {
   return { status: res.status, body: json }
 }
 
+let passwordTeacherReady = false
+
+async function ensurePasswordTeacher() {
+  if (passwordTeacherReady) {
+    return
+  }
+  const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Actual Teacher',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
+    }),
+  })
+  if (res.status !== 201 && res.status !== 400) {
+    throw new Error(`Could not create test teacher account: ${res.status}`)
+  }
+  passwordTeacherReady = true
+}
+
 async function teacherLogin() {
+  await ensurePasswordTeacher()
   const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'password',
-      email: 'teacher@edu.handtyped.app',
-      password: 'handtyped-edu',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
     }),
   })
   return {
@@ -214,6 +238,15 @@ beforeAll(async () => {
     googleClientId: 'test-google-client-id',
     googleTokenVerifier: async (credential) => {
       if (credential !== 'valid-google-credential') {
+        if (credential === 'new-google-teacher-credential') {
+          return {
+            sub: 'google-new-teacher',
+            email: 'new-google-teacher@edu.handtyped.app',
+            email_verified: true,
+            aud: 'test-google-client-id',
+            name: 'New Google Teacher',
+          }
+        }
         if (credential !== 'valid-google-credential-2') {
           throw new Error('invalid google credential')
         }
@@ -285,7 +318,7 @@ describe('teacher auth', () => {
     expect(result.cookie).toContain('edu_teacher_session=')
     expect(result.body).toMatchObject({
       authenticated: true,
-      teacher_email: 'teacher@edu.handtyped.app',
+      teacher_email: TEST_TEACHER_EMAIL,
       provider: 'password',
     })
   })
@@ -303,21 +336,120 @@ describe('teacher auth', () => {
     const body = await res.json()
 
     expect(res.status).toBe(201)
-    expect(res.headers.get('set-cookie') || '').toContain('edu_teacher_session=')
+    const cookie = res.headers.get('set-cookie') || ''
+    expect(cookie).toContain('edu_teacher_session=')
     expect(body).toMatchObject({
       authenticated: true,
       teacher_email: 'signup-teacher@edu.handtyped.app',
       provider: 'password',
     })
+    expect(body.tenant_id).toMatch(/^tenant_/)
+    expect(body.tenant_id).not.toBe('tenant_demo')
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, { Cookie: cookie })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body).toMatchObject({
+      classrooms: [],
+      assignments: [],
+    })
+
+    const classrooms = await request('GET', '/api/edu/classrooms', undefined, { Cookie: cookie })
+    expect(classrooms.status).toBe(200)
+    expect(classrooms.body).toEqual([])
+  })
+
+  it('rejects duplicate classroom join codes across teacher accounts', async () => {
+    const firstSignup = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'First Teacher',
+        email: `first-${shortId(6).toLowerCase()}@edu.handtyped.app`,
+        password: 'longenoughpassword',
+      }),
+    })
+    expect(firstSignup.status).toBe(201)
+    const firstCookie = firstSignup.headers.get('set-cookie') || ''
+
+    const secondSignup = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Second Teacher',
+        email: `second-${shortId(6).toLowerCase()}@edu.handtyped.app`,
+        password: 'longenoughpassword',
+      }),
+    })
+    expect(secondSignup.status).toBe(201)
+    const secondCookie = secondSignup.headers.get('set-cookie') || ''
+
+    const joinCode = `GLB${shortId(5)}`
+    const firstClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: 'First Global Join Code', join_code: joinCode },
+      { Cookie: firstCookie },
+    )
+    expect(firstClassroom.status).toBe(201)
+
+    const duplicateClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: 'Second Global Join Code', join_code: joinCode.toLowerCase() },
+      { Cookie: secondCookie },
+    )
+    expect(duplicateClassroom.status).toBe(409)
+    expect(duplicateClassroom.body).toMatchObject({
+      error: 'Join code already in use',
+      join_code: joinCode.toUpperCase(),
+    })
+  })
+
+  it('generates unused classroom join codes when teachers leave them blank', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const firstClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: `Generated Code ${shortId(6)}` },
+      { Cookie: login.cookie },
+    )
+    expect(firstClassroom.status).toBe(201)
+    expect(firstClassroom.body.join_code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(firstClassroom.body.join_code).not.toBe('JOINME')
+
+    const secondClassroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: `Generated Blank Code ${shortId(6)}`, join_code: '   ' },
+      { Cookie: login.cookie },
+    )
+    expect(secondClassroom.status).toBe(201)
+    expect(secondClassroom.body.join_code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(secondClassroom.body.join_code).not.toBe(firstClassroom.body.join_code)
+    expect(secondClassroom.body.join_code).not.toBe('JOINME')
   })
 
   it('rejects duplicate teacher signup emails', async () => {
-    const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+    const duplicateEmail = `duplicate-${shortId(6).toLowerCase()}@edu.handtyped.app`
+    const first = await fetch(`${baseUrl}/api/edu/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Teacher',
-        email: 'teacher@edu.handtyped.app',
+        email: duplicateEmail,
+        password: 'longenoughpassword',
+      }),
+    })
+    expect(first.status).toBe(201)
+
+    const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Teacher Again',
+        email: duplicateEmail,
         password: 'longenoughpassword',
       }),
     })
@@ -346,6 +478,37 @@ describe('teacher auth', () => {
       authenticated: true,
       teacher_email: 'teacher@edu.handtyped.app',
       provider: 'google',
+    })
+  })
+
+  it('creates a private teacher account from a verified Google login when no teacher exists yet', async () => {
+    const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'google',
+        credential: 'new-google-teacher-credential',
+      }),
+    })
+    const body = await res.json()
+    const cookie = res.headers.get('set-cookie') || ''
+
+    expect(res.status).toBe(200)
+    expect(cookie).toContain('edu_teacher_session=')
+    expect(body).toMatchObject({
+      authenticated: true,
+      teacher_email: 'new-google-teacher@edu.handtyped.app',
+      teacher_name: 'New Google Teacher',
+      provider: 'google',
+    })
+    expect(body.tenant_id).toMatch(/^tenant_/)
+    expect(body.tenant_id).not.toBe('tenant_demo')
+
+    const dashboard = await request('GET', '/api/edu/dashboard', undefined, { Cookie: cookie })
+    expect(dashboard.status).toBe(200)
+    expect(dashboard.body).toMatchObject({
+      classrooms: [],
+      assignments: [],
     })
   })
 
@@ -443,7 +606,7 @@ describe('edu teacher and student flow', () => {
     expect(login.status).toBe(200)
     expect(login.body).toMatchObject({
       authenticated: true,
-      teacher_email: 'teacher@edu.handtyped.app',
+      teacher_email: TEST_TEACHER_EMAIL,
     })
 
     const createClassroom = await request(
@@ -572,6 +735,76 @@ describe('edu teacher and student flow', () => {
       id: replayId,
       student_name: 'Ada',
       assignment_title: 'Hamlet timed write',
+    })
+  })
+
+  it('falls back to live session snapshots when a teacher opens a missing replay record', async () => {
+    const login = await teacherLogin()
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      { name: 'Live replay fallback', join_code: `LRF${shortId(5)}` },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        classroom_id: classroom.body.id,
+        title: 'Fallback draft',
+        course: 'English 11',
+        classroom_name: classroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const liveSessionId = `fallback-student-${shortId(6)}`
+    const documentHistory = [{ t: 1_000, ins: 'Recovered from live snapshot.', del: '', pos: 0 }]
+    const livePublish = await request('POST', '/api/edu/live-sessions', {
+      id: liveSessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada',
+      current_text: 'Recovered from live snapshot.',
+      document_history: documentHistory,
+      focus_events: [{ t: 1_000, state: 'focused' }],
+      url_history: [{ at: '2026-04-27T12:00:00Z', url: 'https://example.test/draft' }],
+      violation_count: 0,
+      violations: [{ kind: 'blocked-url', at: '2026-04-27T12:00:02Z' }],
+      last_activity_at: '2026-04-27T12:00:00Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+      replay_session_id: `replay:${liveSessionId}`,
+    })
+    expect(livePublish.status).toBe(201)
+
+    const prefixedReplayRead = await request('GET', `/api/edu/replays/replay:${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(prefixedReplayRead.status).toBe(200)
+    expect(prefixedReplayRead.body).toMatchObject({
+      id: `replay:${liveSessionId}`,
+      live_session_id: liveSessionId,
+      student_name: 'Ada',
+      current_text: 'Recovered from live snapshot.',
+      document_history: documentHistory,
+      assignment: expect.objectContaining({ id: assignment.body.id }),
+    })
+
+    const directReplayRead = await request('GET', `/api/edu/replays/${liveSessionId}`, undefined, {
+      Cookie: login.cookie,
+    })
+    expect(directReplayRead.status).toBe(200)
+    expect(directReplayRead.body).toMatchObject({
+      id: liveSessionId,
+      live_session_id: liveSessionId,
+      current_text: 'Recovered from live snapshot.',
     })
   })
 
@@ -725,6 +958,7 @@ describe('edu teacher and student flow', () => {
         classroom_id: classroom.body.id,
         classroom_name: classroom.body.name,
         prompt: 'Draft quickly and revise from teacher feedback.',
+        policy: { allow_offline_editing: false },
         rubric: [
           { id: 'claim', title: 'Claim', description: 'Clear argument', points: 4 },
           { id: 'evidence', title: 'Evidence', description: 'Specific support', points: 4 },
@@ -896,6 +1130,7 @@ describe('edu teacher and student flow', () => {
       hid_active: true,
     })
     expect(firstPublish.status).toBe(201)
+    expect(firstPublish.body.tenant_id).toBe(assignment.body.tenant_id)
 
     const firstDashboard = await request('GET', '/api/edu/dashboard', undefined, {
       Cookie: login.cookie,
@@ -1005,6 +1240,7 @@ describe('edu teacher and student flow', () => {
         classroom_id: classroom.body.id,
         classroom_name: classroom.body.name,
         prompt: 'Verify teacher feedback survives round-trips.',
+        policy: { allow_offline_editing: false },
         rubric: [
           { id: 'idea', title: 'Idea', description: 'Clear controlling idea', points: 4 },
         ],
@@ -1171,6 +1407,7 @@ describe('edu teacher and student flow', () => {
         classroom_id: classroom.body.id,
         classroom_name: classroom.body.name,
         prompt: 'Revise your claim and connect each piece of evidence back to it.',
+        policy: { allow_offline_editing: false },
       },
       { Cookie: login.cookie },
     )
@@ -1209,6 +1446,7 @@ describe('edu teacher and student flow', () => {
         grade_score: 79,
         inline_annotations: [
           {
+            id: 'comment-1',
             type: 'comment',
             start: 0,
             end: 9,
@@ -1216,6 +1454,7 @@ describe('edu teacher and student flow', () => {
             note: 'Open with the actual argument instead.',
           },
           {
+            id: 'suggestion-1',
             type: 'suggestion',
             start: 27,
             end: 41,
@@ -1228,6 +1467,17 @@ describe('edu teacher and student flow', () => {
       { Cookie: login.cookie },
     )
     expect(grading.status).toBe(200)
+
+    const resolution = await request(
+      'POST',
+      `/api/edu/student/assignments/${assignment.body.id}/feedback-resolutions`,
+      {
+        join_code: joinCode,
+        student_name: 'Ada Lovelace',
+        annotation_key: 'id:comment-1',
+      },
+    )
+    expect(resolution.status).toBe(200)
 
     const adaConfig = await request(
       'GET',
@@ -1246,11 +1496,15 @@ describe('edu teacher and student flow', () => {
             grade_score: '79',
             inline_annotations: expect.arrayContaining([
               expect.objectContaining({
+                id: 'comment-1',
                 type: 'comment',
                 quote: 'The draft',
                 note: 'Open with the actual argument instead.',
+                resolved_by_student: true,
+                resolved_by: 'Ada Lovelace',
               }),
               expect.objectContaining({
+                id: 'suggestion-1',
                 type: 'suggestion',
                 quote: 'stronger claim',
                 replacement: 'clear thesis',
@@ -1268,6 +1522,37 @@ describe('edu teacher and student flow', () => {
     )
     expect(graceConfig.status).toBe(200)
     expect(graceConfig.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback: null,
+        }),
+      ]),
+    )
+
+    const deletedFeedback = await request(
+      'DELETE',
+      `/api/edu/live-sessions/${liveSessionId}/grading`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(deletedFeedback.status).toBe(200)
+    expect(deletedFeedback.body.grading).toMatchObject({
+      teacher_comment: '',
+      returned_for_revision: false,
+      grade_label: '',
+      grade_score: null,
+      inline_annotations: [],
+      feedback_status: 'draft',
+      published_at: null,
+    })
+
+    const adaConfigAfterDelete = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(adaConfigAfterDelete.status).toBe(200)
+    expect(adaConfigAfterDelete.body.assignments).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: assignment.body.id,
@@ -1739,6 +2024,92 @@ describe('edu teacher and student flow', () => {
         }),
       ]),
     )
+  })
+
+  it('returns the latest linked assignment draft in student assignment payloads', async () => {
+    const joinCode = `LNK${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Linked Drafts',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const priorAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Test Suggestions',
+        course: 'Linked Literature',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Write your first draft.',
+      },
+      { Cookie: login.cookie },
+    )
+    expect(priorAssignment.status).toBe(201)
+
+    const linkedAssignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Revision',
+        course: 'Linked Literature',
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        prompt: 'Revise with access to the latest draft.',
+        linked_assignment_ids: [priorAssignment.body.id],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(linkedAssignment.status).toBe(201)
+
+    const latestDraft = 'The linked draft now has the newest saved claim.'
+    expect(
+      await request('POST', '/api/edu/live-sessions', {
+        id: 'linked-latest:ada',
+        assignment_id: priorAssignment.body.id,
+        assignment_title: priorAssignment.body.title,
+        course: priorAssignment.body.course,
+        classroom: classroom.body.name,
+        student_name: 'Ada Lovelace',
+        current_text: latestDraft,
+        document_history: [{ op: 'insert', text: latestDraft }],
+        current_url: null,
+        current_url_title: null,
+        url_history: [],
+        violation_count: 0,
+        violations: [],
+        last_activity_at: '2026-04-28T12:02:00Z',
+        schedule_open: true,
+        focused: true,
+        hid_active: true,
+      }),
+    ).toMatchObject({ status: 201 })
+
+    const payload = await request(
+      'GET',
+      `/api/edu/student/assignments/${linkedAssignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+
+    expect(payload.status).toBe(200)
+    expect(payload.body.linked_references).toEqual([
+      expect.objectContaining({
+        assignment_id: priorAssignment.body.id,
+        title: 'Test Suggestions',
+        available: true,
+        markdown: latestDraft,
+        word_count: 9,
+      }),
+    ])
   })
 
   it('allows creating assignments without an essay prompt', async () => {
@@ -2325,6 +2696,35 @@ describe('per-student assignment extensions', () => {
       ]),
     )
 
+    const feedbackRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'Please check my thesis.',
+      },
+    )
+    expect(feedbackRequest.status).toBe(201)
+    expect(feedbackRequest.body.student_feedback_request).toMatchObject({
+      student_name: 'Ada Lovelace',
+      note: 'Please check my thesis.',
+    })
+
+    const feedbackDashboard = await request('GET', '/api/edu/dashboard', undefined, {
+      Cookie: login.cookie,
+    })
+    expect(feedbackDashboard.status).toBe(200)
+    expect(feedbackDashboard.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback_requests: expect.objectContaining({
+            'ada lovelace': expect.objectContaining({ student_name: 'Ada Lovelace' }),
+          }),
+        }),
+      ]),
+    )
+
     const approvedUntil = '2026-04-28T18:30:00.000Z'
     const approvedAssignment = await request(
       'PUT',
@@ -2353,6 +2753,122 @@ describe('per-student assignment extensions', () => {
         }),
       ]),
     )
+  })
+
+  it('clears feedback requests when dismissed or when a newer student draft syncs', async () => {
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Feedback Lifecycle Local',
+        teacher_name: 'Ms. Keating',
+        join_code: `FBC${shortId(5)}`,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: `Feedback Lifecycle ${shortId(4)}`,
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const firstRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'Duplicate request.',
+      },
+    )
+    expect(firstRequest.status).toBe(201)
+
+    const dismiss = await request(
+      'DELETE',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests/${encodeURIComponent('Ada Lovelace')}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(dismiss.status).toBe(200)
+    expect(dismiss.body).toMatchObject({
+      assignment_id: assignment.body.id,
+      dismissed: true,
+      student_name: 'Ada Lovelace',
+      student_feedback_request: null,
+    })
+    expect(dismiss.body.assignment.student_feedback_requests).not.toHaveProperty('ada lovelace')
+
+    const secondRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/feedback-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'Please review this version.',
+      },
+    )
+    expect(secondRequest.status).toBe(201)
+
+    const sessionId = `feedback-local:${assignment.body.id}`
+    const staleSync = await request('POST', '/api/edu/live-sessions', {
+      id: sessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'Older draft sync.',
+      document_history: [{ op: 'insert', text: 'Older draft sync.' }],
+      last_activity_at: '2026-04-27T12:00:00.000Z',
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(staleSync.status).toBe(201)
+
+    const afterStaleSync = await request('GET', '/api/edu/dashboard', undefined, { Cookie: login.cookie })
+    expect(afterStaleSync.status).toBe(200)
+    expect(afterStaleSync.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          student_feedback_requests: expect.objectContaining({
+            'ada lovelace': expect.objectContaining({ note: 'Please review this version.' }),
+          }),
+        }),
+      ]),
+    )
+
+    const newerSync = await request('POST', '/api/edu/live-sessions', {
+      id: sessionId,
+      assignment_id: assignment.body.id,
+      assignment_title: assignment.body.title,
+      course: assignment.body.course,
+      classroom: classroom.body.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'New draft after request.',
+      document_history: [{ op: 'insert', text: 'New draft after request.' }],
+      last_activity_at: new Date(Date.now() + 1000).toISOString(),
+      schedule_open: true,
+      focused: true,
+      hid_active: true,
+    })
+    expect(newerSync.status).toBe(201)
+
+    const afterNewerSync = await request('GET', '/api/edu/dashboard', undefined, { Cookie: login.cookie })
+    expect(afterNewerSync.status).toBe(200)
+    const dashboardAssignment = afterNewerSync.body.assignments.find((item) => item.id === assignment.body.id)
+    expect(dashboardAssignment.student_feedback_requests).not.toHaveProperty('ada lovelace')
   })
 
   it('approves a student request into the normal class window when the assignment is already open', async () => {
@@ -2426,6 +2942,138 @@ describe('per-student assignment extensions', () => {
         }),
       ]),
     )
+  })
+
+  it('requires teacher approval before a student can rejoin after leaving a protected assignment', async () => {
+    const joinCode = `REJ${shortId(5)}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: 'Protected Rejoin',
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const openUntil = '2099-01-01T23:59:59.000Z'
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: 'Protected draft',
+        course: classroom.body.name,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        assigned_students: ['Ada Lovelace'],
+        temporary_access_until: openUntil,
+        policy: {
+          require_lockdown: true,
+          require_permission_to_rejoin: true,
+        },
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const beforeLeave = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(beforeLeave.status).toBe(200)
+    expect(beforeLeave.body).toMatchObject({
+      schedule_open: true,
+      assignment: {
+        access_revoked: false,
+        policy: { require_permission_to_rejoin: true },
+      },
+    })
+
+    const close = await request(
+      'POST',
+      `/api/edu/student/assignments/${assignment.body.id}/close`,
+      {
+        join_code: joinCode,
+        student_name: 'Ada Lovelace',
+      },
+    )
+    expect(close.status).toBe(201)
+    expect(close.body).toMatchObject({
+      recorded: true,
+      access_revoked: true,
+      student_name: 'Ada Lovelace',
+    })
+
+    const blockedRejoin = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(blockedRejoin.status).toBe(200)
+    expect(blockedRejoin.body).toMatchObject({
+      schedule_open: false,
+      session_end_at: null,
+      assignment: {
+        access_revoked: true,
+        policy: { require_permission_to_rejoin: true },
+      },
+    })
+
+    const accessRequest = await request(
+      'POST',
+      `/api/edu/assignments/${assignment.body.id}/access-requests`,
+      {
+        student_name: 'Ada Lovelace',
+        note: 'I accidentally left Handtyped.',
+      },
+    )
+    expect(accessRequest.status).toBe(201)
+
+    const waitingForApproval = await request(
+      'GET',
+      `/api/edu/student/config?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(waitingForApproval.status).toBe(200)
+    expect(waitingForApproval.body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: assignment.body.id,
+          access_revoked: true,
+          student_access_request: expect.objectContaining({
+            student_name: 'Ada Lovelace',
+            note: 'I accidentally left Handtyped.',
+          }),
+        }),
+      ]),
+    )
+
+    const approved = await request(
+      'PUT',
+      `/api/edu/assignments/${assignment.body.id}`,
+      {
+        student_access_revoked: {},
+        student_access_requests: {},
+      },
+      { Cookie: login.cookie },
+    )
+    expect(approved.status).toBe(200)
+
+    const afterApproval = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(afterApproval.status).toBe(200)
+    expect(afterApproval.body).toMatchObject({
+      schedule_open: true,
+      assignment: {
+        access_revoked: false,
+        student_access_request: null,
+      },
+    })
   })
 
   it('surfaces per-student instant access revocation in student config', async () => {
@@ -2564,7 +3212,11 @@ describe('per-student assignment extensions', () => {
         }),
       ]),
     )
-    expect(summaries.body.live_sessions[0].document_history).toBeUndefined()
+    expect(summaries.body.live_sessions[0].document_history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ins: 'Draft' }),
+      ]),
+    )
     expect(summaries.body.live_sessions[0].url_history).toHaveLength(4)
 
     const studentAssignment = await request(

@@ -12,6 +12,7 @@ import {
   buildTeacher,
   buildTeacherAuthSession,
   buildTeacherSessionRecord,
+  EDU_EDITOR_FONT_FAMILIES,
 } from "./edu-schema.js";
 import {
   buildAssignmentAuditRecord,
@@ -134,7 +135,7 @@ describe("generated edu schema matrix", () => {
   [
     { email: "TEACHER@EDU.HANDTYPED.APP", expected: "teacher@edu.handtyped.app" },
     { email: " teacher@edu.handtyped.app ", expected: "teacher@edu.handtyped.app" },
-    { email: "", expected: "teacher@edu.handtyped.app" },
+    { email: "", expected: "" },
     { email: "person@example.org", expected: "person@example.org" },
   ].forEach((value, index) => {
     it(`buildTeacher normalization ${index + 1}`, () => {
@@ -208,7 +209,7 @@ describe("generated edu schema matrix", () => {
           });
           expect(assignment.policy.allow_offline_editing).toBe(policy.allow_offline_editing);
           expect(assignment.policy.require_lockdown).toBe(policy.require_lockdown);
-          expect(["arial", "serif", "sans", "mono"]).toContain(assignment.editor_policy.font_family);
+          expect(EDU_EDITOR_FONT_FAMILIES).toContain(assignment.editor_policy.font_family);
           expect(assignment.editor_policy.font_size).toBeGreaterThanOrEqual(10);
           expect(assignment.editor_policy.font_size).toBeLessThanOrEqual(100);
           expect(["compact", "single", "relaxed", "one-half", "double"]).toContain(assignment.editor_policy.line_height);
@@ -389,7 +390,7 @@ describe("generated student config matrix", () => {
                 assignedStudents.some((name) => name.toLowerCase() === normalizedStudent)
               );
               if (!joinMatches) {
-                expect(result).toEqual({ classroom: null, assignments: [] });
+                expect(result).toEqual({ classroom: null, canonical_student_name: null, assignments: [] });
                 return;
               }
               expect(result.classroom?.id).toBe(classroom.id);
@@ -446,6 +447,56 @@ describe("generated student config matrix", () => {
       if (value.expectAssignment) {
         expect(result.assignment.student_feedback?.grade_label).toBe("A-");
       }
+    });
+  });
+
+  it("buildStudentConfig preserves persisted student feedback when no live session is present", async () => {
+    const classroom = baseClassroom();
+    const assignment = baseAssignment({
+      student_feedback: {
+        teacher_comment: "Persisted teacher comment.",
+        returned_for_revision: true,
+      },
+    });
+    const store = makeStore({
+      classrooms: [classroom],
+      assignments: [assignment],
+      liveSessions: [],
+    });
+    const result = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: "Ada Lovelace",
+    });
+
+    expect(result.assignments).toHaveLength(1);
+    expect(result.assignments[0].student_feedback).toMatchObject({
+      teacher_comment: "Persisted teacher comment.",
+      returned_for_revision: true,
+    });
+  });
+
+  it("buildStudentAssignmentConfig preserves persisted student feedback when no live session is present", async () => {
+    const classroom = baseClassroom();
+    const assignment = baseAssignment({
+      student_feedback: {
+        teacher_comment: "Persisted teacher comment.",
+        grade_label: "Revise",
+      },
+    });
+    const store = makeStore({
+      classrooms: [classroom],
+      assignments: [assignment],
+      liveSessions: [],
+    });
+    const result = await buildStudentAssignmentConfig(store, {
+      assignmentId: assignment.id,
+      joinCode: classroom.join_code,
+      studentName: "Ada Lovelace",
+    });
+
+    expect(result.assignment?.student_feedback).toMatchObject({
+      teacher_comment: "Persisted teacher comment.",
+      grade_label: "Revise",
     });
   });
 });

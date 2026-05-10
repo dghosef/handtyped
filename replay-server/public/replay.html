@@ -19,8 +19,6 @@
       --timeline-inactive: #b94d46;
       --timeline-inactive-dark: #923631;
       --timeline-inactive-bg: #efe5e1;
-      --timeline-jump: #d39a21;
-      --timeline-jump-dark: #8b6400;
       --line: #dddddd;
       --panel: #ffffff;
       --panel-strong: #f3f3f3;
@@ -251,41 +249,6 @@
       box-shadow: inset 0 0 0 1px rgba(255, 221, 208, 0.12);
     }
 
-    .timeline-key {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 12px;
-      font-size: 11px;
-      color: var(--muted);
-      align-items: center;
-      justify-content: flex-end;
-    }
-
-    .timeline-key-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      white-space: nowrap;
-    }
-
-    .timeline-key-swatch {
-      display: inline-block;
-      width: 14px;
-      height: 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      flex: 0 0 auto;
-    }
-
-    .timeline-key-swatch.inactive {
-      background: linear-gradient(180deg, rgba(185, 77, 70, 0.55), rgba(146, 54, 49, 0.72));
-    }
-
-    .timeline-key-swatch.jump {
-      background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
-      border-color: var(--timeline-jump-dark);
-    }
-
     .progress-fill {
       height: 100%;
       width: 0%;
@@ -304,27 +267,6 @@
       border-radius: 999px;
       transform: translate(-50%, -50%);
       z-index: 2;
-    }
-
-    .progress-gap-markers {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .progress-gap-marker {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 4px;
-      transform: translateX(-50%);
-      background: linear-gradient(180deg, #f4d27a 0%, var(--timeline-jump) 100%);
-      border: 1px solid var(--timeline-jump-dark);
-      border-radius: 999px;
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.72),
-        0 0 8px rgba(211, 154, 33, 0.2);
     }
 
     .progress-tooltip {
@@ -661,8 +603,8 @@
           <div class="time-display" id="time-display">0:00 / 0:00</div>
           <select class="speed-select" id="speed-select">
             <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
+            <option value="1">1×</option>
+            <option value="2" selected>2×</option>
             <option value="5">5×</option>
             <option value="10">10×</option>
             <option value="25">25×</option>
@@ -692,14 +634,15 @@
     import {
       compressIdleGaps,
       compressedTimeForRawMs,
+      buildCharacterReplayHistory,
       documentWithAttribution,
       downloadFilenameForDocument,
       findHistoryIndex,
       getDurationFromHistory,
       getDurationFromKeydowns,
       getElapsedRawTime,
+      getReplayOriginWallMs,
       buildInactiveSpans,
-      buildTimelineGapMarkers,
       formatAbsoluteReplayTime,
       getFocusStateAtElapsedMs,
       parseFocusEvents,
@@ -723,7 +666,7 @@
     let replayFocusEvents = []
     let keydowns = []
     let playing = false
-    let speed = 1
+    let speed = 2
     let currentElapsedMs = 0
     let replayStartTime = null
     let animationHandle = null
@@ -989,7 +932,15 @@
 
         keydowns = parseKeydowns(session.keystroke_log)
         history = compressIdleGaps(
-          buildReplayHistoryWithAttribution(parseHistory(session, keydowns))
+          buildCharacterReplayHistory(
+            buildReplayHistoryWithAttribution(parseHistory(session, keydowns)),
+            keydowns,
+            {
+              replayOriginWallMs: getReplayOriginWallMs(session),
+              startWallNs: session.start_wall_ns,
+            },
+          ),
+          1200,
         )
         focusEvents = parseFocusEvents(session)
         replayFocusEvents = focusEvents.map((event) => ({

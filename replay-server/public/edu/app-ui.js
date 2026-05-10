@@ -7,15 +7,21 @@ export function parseTimestamp(value) {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+export function sessionPresenceTimestamp(session) {
+  const lastActivityAt = parseTimestamp(session?.last_activity_at)
+  const updatedAt = parseTimestamp(session?.updated_at)
+  return Math.max(lastActivityAt || 0, updatedAt || 0) || null
+}
+
 export function isSessionActive(session, now = Date.now()) {
   if (!session?.schedule_open) {
     return false
   }
-  const lastActivityAt = parseTimestamp(session.last_activity_at || session.updated_at)
-  if (!lastActivityAt) {
+  const presenceAt = sessionPresenceTimestamp(session)
+  if (!presenceAt) {
     return false
   }
-  return now - lastActivityAt <= LIVE_SESSION_STALE_MS
+  return now - presenceAt <= LIVE_SESSION_STALE_MS
 }
 
 export function sessionStatusLabel(session, now = Date.now()) {
@@ -48,10 +54,65 @@ export function dashboardDeltaNeedsFullRefresh(currentState, delta) {
   )
 }
 
+function historyEntryIsDocumentEdit(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return false
+  }
+  if (typeof entry.ins === 'string' && entry.ins.length > 0) {
+    return true
+  }
+  if (typeof entry.del === 'string' && entry.del.length > 0) {
+    return true
+  }
+  if (Number.isFinite(Number(entry.del)) && Number(entry.del) > 0) {
+    return true
+  }
+  return Boolean(entry.marks || entry.formatting || entry.format || entry.style || entry.attrs)
+}
+
+function documentEditHistory(session) {
+  return (Array.isArray(session?.document_history) ? session.document_history : [])
+    .filter((entry) => historyEntryIsDocumentEdit(entry))
+}
+
 function numericHistoryTimes(session) {
-  return (session?.document_history || [])
+  return documentEditHistory(session)
     .map((entry) => Number(entry?.t))
     .filter((value) => Number.isFinite(value) && value >= 0)
+}
+
+function numericHistoryWallTimes(session) {
+  const history = documentEditHistory(session)
+  const relativeTimes = numericHistoryTimes(session)
+  if (!relativeTimes.length) {
+    return history
+      .map((entry) => Number(entry?.absolute_wall_ms))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  }
+  const latestRelativeT = Math.max(...relativeTimes)
+  const anchorWallMs = Math.max(
+    parseTimestamp(session?.last_activity_at) || 0,
+    parseTimestamp(session?.updated_at) || 0,
+  )
+  if (!anchorWallMs) {
+    return history
+      .map((entry) => Number(entry?.absolute_wall_ms))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  }
+
+  return history
+    .map((entry) => {
+      const absoluteWallMs = Number(entry?.absolute_wall_ms)
+      if (Number.isFinite(absoluteWallMs) && absoluteWallMs > 0) {
+        return absoluteWallMs
+      }
+      const relativeT = Number(entry?.t)
+      if (!Number.isFinite(relativeT) || relativeT < 0) {
+        return null
+      }
+      return anchorWallMs - (latestRelativeT - relativeT)
+    })
+    .filter((value) => Number.isFinite(value) && value > 0)
 }
 
 export function recentEditActivity(
@@ -61,7 +122,11 @@ export function recentEditActivity(
     bucketMs = RECENT_EDIT_BUCKET_MS,
   } = {},
 ) {
-  if (Number.isFinite(Number(session?.recent_edit_count))) {
+  const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
+  const buckets = Array.from({ length: bucketCount }, () => 0)
+  const times = numericHistoryTimes(session)
+
+  if (!times.length && Number.isFinite(Number(session?.recent_edit_count))) {
     const totalEdits = Math.max(0, Number(session.recent_edit_count))
     return {
       totalEdits,
@@ -69,9 +134,6 @@ export function recentEditActivity(
       latestT: totalEdits > 0 ? totalEdits : null,
     }
   }
-  const bucketCount = Math.max(1, Math.ceil(windowMs / bucketMs))
-  const buckets = Array.from({ length: bucketCount }, () => 0)
-  const times = numericHistoryTimes(session)
   if (!times.length) {
     return { totalEdits: 0, buckets, latestT: null }
   }
@@ -91,6 +153,52 @@ export function recentEditActivity(
   })
 
   return { totalEdits, buckets, latestT }
+}
+
+export function recentEditActivityCurve(
+  session,
+  {
+    windowMs = RECENT_EDIT_WINDOW_MS,
+    sampleMs = 5000,
+    nowMs = Date.now(),
+  } = {},
+) {
+  const sampleCount = Math.max(1, Math.ceil(windowMs / sampleMs))
+  const points = Array.from({ length: sampleCount }, () => 0)
+  const wallTimes = numericHistoryWallTimes(session)
+
+  if (!wallTimes.length && Number.isFinite(Number(session?.recent_edit_count))) {
+    const totalEdits = Math.max(0, Number(session.recent_edit_count))
+    points[points.length - 1] = totalEdits
+    return {
+      totalEdits,
+      points,
+      latestT: totalEdits > 0 ? totalEdits : null,
+    }
+  }
+  if (!wallTimes.length) {
+    return { totalEdits: 0, points, latestT: null }
+  }
+
+  const latestT = Math.max(...wallTimes)
+  const rawWindowEnd = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now()
+  const windowEnd = Math.ceil(rawWindowEnd / sampleMs) * sampleMs
+  const windowStart = windowEnd - windowMs
+  const recentTimes = wallTimes.filter((t) => t >= windowStart && t <= rawWindowEnd)
+
+  points.forEach((_, index) => {
+    const bucketStart = windowStart + (index * sampleMs)
+    const bucketEnd = index === points.length - 1 ? windowEnd : bucketStart + sampleMs
+    points[index] = recentTimes.some((t) => (
+      t >= bucketStart && (index === points.length - 1 ? t <= bucketEnd : t < bucketEnd)
+    )) ? 1 : 0
+  })
+
+  return {
+    totalEdits: recentTimes.length,
+    points,
+    latestT,
+  }
 }
 
 export function aggregateRecentEditActivity(
@@ -135,9 +243,38 @@ export function applyLiveReplayUpdates(baseReplay, updates) {
   replay.document_history = [...existingHistory]
   replay.url_history = [...existingUrlHistory]
 
+  const eventHistoryEntryWallMs = (event, entry) => {
+    const explicitWallMs = Number(entry?.absolute_wall_ms)
+    if (Number.isFinite(explicitWallMs) && explicitWallMs > 0) {
+      return explicitWallMs
+    }
+    const tail = Array.isArray(event?.document_history_tail) ? event.document_history_tail : []
+    const anchorWallMs = Date.parse(event?.last_activity_at || event?.updated_at || event?.created_at || '')
+    if (!Number.isFinite(anchorWallMs)) {
+      return null
+    }
+    const tailTimes = tail
+      .map((item) => Number(item?.t))
+      .filter((value) => Number.isFinite(value))
+    if (!tailTimes.length) {
+      return anchorWallMs
+    }
+    const maxTailTime = Math.max(...tailTimes)
+    const entryTime = Number(entry?.t)
+    return anchorWallMs - maxTailTime + (Number.isFinite(entryTime) ? entryTime : maxTailTime)
+  }
+
   for (const event of events) {
     if (Array.isArray(event?.document_history_tail) && event.document_history_tail.length) {
-      replay.document_history.push(...event.document_history_tail)
+      replay.document_history.push(
+        ...event.document_history_tail.map((entry) => {
+          const absoluteWallMs = eventHistoryEntryWallMs(event, entry)
+          return {
+            ...entry,
+            ...(Number.isFinite(absoluteWallMs) ? { absolute_wall_ms: absoluteWallMs } : {}),
+          }
+        }),
+      )
     }
     if (Array.isArray(event?.url_history_tail) && event.url_history_tail.length) {
       replay.url_history.push(...event.url_history_tail)
@@ -229,9 +366,13 @@ export function nextLocalTimeAtOrAfter(hour, minute = 0, now = new Date()) {
 }
 
 export function localDateTimeInputValue(date) {
-  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(
-    date.getHours(),
-  )}:${padDatePart(date.getMinutes())}`
+  const value = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(value.getTime())) {
+    return ''
+  }
+  return `${value.getFullYear()}-${padDatePart(value.getMonth() + 1)}-${padDatePart(value.getDate())}T${padDatePart(
+    value.getHours(),
+  )}:${padDatePart(value.getMinutes())}`
 }
 
 export function replayLocalDateInputValue(absoluteMs, offsetMinutes = 0) {
@@ -279,6 +420,30 @@ export function assignmentIsOpenNow(assignment, now = new Date()) {
     return currentMinutes >= startMinutes && currentMinutes <= endMinutes
   }
   return currentMinutes >= startMinutes || currentMinutes <= endMinutes
+}
+
+export function wholeClassExtensionLabel(assignment, now = new Date()) {
+  const current = now instanceof Date ? now : new Date(now)
+  const currentMs = current.getTime()
+  const extensionMs = Date.parse(String(assignment?.temporary_access_until || ''))
+  if (!Number.isFinite(extensionMs) || extensionMs <= currentMs) {
+    return ''
+  }
+
+  const extension = new Date(extensionMs)
+  const sameDay =
+    extension.getFullYear() === current.getFullYear() &&
+    extension.getMonth() === current.getMonth() &&
+    extension.getDate() === current.getDate()
+  const time = extension.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  if (sameDay) {
+    return `Class extended until ${time}`
+  }
+  return `Class extended until ${extension.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`
 }
 
 export function reconcileTeacherNavigation({
@@ -330,9 +495,15 @@ export function assignmentViewMeta(selectedAssignment, selectedClassroom, sessio
     selectedAssignment.id,
     now,
   )
-  return `${selectedAssignment.course || selectedClassroom.name} • ${activeSessions.length} active student${
-    activeSessions.length === 1 ? '' : 's'
-  }`
+  const parts = [
+    selectedAssignment.course || selectedClassroom.name,
+    `${activeSessions.length} active student${activeSessions.length === 1 ? '' : 's'}`,
+  ]
+  const extensionLabel = wholeClassExtensionLabel(selectedAssignment, new Date(now))
+  if (extensionLabel) {
+    parts.push(extensionLabel)
+  }
+  return parts.join(' • ')
 }
 
 function countFocusLeaves(session) {
@@ -404,13 +575,21 @@ export function timeAgoLabel(value, now = Date.now()) {
     return 'Unknown'
   }
   const deltaSeconds = Math.max(0, Math.floor((now - parsed) / 1000))
-  if (deltaSeconds < 5) return 'just now'
+  if (deltaSeconds === 0) return 'just now'
   if (deltaSeconds < 60) return `${deltaSeconds}s ago`
   const minutes = Math.floor(deltaSeconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.floor(hours / 24)}d ago`
+}
+
+export function formatClockTime(hour = 0, minute = 0) {
+  const normalizedHour = Math.max(0, Math.min(23, Number(hour) || 0))
+  const normalizedMinute = Math.max(0, Math.min(59, Number(minute) || 0))
+  const meridiem = normalizedHour >= 12 ? 'PM' : 'AM'
+  const displayHour = normalizedHour % 12 || 12
+  return `${displayHour}:${String(normalizedMinute).padStart(2, '0')} ${meridiem}`
 }
 
 export function formatWindowSummary(assignment) {
@@ -422,8 +601,8 @@ export function formatWindowSummary(assignment) {
   const activeDays = Object.entries(window.days || {})
     .filter(([, enabled]) => Boolean(enabled))
     .map(([day]) => day.slice(0, 3))
-  const start = `${String(window.start_hour ?? 0).padStart(2, '0')}:${String(window.start_minute ?? 0).padStart(2, '0')}`
-  const end = `${String(window.end_hour ?? 0).padStart(2, '0')}:${String(window.end_minute ?? 0).padStart(2, '0')}`
+  const start = formatClockTime(window.start_hour, window.start_minute)
+  const end = formatClockTime(window.end_hour, window.end_minute)
   const daysLabel = activeDays.length ? activeDays.join(', ') : 'No days selected'
   const endDate = window.end_date ? ` until ${window.end_date}` : ''
   return `${daysLabel} • ${start}–${end}${endDate}`

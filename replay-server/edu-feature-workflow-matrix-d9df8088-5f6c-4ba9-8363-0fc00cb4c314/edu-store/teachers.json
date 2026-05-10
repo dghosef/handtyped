@@ -1,0 +1,74 @@
+[
+  {
+    "id": "teacher_default",
+    "tenant_id": "tenant_demo",
+    "name": "Joseph Tan",
+    "email": "teacher@edu.handtyped.app",
+    "access_code": "handtyped-edu",
+    "password_hash": "87351bf41912d5cabfdb54eea21c8eff1cbf7067559155f0c38b1f7a6d902aa52c52d98a2b9d487195f1066ec39f524a74951ec6ad51ff19c51748255713b519",
+    "password_salt": "2475fff40e306e739e56be540d23d055",
+    "google_subject": null,
+    "created_at": "2026-04-30T02:10:32.365Z",
+    "updated_at": "2026-04-30T02:10:32.365Z"
+  },
+  {
+    "id": "teacher_c46e2e5904434889",
+    "tenant_id": "tenant_demo",
+    "name": "Feature Teacher 1",
+    "email": "feature-teacher-1@edu.handtyped.app",
+    "access_code": "feature-password-1-long",
+    "password_hash": "9a17ad7fe3ab9163708e36a2c87e6c54f127858726cd02a73572186a216ba165f5d1b99ed95be89e8692bbf8db7ce2ac363db31927c655e56c6852962c955785",
+    "password_salt": "e9ef86c595c09a7cf72e499b997fa89c",
+    "google_subject": null,
+    "created_at": "2026-04-30T02:11:38.634Z",
+    "updated_at": "2026-04-30T02:11:38.634Z"
+  },
+  {
+    "id": "teacher_0e564e0829b34ff7",
+    "tenant_id": "tenant_demo",
+    "name": "Feature Teacher 2",
+    "email": "feature-teacher-2@edu.handtyped.app",
+    "access_code": "feature-password-2-long",
+    "password_hash": "2051f7f4c39eb147bee63ea207949860320e5fb91c14a185716671dace219c642f67886f7724dd9c890f239e948cce96322465b2ebf2a4bd4dc1e79084054034",
+    "password_salt": "b3f0cf7455e90c7d304aa275f0cdd56d",
+    "google_subject": null,
+    "created_at": "2026-04-30T02:11:38.753Z",
+    "updated_at": "2026-04-30T02:11:38.753Z"
+  },
+  {
+    "id": "teacher_df4fdcd02e764df5",
+    "tenant_id": "tenant_demo",
+    "name": "Feature Teacher 3",
+    "email": "feature-teacher-3@edu.handtyped.app",
+    "access_code": "feature-password-3-long",
+    "password_hash": "c24e079f09597891310ef006105b3a041dd24c8de39f94344b9de41f570f44b67fc252fcb7670f4a54daea9e598476f2b5c7c3be1910278c5031b4adcec87354",
+    "password_salt": "fc5bbb7a1204332a4670991888dd9509",
+    "google_subject": null,
+    "created_at": "2026-04-30T02:11:38.840Z",
+    "updated_at": "2026-04-30T02:11:38.840Z"
+  },
+  {
+    "id": "teacher_0933f4084bd54130",
+    "tenant_id": "tenant_demo",
+    "name": "Feature Teacher 4",
+    "email": "feature-teacher-4@edu.handtyped.app",
+    "access_code": "feature-password-4-long",
+    "password_hash": "3db810f96025de2adc438bc986e355b38ded38aca3534fd25c93d678a498e14061001ea5b263cc470adcc986758ec29894e48a4c6909f83d096f295cd8799217",
+    "password_salt": "f56f00553e58d32fa5084488d3593266",
+    "google_subject": null,
+    "created_at": "2026-04-30T02:11:38.928Z",
+    "updated_at": "2026-04-30T02:11:38.928Z"
+  },
+  {
+    "id": "teacher_4c08444c13984b0b",
+    "tenant_id": "tenant_demo",
+    "name": "Feature Teacher 5",
+    "email": "feature-teacher-5@edu.handtyped.app",
+    "access_code": "feature-password-5-long",
+    "password_hash": "a823466ccdd547eed404aab68476ec43a1104944602495f2daa2e03ab5437313b4de30f32b915acbaf424cc67b7a226a87953ee19af103eb2f91cd65591f48fc",
+    "password_salt": "67a9347cde0acb9d9541fa1a93ae3434",
+    "google_subject": null,
+    "created_at": "2026-04-30T02:11:39.015Z",
+    "updated_at": "2026-04-30T02:11:39.015Z"
+  }
+]

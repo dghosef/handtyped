@@ -5,6 +5,8 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
+const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
 
 let baseUrl
 let server
@@ -26,14 +28,36 @@ async function request(method, path, body, headers = {}) {
   return { status: res.status, body: json, headers: res.headers }
 }
 
+let passwordTeacherReady = false
+
+async function ensurePasswordTeacher() {
+  if (passwordTeacherReady) {
+    return
+  }
+  const res = await fetch(`${baseUrl}/api/edu/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Actual Teacher',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
+    }),
+  })
+  if (res.status !== 201 && res.status !== 400) {
+    throw new Error(`Could not create test teacher account: ${res.status}`)
+  }
+  passwordTeacherReady = true
+}
+
 async function teacherLogin() {
+  await ensurePasswordTeacher()
   const res = await fetch(`${baseUrl}/api/edu/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'password',
-      email: 'teacher@edu.handtyped.app',
-      password: 'handtyped-edu',
+      email: TEST_TEACHER_EMAIL,
+      password: TEST_TEACHER_PASSWORD,
     }),
   })
   return {

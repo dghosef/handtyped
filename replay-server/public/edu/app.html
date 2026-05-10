@@ -12,8 +12,26 @@
 <body>
   <div class="teacher-app-shell">
     <header class="teacher-topbar">
-      <a class="teacher-brand" href="/edu">Handtyped EDU</a>
+      <a class="teacher-brand" href="https://edu.handtyped.app">Handtyped EDU</a>
       <div class="teacher-topbar-actions">
+        <a
+          class="button button-secondary"
+          id="student-download-apple-silicon-button"
+          href="/downloads/Handtyped-EDU-Student-macos.dmg"
+          download="Handtyped-EDU-Student-macos.dmg"
+        >Apple Silicon</a>
+        <a
+          class="button button-secondary"
+          id="student-download-intel-button"
+          href="/downloads/Handtyped-EDU-Student-macos-intel.dmg"
+          download="Handtyped-EDU-Student-macos-intel.dmg"
+        >Intel Mac</a>
+        <a
+          class="button button-secondary"
+          id="student-download-windows-button"
+          href="/downloads/Handtyped-EDU-Student-windows-x86_64.zip"
+          download="Handtyped-EDU-Student-windows-x86_64.zip"
+        >Windows x86-64</a>
         <button class="button button-secondary" id="feedback-button" type="button">Send feedback</button>
         <a class="button button-secondary" href="/">Main site</a>
         <button class="button button-secondary" id="logout-button" type="button" hidden>Sign out</button>
@@ -54,6 +72,7 @@
               <button class="button" id="new-assignment-button" type="button">New assignment</button>
             </div>
           </div>
+          <section class="classroom-roster-panel" id="classroom-roster-panel"></section>
           <section class="selection-grid" id="assignment-grid"></section>
         </section>
       </section>
@@ -65,67 +84,50 @@
             <button class="button button-secondary" id="back-to-assignments-button" type="button">← Back to assignments</button>
             <h2 id="assignment-view-title">Assignment Name</h2>
             <p class="muted" id="assignment-view-meta"></p>
+            <div class="monitoring-path-status" id="assignment-monitoring-status">Monitoring: waiting for updates</div>
           </div>
           <div class="stage-actions">
             <div class="quick-extend-control">
               <label>
-                <span class="section-label">Extend everyone until</span>
-                <input id="quick-extend-time" type="time" value="15:00" />
+                <span class="section-label">Extend until date</span>
+                <input id="quick-extend-date" type="date" />
               </label>
-              <button class="button button-secondary" id="quick-extend-button" type="button">Extend all today</button>
+              <label>
+                <span class="section-label">Time</span>
+                <input id="quick-extend-time" type="time" />
+              </label>
+              <button class="button button-secondary" id="quick-extend-button" type="button">Extend all</button>
             </div>
             <div class="muted selection-meta" id="quick-extend-status" hidden></div>
             <button class="button button-secondary" id="delete-assignment-button" type="button">Delete assignment</button>
             <button class="button" id="edit-assignment-button" type="button">Edit assignment</button>
           </div>
         </div>
-        <section class="teacher-panel monitoring-overview" id="monitoring-overview">
-          <div class="monitoring-overview-grid">
-            <div class="overview-stat">
-              <div class="section-label">Students</div>
-              <div class="overview-value" id="overview-students">0</div>
-              <div class="selection-meta" id="overview-students-meta">No sessions</div>
-            </div>
-            <div class="overview-stat">
-              <div class="section-label">Needs attention</div>
-              <div class="overview-value overview-danger" id="overview-attention">0</div>
-              <div class="selection-meta" id="overview-attention-meta">No active alerts</div>
-            </div>
-            <div class="overview-stat">
-              <div class="section-label">Unfocused</div>
-              <div class="overview-value" id="overview-unfocused">0</div>
-              <div class="selection-meta" id="overview-unfocused-meta">Students who left the app</div>
-            </div>
-            <div class="overview-stat">
-              <div class="section-label">Offline / stale</div>
-              <div class="overview-value" id="overview-offline">0</div>
-              <div class="selection-meta" id="overview-offline-meta">Sessions not reporting recently</div>
-            </div>
-            <div class="overview-stat">
-              <div class="section-label">Recent edits</div>
-              <div class="overview-value" id="overview-edits">0</div>
-              <div class="selection-meta" id="overview-edits-meta">No recent writing changes</div>
-            </div>
-          </div>
-        </section>
-        <section class="teacher-panel monitoring-toolbar">
-          <div class="monitoring-filters" id="session-filter-bar">
-            <button class="button button-secondary small-button" type="button" data-filter="all">All students</button>
-            <button class="button button-secondary small-button" type="button" data-filter="attention">Needs attention</button>
-            <button class="button button-secondary small-button" type="button" data-filter="active">Active only</button>
-            <button class="button button-secondary small-button" type="button" data-filter="offline">Offline / stale</button>
-          </div>
-          <label class="monitoring-search">
-            <span class="section-label">Student search</span>
-            <input id="session-search-input" type="search" placeholder="Filter by student name" />
-          </label>
-        </section>
         <section class="teacher-panel access-request-panel" hidden>
           <div class="review-card-header">
             <div class="section-label">Access requests</div>
             <div class="student-meta">Students can ask to re-enter Handtyped when they are outside the writing window.</div>
           </div>
           <div id="access-request-list" class="access-request-list"></div>
+        </section>
+        <section class="teacher-panel feedback-request-panel" hidden>
+          <div class="review-card-header">
+            <div class="section-label">Feedback requests</div>
+            <div class="student-meta">Students can ask you to review their current draft.</div>
+          </div>
+          <div id="feedback-request-list" class="access-request-list"></div>
+        </section>
+        <section class="teacher-panel assignment-edit-activity-panel" id="assignment-edit-activity-panel" hidden>
+          <div class="edit-activity-header">
+            <div>
+              <div class="section-label">Edit frequency</div>
+              <div class="student-meta" id="edit-activity-summary">Per-student edit graphs use this window.</div>
+            </div>
+            <div class="edit-activity-controls" role="group" aria-label="Edit activity time window">
+              <button class="button button-secondary small-button" type="button" data-edit-activity-window="5">Last 5 min</button>
+              <button class="button button-secondary small-button" type="button" data-edit-activity-window="60">Last hour</button>
+            </div>
+          </div>
         </section>
         <section class="review-layout" id="review-layout">
           <section class="student-grid" id="session-grid"></section>
@@ -140,54 +142,35 @@
                   <p class="muted" id="review-workspace-meta"></p>
                 </div>
                 <div class="review-workspace-actions">
+                  <div class="student-badge review-activity-status" id="review-activity-status" hidden>Not active</div>
                   <div class="review-sync-pill" id="review-sync-status">Saved</div>
                   <button class="button button-secondary small-button" id="review-close-button" type="button">Back to students</button>
                 </div>
               </div>
 
+              <section class="review-card review-edit-activity-card" id="review-edit-activity" aria-label="Selected student edit frequency"></section>
+
               <section class="review-card">
                 <div class="review-card-header">
-                  <div>
-                    <div class="section-label">Teacher mode editor</div>
-                    <div class="student-meta" id="review-draft-meta">Live draft updates appear here.</div>
-                  </div>
+	                  <div>
+	                    <div class="section-label">Teacher mode editor</div>
+	                    <div class="student-meta" id="review-draft-meta">Live draft updates appear here.</div>
+	                  </div>
                   <div class="review-selection-count" id="review-selection-count">No text selected</div>
-                </div>
-                <div class="review-time-tools">
-                  <div class="review-time-tools-row">
-                    <label class="review-time-field">
-                      <span>Day</span>
-                      <input id="review-highlight-date" type="date" />
-                    </label>
-                    <div class="review-time-actions">
-                      <button class="button button-secondary small-button" id="review-highlight-after-school-day" type="button">After school on day</button>
-                      <button class="button button-secondary small-button" id="review-highlight-after-school-all" type="button">All after school</button>
-                      <button class="button button-secondary small-button" id="review-highlight-clear" type="button">Clear highlight</button>
-                    </div>
-                  </div>
-                  <div class="student-meta" id="review-highlight-meta">Replay-based time highlighting appears here when a replay is available.</div>
                 </div>
                 <div class="review-draft-surface" id="review-draft-surface" tabindex="0" aria-label="Student draft review surface"></div>
                 <div class="review-selection-panel" id="review-selection-panel">
                   <div class="section-label">Selected text</div>
-                  <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment or suggestion.</div>
-                  <div class="review-selection-actions">
-                    <button class="button button-secondary small-button" id="review-comment-mode" type="button">Comment</button>
-                    <button class="button button-secondary small-button" id="review-suggest-mode" type="button">Suggest</button>
-                  </div>
+                  <div class="review-selection-quote" id="review-selection-quote">Select text in the draft to add a comment.</div>
                 </div>
                 <div class="review-composer" id="review-composer" hidden>
-                  <div class="section-label" id="review-composer-label">New annotation</div>
-                  <label id="review-replacement-field" hidden>
-                    <span>Suggested replacement</span>
-                    <textarea id="review-composer-replacement" rows="2" placeholder="Replace the selected text with..."></textarea>
-                  </label>
+                  <div class="section-label" id="review-composer-label">New comment</div>
                   <label>
                     <span>Note</span>
                     <textarea id="review-composer-note" rows="3" placeholder="What should the student notice here?"></textarea>
                   </label>
                   <div class="review-selection-actions">
-                    <button class="button small-button" id="review-add-annotation" type="button">Add to draft</button>
+                    <button class="button small-button" id="review-add-annotation" type="button">Add comment</button>
                     <button class="button button-secondary small-button" id="review-cancel-annotation" type="button">Cancel</button>
                   </div>
                 </div>
@@ -218,11 +201,16 @@
                   <input id="review-returned" type="checkbox" />
                   <span>Return for revision</span>
                 </label>
+                <div class="review-publish-actions">
+                  <button class="button small-button" id="review-publish-feedback" type="button">Publish feedback</button>
+                  <button class="button button-secondary small-button" id="review-delete-feedback" type="button">Delete feedback</button>
+                  <div class="review-publish-confirmation" id="review-publish-confirmation" hidden role="status" aria-live="polite"></div>
+                </div>
               </section>
 
               <section class="review-card">
                 <div class="review-card-header">
-                  <div class="section-label">Inline comments and suggestions</div>
+                  <div class="section-label">Inline comments</div>
                   <div class="student-meta" id="review-annotation-meta">No inline notes yet.</div>
                 </div>
                 <div class="review-annotation-list" id="review-annotation-list"></div>
@@ -252,7 +240,7 @@
           <span>Join code</span>
           <input name="join_code" type="text" placeholder="Optional custom code" />
         </label>
-        <button class="button" type="submit">Create class</button>
+        <button class="button" id="classroom-form-submit" type="submit">Create class</button>
       </form>
     </div>
   </div>
@@ -321,10 +309,7 @@
             <input type="checkbox" name="export_allowed" />
             <span>Allow export or print from the student app</span>
           </label>
-          <label class="checkbox-label">
-            <input type="checkbox" name="images_allowed" />
-            <span>Allow images in the document, including images copied from the study browser</span>
-          </label>
+          <input type="hidden" name="images_allowed" value="" />
           <label class="checkbox-label">
             <input type="checkbox" name="show_rubric_to_student" />
             <span>Let students see the rubric while writing</span>
@@ -348,15 +333,14 @@
               <span>Default document</span>
             </div>
             <div class="teacher-editor-toolbar" id="starter-document-toolbar">
-              <button class="button button-secondary small-button" type="button" data-starter-command="bold">Bold</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="italic">Italic</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="underline">Underline</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="h1">H1</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="h2">H2</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="bullet">Bullets</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="number">Numbers</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="quote">Quote</button>
-              <button class="button button-secondary small-button" type="button" data-starter-command="clear">Clear</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="bold" aria-pressed="false">Bold</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="italic" aria-pressed="false">Italic</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="underline" aria-pressed="false">Underline</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="h1" aria-pressed="false">H1</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="h2" aria-pressed="false">H2</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="bullet" aria-pressed="false">Bullets</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="number" aria-pressed="false">Numbers</button>
+              <button class="button button-secondary small-button" type="button" data-starter-command="quote" aria-pressed="false">Quote</button>
             </div>
             <div
               id="starter-document-editor"
@@ -385,6 +369,18 @@
                 <option value="serif">Serif</option>
                 <option value="sans">Sans</option>
                 <option value="mono">Mono</option>
+                <option value="georgia">Georgia</option>
+                <option value="times">Times New Roman</option>
+                <option value="garamond">Garamond</option>
+                <option value="palatino">Palatino</option>
+                <option value="baskerville">Baskerville</option>
+                <option value="verdana">Verdana</option>
+                <option value="trebuchet">Trebuchet</option>
+                <option value="tahoma">Tahoma</option>
+                <option value="helvetica">Helvetica</option>
+                <option value="courier">Courier New</option>
+                <option value="comic-sans">Comic Sans</option>
+                <option value="lucida">Lucida Sans</option>
               </select>
             </label>
             <label>
@@ -395,7 +391,7 @@
             </label>
           </div>
           <label>
-            <span>Line spacing</span>
+            <span>Locked line spacing</span>
             <select name="editor_line_height">
               <option value="single">Single</option>
               <option value="relaxed" selected>1.15</option>
@@ -425,10 +421,6 @@
               <option value="whitelist">Allow only these URLs</option>
               <option value="blacklist">Allow all except these URLs</option>
             </select>
-          </label>
-          <label>
-            <span>Home URL</span>
-            <input name="browser_home_url" type="url" placeholder="https://example.com" />
           </label>
           <label>
             <span>URLs or domains (one per line)</span>
@@ -474,6 +466,35 @@
         <div class="form-actions">
           <button class="button" id="assignment-form-submit" type="submit">Create assignment</button>
           <button class="button button-secondary" id="assignment-form-cancel" type="button" hidden>Cancel</button>
+        </div>
+        <div id="assignment-form-toast" class="form-toast" hidden></div>
+        <ul class="validation-list" id="assignment-form-errors" hidden></ul>
+        <ul class="validation-list validation-warnings" id="assignment-form-warnings" hidden></ul>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="student-extension-modal" hidden>
+    <div class="modal-card student-extension-card">
+      <div class="modal-header">
+        <div>
+          <div class="section-label">Extend student</div>
+          <h2 id="student-extension-title">Extend access</h2>
+        </div>
+        <button class="button button-secondary modal-close" type="button" data-close-modal="student-extension-modal">Close</button>
+      </div>
+      <form class="inline-form" id="student-extension-form">
+        <label>
+          <span>Date</span>
+          <input id="student-extension-date" type="date" required />
+        </label>
+        <label>
+          <span>Time</span>
+          <input id="student-extension-time" type="time" required />
+        </label>
+        <div class="form-actions">
+          <button class="button" type="submit">Extend access</button>
+          <button class="button button-secondary" id="student-extension-cancel" type="button">Cancel</button>
         </div>
       </form>
     </div>

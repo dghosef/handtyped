@@ -2974,7 +2974,7 @@ impl NativeEditorApp {
         if !active {
             return false;
         }
-        // Check if there's a recent SPI keydown (within last 200ms)
+        // Check if there's a recent accepted built-in keyboard keydown (within last 200ms).
         let last_keydown = self.state.builtin_keydown_timestamp.load(Ordering::Acquire);
         if last_keydown == 0 {
             return false;

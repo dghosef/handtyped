@@ -32,17 +32,16 @@
             Sign in with a teacher email and password, or continue with Google. This keeps the teacher workspace on the web
             while leaving student-side attestation and enforcement in the native app.
           </p>
-          <p class="subhead">Default local development account: <strong>teacher@edu.handtyped.app</strong> with password <strong>handtyped-edu</strong>.</p>
         </div>
         <p class="subhead login-status" id="login-status" hidden></p>
         <form class="edu-form login-form" id="teacher-login-form">
           <label>
             <span>Email</span>
-            <input name="email" type="email" value="teacher@edu.handtyped.app" required />
+            <input name="email" type="email" placeholder="teacher@school.edu" required />
           </label>
           <label>
             <span>Password</span>
-            <input name="password" type="password" value="handtyped-edu" required />
+            <input name="password" type="password" required />
           </label>
           <button class="button" type="submit">Sign in</button>
         </form>
@@ -51,8 +50,7 @@
           <div id="google-signin-button"></div>
         </div>
         <div class="login-divider"><span>new here?</span></div>
-        <button class="button button-secondary" id="show-signup-button" type="button">Create teacher account</button>
-        <form class="edu-form login-form" id="teacher-signup-form" hidden>
+        <form class="edu-form login-form" id="teacher-signup-form">
           <label>
             <span>Name</span>
             <input name="name" type="text" placeholder="Teacher name" required />
@@ -75,11 +73,11 @@
     let googleClientId = ''
     let googleHostedDomain = ''
     let googleEnabled = false
+    let googleButtonRendered = false
 
     const statusEl = document.getElementById('login-status')
     const form = document.getElementById('teacher-login-form')
     const signupForm = document.getElementById('teacher-signup-form')
-    const showSignupButton = document.getElementById('show-signup-button')
     const googleShell = document.getElementById('google-signin-shell')
     const googleDivider = document.getElementById('google-login-divider')
 
@@ -154,19 +152,29 @@
       )
     }
 
-    function initGoogleButton() {
-      if (!googleEnabled || !googleClientId || !window.google?.accounts?.id) {
-        updateGoogleUi()
+    function renderGoogleButtonWhenReady(retriesRemaining = 40) {
+      updateGoogleUi()
+      if (!googleEnabled || !googleClientId || googleButtonRendered) {
+        return
+      }
+      if (!window.google?.accounts?.id) {
+        if (retriesRemaining > 0) {
+          window.setTimeout(() => renderGoogleButtonWhenReady(retriesRemaining - 1), 150)
+          return
+        }
+        setStatus('Google sign-in could not load. Check your browser content blockers and refresh.', 'danger')
         return
       }
 
+      const buttonTarget = document.getElementById('google-signin-button')
+      buttonTarget.replaceChildren()
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: handleGoogleCredential,
         hd: googleHostedDomain || undefined,
       })
       window.google.accounts.id.renderButton(
-        document.getElementById('google-signin-button'),
+        buttonTarget,
         {
           theme: 'outline',
           size: 'large',
@@ -175,6 +183,7 @@
           width: 320,
         },
       )
+      googleButtonRendered = true
     }
 
     form.addEventListener('submit', async (event) => {
@@ -182,10 +191,6 @@
       setStatus('')
       const payload = Object.fromEntries(new FormData(form).entries())
       await loginWithPayload({ ...payload, provider: 'password' }, 'Could not sign in.')
-    })
-
-    showSignupButton.addEventListener('click', () => {
-      signupForm.hidden = !signupForm.hidden
     })
 
     signupForm.addEventListener('submit', async (event) => {
@@ -208,7 +213,7 @@
     await loadSession()
     await loadConfig()
     updateGoogleUi()
-    initGoogleButton()
+    renderGoogleButtonWhenReady()
   </script>
 </body>
 </html>

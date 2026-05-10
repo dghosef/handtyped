@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildFocusSegments,
   buildAttributedDocument,
+  buildCharacterReplayHistory,
   buildInactiveSpans,
   buildTimelineGapMarkers,
   buildSyntheticHistory,
@@ -17,6 +18,7 @@ import {
   getFocusStateAtElapsedMs,
   getRawDurationFromHistory,
   getReplayOriginWallMs,
+  handtypedMarkdownDisplayText,
   findHistoryIndex,
   latestTextFromHistory,
   parseKeydowns,
@@ -25,6 +27,8 @@ import {
   renderInsertedRangeHtml,
   renderInsertedRangesHtml,
   renderMarkdownToHtml,
+  renderHandtypedInlineMarkupHtml,
+  stripHandtypedInlineMarkup,
 } from './public/replay-view.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -45,7 +49,7 @@ const eduAppJs = fs.readFileSync(
 describe('replay history start state', () => {
   it('keeps the edu replay page on the shared history parser', () => {
     expect(eduReplayPageHtml).toContain('parseHistory,')
-    expect(eduReplayPageHtml).toContain('const rawHistory = parseHistory(')
+    expect(eduReplayPageHtml).toContain('const rawHistory = buildCharacterReplayHistory(parseHistory(')
     expect(eduReplayPageHtml).not.toContain("text: h.ins || ''")
   })
 
@@ -55,16 +59,32 @@ describe('replay history start state', () => {
     expect(eduAppJs).toContain('displaySessionText(session')
   })
 
-  it('adds teacher time-window controls for inserted-text highlighting', () => {
-    expect(eduReplayPageHtml).toContain('Highlight inserted text by time')
-    expect(eduReplayPageHtml).toContain('id="highlight-start"')
-    expect(eduReplayPageHtml).toContain('id="highlight-end"')
-    expect(eduReplayPageHtml).toContain('id="highlight-after-school"')
-    expect(eduReplayPageHtml).toContain('id="highlight-outside-window"')
-    expect(eduReplayPageHtml).toContain('buildAttributedDocument')
-    expect(eduReplayPageHtml).toContain('renderInsertedRangeHtml')
-    expect(eduReplayPageHtml).toContain('renderInsertedRangesHtml')
-    expect(eduReplayPageHtml).toContain('id="highlight-doc"')
+  it('removes teacher time-window inserted-text highlighting from the replay page', () => {
+    expect(eduReplayPageHtml).not.toContain('Highlight inserted text by time')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-start"')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-end"')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-after-school"')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-outside-window"')
+    expect(eduReplayPageHtml).not.toContain('renderInsertedRangeHtml')
+    expect(eduReplayPageHtml).not.toContain('renderInsertedRangesHtml')
+    expect(eduReplayPageHtml).not.toContain('id="highlight-doc"')
+    expect(eduReplayPageHtml).toContain('buildCharacterReplayHistory')
+  })
+
+  it('removes replay key moment jump controls from the EDU replay page', () => {
+    expect(eduReplayPageHtml).not.toContain('Jump to key moments')
+    expect(eduReplayPageHtml).not.toContain('class="event-jumps"')
+    expect(eduReplayPageHtml).not.toContain('id="event-jump-list"')
+    expect(eduReplayPageHtml).not.toContain('eventJumpListEl')
+    expect(eduReplayPageHtml).not.toContain('buildReplayHighlights')
+    expect(eduReplayPageHtml).not.toContain('renderEventJumps')
+  })
+
+  it('shows absolute replay time above both replay surfaces and removes gap markers', () => {
+    expect(replayPageHtml).toContain('id="progress-readout">Absolute time: --</div>')
+    expect(eduReplayPageHtml).toContain('id="progress-readout">Absolute time: --</div>')
+    expect(replayPageHtml).not.toContain('progress-gap-markers')
+    expect(eduReplayPageHtml).not.toContain('progress-gap-markers')
   })
 
   it('hides numeric risk scores from teacher student cards', () => {
@@ -97,6 +117,11 @@ describe('replay history start state', () => {
     expect(replayPageHtml).not.toContain('stat-words')
   })
 
+  it('keeps EDU replay preserved whitespace off the page wrapper so the first line is flush', () => {
+    expect(eduReplayPageHtml).toContain('#doc-content {\n      white-space: pre-wrap;')
+    expect(eduReplayPageHtml).not.toMatch(/\\.doc-page \\{[\\s\\S]*?white-space: pre-wrap;[\\s\\S]*?\\}/)
+  })
+
   it('initializes replay speed from the restored speed dropdown value', () => {
     for (const html of [replayPageHtml, eduReplayPageHtml]) {
       expect(html).toContain("const speedSelectEl = document.getElementById('speed-select')")
@@ -111,6 +136,30 @@ describe('replay history start state', () => {
     expect(renderMarkdownToHtml('Hello <script>alert(1)</script>')).toBe(
       '<p>Hello &lt;script&gt;alert(1)&lt;/script&gt;</p>',
     )
+  })
+
+  it('renders Handtyped custom inline style tags in replay html surfaces', () => {
+    const source = 'This is my essay written in [u][font=times][size=16]Handtyped[/size][/font][/u]'
+
+    expect(stripHandtypedInlineMarkup(source)).toBe('This is my essay written in Handtyped')
+    expect(handtypedMarkdownDisplayText(source)).toBe('This is my essay written in Handtyped')
+    expect(renderMarkdownToHtml(source)).toBe(
+      '<p>This is my essay written in <u><span style="font-family:&quot;Times New Roman&quot;, Times, serif"><span style="font-size:16px">Handtyped</span></span></u></p>',
+    )
+  })
+
+  it('ignores unsafe Handtyped inline style values in replay html surfaces', () => {
+    expect(renderHandtypedInlineMarkupHtml('[font=evil]Nope[/font] [size=999]Huge[/size]')).toBe(
+      'Nope Huge',
+    )
+  })
+
+  it('keeps the EDU replay page on the formatted markdown render path', () => {
+    expect(eduReplayPageHtml).toContain('cdn.jsdelivr.net/npm/marked/marked.min.js')
+    expect(eduReplayPageHtml).toContain('renderMarkdownInto,')
+    expect(eduReplayPageHtml).toContain('renderMarkdownInto(docContentEl, text, {')
+    expect(eduReplayPageHtml).not.toContain('docContentEl.textContent = text')
+    expect(eduReplayPageHtml).not.toContain('docContentEl.textContent = handtypedMarkdownDisplayText(text)')
   })
 
   it('preserves the actual timestamp of the first parsed edit', () => {
@@ -242,6 +291,26 @@ describe('replay history start state', () => {
       attributed.originWallMs + 1000,
     ])
     expect(html).toBe('a<mark class="insert-highlight">x</mark>c')
+  })
+
+  it('does not attribute unreplayed surrounding text to the latest live tail edit', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'Existing draft plus new',
+      doc_history: [
+        { t: 5000, pos: 19, del: '', ins: ' new' },
+      ],
+    })
+
+    const html = renderInsertedRangeHtml(
+      attributed,
+      attributed.originWallMs + 4500,
+      attributed.originWallMs + 5500,
+    )
+
+    expect(attributed.text).toBe('Existing draft plus new')
+    expect(attributed.chars.filter((entry) => Number.isFinite(entry.insertedAtMs)).map((entry) => entry.char).join('')).toBe(' new')
+    expect(html).toBe('Existing draft plus<mark class="insert-highlight"> new</mark>')
   })
 
   it('treats snapshot replacements as newly inserted characters in the selected range', () => {
@@ -657,16 +726,30 @@ describe('replay history start state', () => {
     ])
   })
 
-  it('formats absolute replay times from explicit replay origin and timezone offset', () => {
+  it('formats absolute replay times in the teacher local timezone', () => {
     const session = {
       replay_origin_wall_ms: Date.UTC(2026, 3, 22, 21, 0, 0),
       recorded_timezone: 'AST',
       recorded_timezone_offset_minutes: -240,
     }
+    const local = new Date(Date.UTC(2026, 3, 22, 21, 1, 30))
+    const offsetMinutes = -local.getTimezoneOffset()
+    const offsetSign = offsetMinutes >= 0 ? '+' : '-'
+    const absoluteOffset = Math.abs(offsetMinutes)
+    const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
+    const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
+    const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const timezone = localTimezone
+      ? `${localTimezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
+      : `UTC${offsetSign}${offsetHours}:${offsetMins}`
+    const hours = local.getHours() % 12 || 12
+    const minutes = String(local.getMinutes()).padStart(2, '0')
+    const seconds = String(local.getSeconds()).padStart(2, '0')
+    const meridiem = local.getHours() >= 12 ? 'PM' : 'AM'
 
     expect(getReplayOriginWallMs(session)).toBe(Date.UTC(2026, 3, 22, 21, 0, 0))
     expect(formatAbsoluteReplayTime(session, 90_000)).toBe(
-      'Apr 22, 2026, 5:01:30 PM AST (UTC-04:00)',
+      `${local.toLocaleString('en-US', { month: 'short' })} ${local.getDate()}, ${local.getFullYear()}, ${hours}:${minutes}:${seconds} ${meridiem} ${timezone}`,
     )
   })
 
@@ -674,6 +757,24 @@ describe('replay history start state', () => {
     expect(getReplayOriginWallMs({ start_wall_ns: 1_700_000_000_000_000_000 })).toBe(
       1_700_000_000_000,
     )
+  })
+
+  it('uses absolute wall timestamps on live replay history entries for character attribution', () => {
+    const attributed = buildAttributedDocument({
+      start_wall_ns: 1_700_000_000_000_000_000,
+      doc_text: 'abc',
+      doc_history: [
+        { t: 0, pos: 0, del: '', ins: 'a' },
+        { t: 60_000, pos: 1, del: '', ins: 'b', absolute_wall_ms: 1_700_000_010_000 },
+        { t: 120_000, pos: 2, del: '', ins: 'c' },
+      ],
+    })
+
+    expect(attributed.chars.map((entry) => entry.insertedAtMs)).toEqual([
+      1_700_000_000_000,
+      1_700_000_010_000,
+      1_700_000_120_000,
+    ])
   })
 
   it('falls back to created_at when explicit replay origin metadata is missing', () => {
@@ -754,6 +855,39 @@ describe('replay history start state', () => {
     expect(samples).toEqual([
       { t: 20, weight: 5 },
       { t: 40, weight: 6 },
+    ])
+  })
+
+  it('expands snapshot history into character-by-character replay steps', () => {
+    const replay = buildCharacterReplayHistory([
+      { t: 120, text: 'cat' },
+      { t: 240, text: 'cart' },
+    ])
+
+    expect(replay).toEqual([
+      { t: 40, text: 'c' },
+      { t: 80, text: 'ca' },
+      { t: 120, text: 'cat' },
+      { t: 240, text: 'cart' },
+    ])
+  })
+
+  it('uses recorded keydown timing to shape character playback for coarse snapshot history', () => {
+    const replay = buildCharacterReplayHistory(
+      [{ t: 1600, text: 'word' }],
+      [
+        { type: 'down', t: 100 },
+        { type: 'down', t: 140 },
+        { type: 'down', t: 800 },
+        { type: 'down', t: 1500 },
+      ],
+    )
+
+    expect(replay).toEqual([
+      { t: 100, text: 'w' },
+      { t: 140, text: 'wo' },
+      { t: 800, text: 'wor' },
+      { t: 1500, text: 'word' },
     ])
   })
 
@@ -857,6 +991,118 @@ describe('replay history start state', () => {
     )
 
     expect(history.map((entry) => entry.text)).toEqual(['go 😀😎', 'go 😎'])
+  })
+
+  it('parseHistory treats snapshot-like leading inserts as replacements instead of duplicate text', () => {
+    const history = parseHistory(
+      {
+        doc_text: 'This is my essay written in Handtyped',
+        doc_history: [
+          { t: 0, pos: 0, del: '', ins: 'This is my essay' },
+          { t: 10, pos: 0, del: '', ins: 'This is my essay written in Handtyped' },
+        ],
+      },
+      [],
+    )
+    const replay = buildCharacterReplayHistory(history, [])
+
+    expect(history.map((entry) => entry.text)).toEqual([
+      'This is my essay',
+      'This is my essay written in Handtyped',
+    ])
+    expect(replay.some((entry) => entry.text.includes('This is my essay written in HandtypedThis is my essay'))).toBe(false)
+    expect(replay.at(-1)?.text).toBe('This is my essay written in Handtyped')
+  })
+
+  it('stress tests replay reconstruction across randomized edit histories', () => {
+    function makePrng(seed) {
+      let state = seed >>> 0
+      return () => {
+        state = (state * 1664525 + 1013904223) >>> 0
+        return state / 0x100000000
+      }
+    }
+
+    function buildDelta(previous, next) {
+      const prevChars = Array.from(previous)
+      const nextChars = Array.from(next)
+      let start = 0
+      while (
+        start < prevChars.length &&
+        start < nextChars.length &&
+        prevChars[start] === nextChars[start]
+      ) {
+        start += 1
+      }
+
+      let prevEnd = prevChars.length - 1
+      let nextEnd = nextChars.length - 1
+      while (
+        prevEnd >= start &&
+        nextEnd >= start &&
+        prevChars[prevEnd] === nextChars[nextEnd]
+      ) {
+        prevEnd -= 1
+        nextEnd -= 1
+      }
+
+      const del = prevChars.slice(start, prevEnd + 1).join('')
+      const ins = nextChars.slice(start, nextEnd + 1).join('')
+      return del || ins ? { pos: start, del, ins } : null
+    }
+
+    const alphabet = Array.from('abc xyz😀é')
+    for (let seed = 1; seed <= 80; seed += 1) {
+      const random = makePrng(seed)
+      let text = ''
+      let time = 0
+      const doc_history = []
+
+      for (let step = 0; step < 120; step += 1) {
+        const chars = Array.from(text)
+        const mode = random()
+        const nextChars = chars.slice()
+
+        if (mode < 0.5 || !nextChars.length) {
+          const insertCount = 1 + Math.floor(random() * 4)
+          const insertAt = Math.floor(random() * (nextChars.length + 1))
+          const insert = Array.from({ length: insertCount }, () =>
+            alphabet[Math.floor(random() * alphabet.length)],
+          )
+          nextChars.splice(insertAt, 0, ...insert)
+        } else if (mode < 0.8) {
+          const deleteAt = Math.floor(random() * nextChars.length)
+          const deleteCount = 1 + Math.floor(random() * Math.min(4, nextChars.length - deleteAt))
+          nextChars.splice(deleteAt, deleteCount)
+        } else {
+          const replaceAt = Math.floor(random() * nextChars.length)
+          const deleteCount = Math.floor(random() * Math.min(4, nextChars.length - replaceAt))
+          const insertCount = 1 + Math.floor(random() * 3)
+          const insert = Array.from({ length: insertCount }, () =>
+            alphabet[Math.floor(random() * alphabet.length)],
+          )
+          nextChars.splice(replaceAt, deleteCount, ...insert)
+        }
+
+        const next = nextChars.join('')
+        const delta = buildDelta(text, next)
+        if (!delta) continue
+
+        time += Math.floor(random() * 4)
+        doc_history.push({ ...delta, t: time })
+        text = next
+      }
+
+      const parsed = parseHistory({ doc_text: text, doc_history }, [])
+      const replay = buildCharacterReplayHistory(parsed, [])
+
+      expect(parsed.at(-1)?.text, `seed ${seed} parsed final text`).toBe(text)
+      expect(replay.at(-1)?.text, `seed ${seed} replay final text`).toBe(text)
+      for (let index = 1; index < replay.length; index += 1) {
+        expect(replay[index].t, `seed ${seed} replay time ${index}`).toBeGreaterThan(replay[index - 1].t)
+        expect(replay[index].text, `seed ${seed} duplicate frame ${index}`).not.toBe(replay[index - 1].text)
+      }
+    }
   })
 
   it('buildRhythmSamples gives replacement edits a nonzero weight', () => {

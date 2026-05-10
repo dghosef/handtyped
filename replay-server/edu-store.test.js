@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { buildStudentConfig, createD1EduStore, createNodeEduStore } from './edu-store.js'
+import { buildStudentConfig, createD1EduStore, createNodeEduStore, ensureEduSeedData } from './edu-store.js'
 import { buildAssignment, buildClassroom, buildTeacher } from './edu-schema.js'
 
 class FakeD1PreparedStatement {
@@ -53,7 +53,8 @@ class FakeD1Database {
       return
     }
 
-    if (sql.startsWith('CREATE INDEX IF NOT EXISTS edu_records_')) {
+    if (sql.startsWith('CREATE INDEX IF NOT EXISTS edu_records_')
+      || sql.startsWith('CREATE UNIQUE INDEX IF NOT EXISTS edu_records_')) {
       return
     }
 
@@ -129,7 +130,8 @@ class FakeD1Database {
       return this.columns.map((name, index) => ({ cid: index, name }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind] = args
       return records
         .filter((row) => row.kind === kind && row.tenant_id === tenant_id)
@@ -137,49 +139,72 @@ class FakeD1Database {
           const updatedCompare = String(b.updated_at).localeCompare(String(a.updated_at))
           return updatedCompare || String(b.id).localeCompare(String(a.id))
         })
-        .map((row) => ({ json: row.json }))
+        .map((row) => ({ ...row }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')) {
+    if (sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? ORDER BY updated_at DESC')) {
+      const [kind] = args
+      return records
+        .filter((row) => row.kind === kind)
+        .sort((a, b) => {
+          const updatedCompare = String(b.updated_at).localeCompare(String(a.updated_at))
+          return updatedCompare || String(b.id).localeCompare(String(a.id))
+        })
+        .map((row) => ({ ...row }))
+    }
+
+    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')) {
       const [kind, id] = args
       const row = this.records.get(this.key(kind, id))
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')) {
       const [tenant_id, kind, email] = args
       const row = records.find((item) => item.tenant_id === tenant_id && item.kind === kind && item.email === email)
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')) {
+    if (sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND email = ? LIMIT 1')) {
+      const [kind, email] = args
+      const row = records.find((item) => item.kind === kind && item.email === email)
+      return row ? [{ ...row }] : []
+    }
+
+    if (sql.startsWith('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')) {
       const [kind, join_code] = args
       const row = records.find((item) => item.kind === kind && item.join_code === join_code)
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind, classroom_id] = args
       return records
         .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.classroom_id === classroom_id)
         .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))
-        .map((row) => ({ json: row.json }))
+        .map((row) => ({ ...row }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind, parent_id] = args
       return records
         .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.parent_id === parent_id)
         .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))
-        .map((row) => ({ json: row.json }))
+        .map((row) => ({ ...row }))
     }
 
-    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')) {
+    if (sql.startsWith('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')
+      || sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC')) {
       const [tenant_id, kind, classroom_id, student_key] = args
       const row = records
         .filter((item) => item.tenant_id === tenant_id && item.kind === kind && item.classroom_id === classroom_id && item.student_key === student_key)
         .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || String(b.id).localeCompare(String(a.id)))[0]
-      return row ? [{ json: row.json }] : []
+      return row ? [{ ...row }] : []
     }
 
     throw new Error(`Unsupported D1 query SQL in test: ${sql}`)
@@ -187,6 +212,33 @@ class FakeD1Database {
 }
 
 describe('createD1EduStore', () => {
+  it('does not seed a shared default teacher account', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+
+    await ensureEduSeedData(store)
+
+    await expect(store.listTeachers()).resolves.toEqual([])
+    await expect(store.getTeacherByEmail('teacher@edu.handtyped.app')).resolves.toBeNull()
+  })
+
+  it('removes a persisted shared default teacher account during seed maintenance', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    await store.putTeacher(
+      buildTeacher({
+        tenant_id: 'tenant_demo',
+        id: 'teacher_default',
+        name: 'Joseph Tan',
+        email: 'teacher@edu.handtyped.app',
+        access_code: 'handtyped-edu',
+      }),
+    )
+
+    await ensureEduSeedData(store)
+
+    await expect(store.getTeacherByEmail('teacher@edu.handtyped.app')).resolves.toBeNull()
+    await expect(store.listTeachers()).resolves.toEqual([])
+  })
+
   it('stores classrooms, assignments, teachers, and sessions without KV semantics', async () => {
     const store = createD1EduStore(new FakeD1Database())
 
@@ -373,6 +425,35 @@ describe('createD1EduStore', () => {
     expect(graceConfig.assignments[0]).toMatchObject({
       id: 'assignment-personal',
       temporary_access_until: '2026-04-27T18:00:00.000Z',
+      student_temporary_access_until: {},
+    })
+  })
+
+  it('keeps the later class extension when a student has an older personal extension', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-later', name: 'English 11', join_code: 'LATER' })
+    const assignment = buildAssignment({
+      id: 'assignment-later',
+      title: 'Long extension',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+      temporary_access_until: '2026-04-28T23:00:00.000Z',
+      student_temporary_access_until: {
+        'ada lovelace': '2026-04-28T15:00:00.000Z',
+      },
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(assignment)
+
+    const adaConfig = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+
+    expect(adaConfig.assignments[0]).toMatchObject({
+      id: 'assignment-later',
+      temporary_access_until: '2026-04-28T23:00:00.000Z',
       student_temporary_access_until: {},
     })
   })

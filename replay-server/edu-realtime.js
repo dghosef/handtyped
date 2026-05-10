@@ -62,6 +62,10 @@ export function buildStudentAssignmentGroupChannel({ tenantId, classroomId, assi
   ).trim()}`
 }
 
+export function buildStudentBootstrapChannel({ tenantId, classroomId }) {
+  return `student-bootstrap:${String(tenantId || '').trim()}:${String(classroomId || '').trim()}`
+}
+
 async function publishToRealtimeHub(env, { channels = [], event = 'message', payload = {} } = {}) {
   const normalizedChannels = parseChannels(channels)
   if (!env?.EDU_REALTIME || !normalizedChannels.length) {
@@ -112,7 +116,7 @@ export class EduRealtimeHub {
         clearInterval(this.heartbeatTimer)
         this.heartbeatTimer = null
       }
-    }, 15000)
+    }, 5000)
   }
 
   dropClient(clientId) {
@@ -146,9 +150,12 @@ export class EduRealtimeHub {
         continue
       }
       try {
-        await client.writer.write(frame)
         delivered += 1
+        client.writer.write(frame).catch(() => {
+          this.dropClient(client.id)
+        })
       } catch {
+        delivered -= 1
         this.dropClient(client.id)
       }
     }

@@ -50,6 +50,7 @@ const D1_SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS edu_records_join_code ON edu_records(kind, join_code)',
   'CREATE INDEX IF NOT EXISTS edu_records_classroom_id ON edu_records(kind, classroom_id)',
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_join_code ON edu_records(tenant_id, kind, join_code)',
+  "CREATE UNIQUE INDEX IF NOT EXISTS edu_records_classroom_join_code_unique ON edu_records(kind, join_code) WHERE kind = 'classroom' AND join_code IS NOT NULL",
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_classroom_id ON edu_records(tenant_id, kind, classroom_id, updated_at DESC)',
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_parent_id ON edu_records(tenant_id, kind, parent_id, updated_at DESC)',
   'CREATE INDEX IF NOT EXISTS edu_records_tenant_kind_student_key ON edu_records(tenant_id, kind, student_key, updated_at DESC)',
@@ -76,6 +77,44 @@ function normalizeStudentOverrideKey(studentName) {
   return String(studentName || '').trim().toLowerCase()
 }
 
+function cleanStudentName(studentName) {
+  return String(studentName || '').replace(/\s+/g, ' ').trim()
+}
+
+function studentAliasMap(classroom) {
+  return classroom?.student_aliases && typeof classroom.student_aliases === 'object' && !Array.isArray(classroom.student_aliases)
+    ? classroom.student_aliases
+    : {}
+}
+
+function canonicalStudentNameForClassroom(classroom, studentName) {
+  const cleanName = cleanStudentName(studentName)
+  const key = normalizeStudentOverrideKey(cleanName)
+  const alias = key ? cleanStudentName(studentAliasMap(classroom)[key]) : ''
+  return alias || cleanName
+}
+
+function studentRemovedFromClassroom(classroom, studentName) {
+  const key = normalizeStudentOverrideKey(canonicalStudentNameForClassroom(classroom, studentName) || studentName)
+  if (!key) {
+    return false
+  }
+  return (Array.isArray(classroom?.removed_students) ? classroom.removed_students : []).some(
+    (value) => normalizeStudentOverrideKey(value) === key,
+  )
+}
+
+function mergeById(previous = [], incoming = []) {
+  const merged = new Map()
+  for (const item of Array.isArray(previous) ? previous : []) {
+    if (item?.id) merged.set(item.id, item)
+  }
+  for (const item of Array.isArray(incoming) ? incoming : []) {
+    if (item?.id) merged.set(item.id, item)
+  }
+  return [...merged.values()]
+}
+
 function assignmentTargetsStudent(assignment, studentName) {
   const assignedStudents = Array.isArray(assignment?.assigned_students)
     ? assignment.assigned_students.map((value) => String(value || '').trim()).filter(Boolean)
@@ -91,9 +130,12 @@ function assignmentTargetsStudent(assignment, studentName) {
 }
 
 async function rememberStudentInClassroom(store, classroom, studentName) {
-  const normalizedStudent = String(studentName || '').trim()
+  const normalizedStudent = canonicalStudentNameForClassroom(classroom, studentName)
   if (!normalizedStudent || !classroom) {
     return classroom
+  }
+  if (studentRemovedFromClassroom(classroom, normalizedStudent)) {
+    return null
   }
 
   const existingStudents = Array.isArray(classroom.students) ? classroom.students : []
@@ -107,18 +149,178 @@ async function rememberStudentInClassroom(store, classroom, studentName) {
   const updated = buildClassroom({
     ...classroom,
     students: [...existingStudents, normalizedStudent],
+    removed_students: (Array.isArray(classroom.removed_students) ? classroom.removed_students : []).filter(
+      (value) => normalizeStudentOverrideKey(value) !== normalizeStudentOverrideKey(normalizedStudent),
+    ),
     updated_at: nowIso(),
   })
   await store.putClassroom(updated)
   return updated
 }
 
+function mapStudentNameList(values, oldName, newName) {
+  const oldKey = normalizeStudentOverrideKey(oldName)
+  const seen = new Set()
+  const next = []
+  for (const value of Array.isArray(values) ? values : []) {
+    const candidate = normalizeStudentOverrideKey(value) === oldKey ? cleanStudentName(newName) : cleanStudentName(value)
+    const key = normalizeStudentOverrideKey(candidate)
+    if (candidate && !seen.has(key)) {
+      seen.add(key)
+      next.push(candidate)
+    }
+  }
+  return next
+}
+
+function renameStudentKeyedMap(map, oldName, newName) {
+  const oldKey = normalizeStudentOverrideKey(oldName)
+  const newKey = normalizeStudentOverrideKey(newName)
+  const next = { ...(map || {}) }
+  if (oldKey && Object.hasOwn(next, oldKey)) {
+    next[newKey] = next[oldKey]
+    delete next[oldKey]
+  }
+  return next
+}
+
+function removeStudentKeyedMap(map, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  const next = { ...(map || {}) }
+  delete next[key]
+  return next
+}
+
+function renameStudentRequestEntries(entries, oldName, newName) {
+  const oldKey = normalizeStudentOverrideKey(oldName)
+  return (Array.isArray(entries) ? entries : []).map((entry) =>
+    normalizeStudentOverrideKey(entry?.student_name) === oldKey
+      ? { ...entry, student_name: cleanStudentName(newName) }
+      : entry,
+  )
+}
+
+function removeStudentRequestEntries(entries, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  return (Array.isArray(entries) ? entries : []).filter(
+    (entry) => normalizeStudentOverrideKey(entry?.student_name) !== key,
+  )
+}
+
+function assignmentWithRenamedStudent(assignment, oldName, newName) {
+  return buildAssignment({
+    ...assignment,
+    assigned_students: mapStudentNameList(assignment.assigned_students, oldName, newName),
+    student_temporary_access_until: renameStudentKeyedMap(assignment.student_temporary_access_until, oldName, newName),
+    student_access_revoked: renameStudentKeyedMap(assignment.student_access_revoked, oldName, newName),
+    student_overrides: renameStudentKeyedMap(assignment.student_overrides, oldName, newName),
+    student_access_requests: renameStudentRequestEntries(assignment.student_access_requests, oldName, newName),
+    student_feedback_requests: renameStudentRequestEntries(assignment.student_feedback_requests, oldName, newName),
+    updated_at: nowIso(),
+  })
+}
+
+function assignmentWithoutStudent(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  return buildAssignment({
+    ...assignment,
+    assigned_students: (Array.isArray(assignment.assigned_students) ? assignment.assigned_students : []).filter(
+      (value) => normalizeStudentOverrideKey(value) !== key,
+    ),
+    student_temporary_access_until: removeStudentKeyedMap(assignment.student_temporary_access_until, studentName),
+    student_access_revoked: removeStudentKeyedMap(assignment.student_access_revoked, studentName),
+    student_overrides: removeStudentKeyedMap(assignment.student_overrides, studentName),
+    student_access_requests: removeStudentRequestEntries(assignment.student_access_requests, studentName),
+    student_feedback_requests: removeStudentRequestEntries(assignment.student_feedback_requests, studentName),
+    updated_at: nowIso(),
+  })
+}
+
+export async function renameClassroomStudent(store, classroom, oldName, newName) {
+  const cleanOld = canonicalStudentNameForClassroom(classroom, oldName)
+  const cleanNew = cleanStudentName(newName)
+  const oldKey = normalizeStudentOverrideKey(cleanOld)
+  const newKey = normalizeStudentOverrideKey(cleanNew)
+  if (!classroom || !oldKey || !newKey) {
+    throw new Error('Both old and new student names are required')
+  }
+  if (oldKey === newKey) {
+    return buildClassroom({ ...classroom, updated_at: nowIso() })
+  }
+
+  const aliases = { ...studentAliasMap(classroom), [oldKey]: cleanNew }
+  for (const [aliasKey, aliasValue] of Object.entries(aliases)) {
+    if (normalizeStudentOverrideKey(aliasValue) === oldKey) {
+      aliases[aliasKey] = cleanNew
+    }
+  }
+  const updatedClassroom = buildClassroom({
+    ...classroom,
+    students: mapStudentNameList(classroom.students, cleanOld, cleanNew),
+    removed_students: (Array.isArray(classroom.removed_students) ? classroom.removed_students : []).filter(
+      (value) => normalizeStudentOverrideKey(value) !== newKey,
+    ),
+    student_aliases: aliases,
+    updated_at: nowIso(),
+  })
+  await store.putClassroom(updatedClassroom)
+
+  const assignments = await listAssignmentsByClassroomCompat(store, updatedClassroom)
+  for (const assignment of assignments) {
+    await store.putAssignment(assignmentWithRenamedStudent(assignment, cleanOld, cleanNew))
+  }
+  await store.refreshDashboardSummary?.(updatedClassroom.tenant_id)
+  return updatedClassroom
+}
+
+export async function removeClassroomStudent(store, classroom, studentName) {
+  const cleanName = canonicalStudentNameForClassroom(classroom, studentName)
+  const key = normalizeStudentOverrideKey(cleanName)
+  if (!classroom || !key) {
+    throw new Error('Student name is required')
+  }
+  const aliases = { ...studentAliasMap(classroom) }
+  for (const [aliasKey, aliasValue] of Object.entries(aliases)) {
+    if (aliasKey === key || normalizeStudentOverrideKey(aliasValue) === key) {
+      delete aliases[aliasKey]
+    }
+  }
+  const removedStudents = [
+    ...mapStudentNameList(classroom.removed_students, cleanName, cleanName),
+    cleanName,
+  ].filter(Boolean)
+  const updatedClassroom = buildClassroom({
+    ...classroom,
+    students: (Array.isArray(classroom.students) ? classroom.students : []).filter(
+      (value) => normalizeStudentOverrideKey(value) !== key,
+    ),
+    removed_students: [...new Set(removedStudents.map(cleanStudentName).filter(Boolean))],
+    student_aliases: aliases,
+    updated_at: nowIso(),
+  })
+  await store.putClassroom(updatedClassroom)
+
+  const assignments = await listAssignmentsByClassroomCompat(store, updatedClassroom)
+  for (const assignment of assignments) {
+    await store.putAssignment(assignmentWithoutStudent(assignment, cleanName))
+  }
+  await store.refreshDashboardSummary?.(updatedClassroom.tenant_id)
+  return updatedClassroom
+}
+
 function effectiveStudentTemporaryAccessUntil(assignment, studentName) {
   const key = normalizeStudentOverrideKey(studentName)
+  const classUntil = assignment?.temporary_access_until ?? null
   if (!key) {
-    return assignment?.temporary_access_until ?? null
+    return classUntil
   }
-  return assignment?.student_temporary_access_until?.[key] ?? assignment?.temporary_access_until ?? null
+  const studentUntil = assignment?.student_temporary_access_until?.[key] ?? null
+  const classDate = parseDateOrNull(classUntil)
+  const studentDate = parseDateOrNull(studentUntil)
+  if (studentDate && (!classDate || studentDate >= classDate)) {
+    return studentUntil
+  }
+  return classUntil
 }
 
 function parseDateOrNull(value) {
@@ -137,6 +339,16 @@ function laterDate(left, right) {
     return left
   }
   return left >= right ? left : right
+}
+
+function studentVisibleFeedback(grading) {
+  if (!grading || typeof grading !== 'object') {
+    return null
+  }
+  if (grading.feedback_status === 'draft') {
+    return null
+  }
+  return grading
 }
 
 function assignmentWindowContainsNow(window, now = new Date()) {
@@ -184,9 +396,9 @@ function assignmentWindowDeadline(window, now = new Date()) {
   return deadline
 }
 
-function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
+export function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
   const normalized = buildAssignment(assignment)
-  if (normalized.access_revoked) {
+  if (assignment?.access_revoked || normalized.access_revoked || studentAccessRevokedForAssignment(normalized, studentName)) {
     return { schedule_open: false, session_end_at: null }
   }
   const temporaryUntil = parseDateOrNull(effectiveStudentTemporaryAccessUntil(normalized, studentName))
@@ -303,6 +515,19 @@ function studentAccessRequestForAssignment(assignment, studentName) {
   return request && typeof request === 'object' ? request : null
 }
 
+function studentFeedbackRequestForAssignment(assignment, studentName) {
+  const key = normalizeStudentOverrideKey(studentName)
+  if (!key) {
+    return null
+  }
+  const requests = assignment?.student_feedback_requests
+  if (!requests || typeof requests !== 'object') {
+    return null
+  }
+  const request = requests[key]
+  return request && typeof request === 'object' ? request : null
+}
+
 function assignmentForStudentConfig(assignment, studentName) {
   const normalized = buildAssignment(assignment)
   const override = effectiveStudentSettingsOverride(normalized, studentName)
@@ -327,7 +552,9 @@ function assignmentForStudentConfig(assignment, studentName) {
     },
     student_feedback: normalized.student_feedback || null,
     student_access_request: studentAccessRequestForAssignment(normalized, studentName),
+    student_feedback_request: studentFeedbackRequestForAssignment(normalized, studentName),
     student_access_requests: {},
+    student_feedback_requests: {},
     student_access_revoked: {},
     student_temporary_access_until: {},
     student_overrides: {},
@@ -433,6 +660,9 @@ export function createNodeEduStore(baseDir) {
   }
 
   function filterByTenant(items, tenantId = DEFAULT_TENANT_ID) {
+    if (tenantId == null) {
+      return items
+    }
     const normalizedTenant = normalizeTenantId(tenantId)
     return items.filter((item) => normalizeTenantId(item?.tenant_id) === normalizedTenant)
   }
@@ -488,8 +718,17 @@ export function createNodeEduStore(baseDir) {
       next.push(teacher)
       writeCollection('teachers', next)
     },
-    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
-      return filterByTenant(readCollection('teachers'), tenantId).find((item) => item.email === email) || null
+    async getTeacherByEmail(email, tenantId = null) {
+      const teachers = readCollection('teachers')
+      const scoped = tenantId ? filterByTenant(teachers, tenantId) : teachers
+      return scoped.find((item) => item.email === email) || null
+    },
+    async deleteTeacher(id) {
+      const teachers = readCollection('teachers')
+      writeCollection(
+        'teachers',
+        teachers.filter((item) => item.id !== id),
+      )
     },
     async putTeacherSession(session) {
       const sessions = readCollection('teacher_sessions')
@@ -522,6 +761,20 @@ export function createNodeEduStore(baseDir) {
       const nextSummaries = summaries.filter((item) => item.id !== summary.id)
       nextSummaries.push(summary)
       writeCollection('live_session_summaries', nextSummaries)
+      writeCollection(
+        'dashboard_summaries',
+        mergeById(readCollection('dashboard_summaries'), [
+          buildDashboardSummaryRecord({
+            tenantId: session.tenant_id,
+            classrooms: readCollection('classrooms').filter((item) => item.tenant_id === session.tenant_id).length,
+            assignments: readCollection('assignments').filter((item) => item.tenant_id === session.tenant_id).length,
+            live_sessions: next.filter((item) => item.tenant_id === session.tenant_id).length,
+            replays_available: readCollection('replays').filter((item) => item.tenant_id === session.tenant_id).length,
+            audits_recorded: readCollection('assignment_audits').filter((item) => item.tenant_id === session.tenant_id).length,
+            active_students: next.filter((item) => item.tenant_id === session.tenant_id).length,
+          }),
+        ]),
+      )
     },
     async getLiveSession(id) {
       return readCollection('live_sessions').find((item) => item.id === id) || null
@@ -647,6 +900,9 @@ export function createKvEduStore(kv) {
   }
 
   function filterByTenant(items, tenantId = DEFAULT_TENANT_ID) {
+    if (tenantId == null) {
+      return items
+    }
     const normalizedTenant = normalizeTenantId(tenantId)
     return items.filter((item) => normalizeTenantId(item?.tenant_id) === normalizedTenant)
   }
@@ -687,9 +943,13 @@ export function createKvEduStore(kv) {
       teacher = buildTeacher(teacher)
       await kv.put(`${TEACHER_PREFIX}${teacher.id}`, JSON.stringify(teacher))
     },
-    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
-      const teachers = filterByTenant(await listByPrefix(TEACHER_PREFIX), tenantId)
-      return teachers.find((item) => item.email === email) || null
+    async getTeacherByEmail(email, tenantId = null) {
+      const teachers = await listByPrefix(TEACHER_PREFIX)
+      const scoped = tenantId ? filterByTenant(teachers, tenantId) : teachers
+      return scoped.find((item) => item.email === email) || null
+    },
+    async deleteTeacher(id) {
+      await kv.delete(`${TEACHER_PREFIX}${id}`)
     },
     async putTeacherSession(session) {
       await kv.put(`${TEACHER_SESSION_PREFIX}${session.id}`, JSON.stringify(session))
@@ -709,6 +969,7 @@ export function createKvEduStore(kv) {
       const summary = buildLiveSessionSummary(session)
       await kv.put(`${LIVE_PREFIX}${session.id}`, JSON.stringify(session))
       await kv.put(`${LIVE_SUMMARY_PREFIX}${session.assignment_id}:${session.id}`, JSON.stringify(summary))
+      await this.refreshDashboardSummary(session.tenant_id)
     },
     async getLiveSession(id) {
       const raw = await kv.get(`${LIVE_PREFIX}${id}`)
@@ -813,6 +1074,21 @@ export function createD1EduStore(db) {
   let schemaReady = null
   let maintenanceRanAt = 0
 
+  function hydrateRow(row) {
+    if (!row) {
+      return null
+    }
+    const parsed = JSON.parse(row.json)
+    return {
+      ...parsed,
+      tenant_id: parsed?.tenant_id || row.tenant_id || DEFAULT_TENANT_ID,
+      classroom_id: parsed?.classroom_id || row.classroom_id || parsed?.assignment_id || null,
+      student_key: parsed?.student_key || row.student_key || null,
+      parent_id: parsed?.parent_id || row.parent_id || parsed?.live_session_id || parsed?.replay_session_id || null,
+      expires_at: Object.hasOwn(parsed || {}, 'expires_at') ? parsed.expires_at : row.expires_at ?? null,
+    }
+  }
+
   async function schemaColumns() {
     const response = await db.prepare('PRAGMA table_info(edu_records)').all()
     return new Set((response.results || []).map((row) => String(row.name || '')))
@@ -876,64 +1152,73 @@ export function createD1EduStore(db) {
 
   async function listKind(kind, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
+    if (tenantId == null) {
+      const response = await db
+        .prepare(
+          'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? ORDER BY updated_at DESC, id DESC',
+        )
+        .bind(kind)
+        .all()
+      return (response.results || []).map((row) => hydrateRow(row))
+    }
     const response = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC, id DESC',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC, id DESC',
       )
       .bind(normalizeTenantId(tenantId), kind)
       .all()
-    return (response.results || []).map((row) => JSON.parse(row.json))
+    return (response.results || []).map((row) => hydrateRow(row))
   }
 
   async function getByKindAndId(kind, id) {
     await ensureSchema()
     const row = await db
-      .prepare('SELECT json FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
+      .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND id = ? LIMIT 1')
       .bind(kind, id)
       .first()
-    return row ? JSON.parse(row.json) : null
+    return row ? hydrateRow(row) : null
   }
 
   async function getByKindAndJoinCode(kind, joinCode) {
     await ensureSchema()
     const row = await db
-      .prepare('SELECT json FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
+      .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND join_code = ? LIMIT 1')
       .bind(kind, normalizeJoinCode(joinCode))
       .first()
-    return row ? JSON.parse(row.json) : null
+    return row ? hydrateRow(row) : null
   }
 
   async function listKindByClassroom(kind, classroomId, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const response = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? ORDER BY updated_at DESC, id DESC',
       )
       .bind(normalizeTenantId(tenantId), kind, classroomId)
       .all()
-    return (response.results || []).map((row) => JSON.parse(row.json))
+    return (response.results || []).map((row) => hydrateRow(row))
   }
 
   async function listKindByParent(kind, parentId, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const response = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC, id DESC',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND parent_id = ? ORDER BY updated_at DESC, id DESC',
       )
       .bind(normalizeTenantId(tenantId), kind, parentId)
       .all()
-    return (response.results || []).map((row) => JSON.parse(row.json))
+    return (response.results || []).map((row) => hydrateRow(row))
   }
 
   async function getLiveSessionForAssignmentStudent(assignmentId, studentName, tenantId = DEFAULT_TENANT_ID) {
     await ensureSchema()
     const row = await db
       .prepare(
-        'SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC, id DESC LIMIT 1',
+        'SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND classroom_id = ? AND student_key = ? ORDER BY updated_at DESC, id DESC LIMIT 1',
       )
       .bind(normalizeTenantId(tenantId), 'live_session', assignmentId, normalizedStudentKey(studentName))
       .first()
-    return row ? JSON.parse(row.json) : null
+    return row ? hydrateRow(row) : null
   }
 
   async function putRecord(kind, id, record, extras = {}) {
@@ -1058,13 +1343,24 @@ export function createD1EduStore(db) {
         email: normalizeEmail(teacher.email),
       })
     },
-    async getTeacherByEmail(email, tenantId = DEFAULT_TENANT_ID) {
+    async getTeacherByEmail(email, tenantId = null) {
       await ensureSchema()
+      if (!tenantId) {
+        const row = await db
+          .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE kind = ? AND email = ? LIMIT 1')
+          .bind('teacher', normalizeEmail(email))
+          .first()
+        return row ? hydrateRow(row) : null
+      }
       const row = await db
-        .prepare('SELECT json FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
+        .prepare('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? AND email = ? LIMIT 1')
         .bind(normalizeTenantId(tenantId), 'teacher', normalizeEmail(email))
         .first()
-      return row ? JSON.parse(row.json) : null
+      return row ? hydrateRow(row) : null
+    },
+    async deleteTeacher(id) {
+      await ensureSchema()
+      await db.prepare('DELETE FROM edu_records WHERE kind = ? AND id = ?').bind('teacher', id).run()
     },
     async putTeacherSession(session) {
       await putRecord('teacher_session', session.id, session, {
@@ -1189,17 +1485,10 @@ export async function ensureEduSeedData(store) {
   const liveSessions = await store.listLiveSessions(tenantId)
   const teachers = await store.listTeachers(tenantId)
 
-  if (!teachers.length) {
-    const runtimeEnv = globalThis.process?.env || {}
-    await store.putTeacher(
-      buildTeacher({
-        tenant_id: tenantId,
-        id: 'teacher_default',
-        name: 'Joseph Tan',
-        email: runtimeEnv.EDU_TEACHER_EMAIL || 'teacher@edu.handtyped.app',
-        access_code: runtimeEnv.EDU_TEACHER_ACCESS_CODE || 'handtyped-edu',
-      }),
-    )
+  for (const teacher of teachers) {
+    if (teacher?.id === 'teacher_default') {
+      await store.deleteTeacher?.(teacher.id)
+    }
   }
 
   if (classrooms.length || assignments.length || liveSessions.length) {
@@ -1237,8 +1526,8 @@ export async function ensureEduSeedData(store) {
     instructions: 'Use only this computer. Build your argument from memory and class notes.',
     browser_policy: {
       browser_enabled: true,
-      home_url: 'https://www.gutenberg.org',
-      allowed_domains: ['gutenberg.org'],
+      home_url: '',
+      allowed_domains: [],
       log_all_navigation: true,
     },
   })
@@ -1412,6 +1701,7 @@ export function buildAssignmentAuditRecord({
     )
     pushChange('Blocked students', previousSnapshot.student_access_revoked, nextSnapshot.student_access_revoked)
     pushChange('Access requests', previousSnapshot.student_access_requests, nextSnapshot.student_access_requests)
+    pushChange('Feedback requests', previousSnapshot.student_feedback_requests, nextSnapshot.student_feedback_requests)
     pushChange('Student setting overrides', previousSnapshot.student_overrides, nextSnapshot.student_overrides)
     pushChange('Assigned students', previousSnapshot.assigned_students, nextSnapshot.assigned_students)
     pushChange('Rules', previousSnapshot.policy, nextSnapshot.policy)
@@ -1448,24 +1738,31 @@ export function buildAssignmentAuditRecord({
 export async function buildStudentConfig(store, { joinCode, studentName } = {}) {
   let classroom = await getClassroomByJoinCodeCompat(store, joinCode)
   if (!classroom) {
-    return { classroom: null, assignments: [] }
+    return { classroom: null, assignments: [], canonical_student_name: null }
   }
-  classroom = await rememberStudentInClassroom(store, classroom, studentName)
+  const canonicalStudentName = canonicalStudentNameForClassroom(classroom, studentName)
+  if (studentRemovedFromClassroom(classroom, canonicalStudentName)) {
+    return { classroom: null, assignments: [], canonical_student_name: canonicalStudentName || null }
+  }
+  classroom = await rememberStudentInClassroom(store, classroom, canonicalStudentName)
+  if (!classroom) {
+    return { classroom: null, assignments: [], canonical_student_name: canonicalStudentName || null }
+  }
   const assignments = (await listAssignmentsByClassroomCompat(store, classroom))
-    .filter((item) => assignmentTargetsStudent(item, studentName))
+    .filter((item) => assignmentTargetsStudent(item, canonicalStudentName))
   const assignmentsWithFeedback = await Promise.all(
     assignments.map(async (item) => {
-      const liveSession = await getLiveSessionForAssignmentStudentCompat(store, item.id, studentName, classroom.tenant_id)
+      const liveSession = await getLiveSessionForAssignmentStudentCompat(store, item.id, canonicalStudentName, classroom.tenant_id)
       return assignmentForStudentConfig(
         {
           ...item,
-          student_feedback: liveSession?.grading || null,
+          student_feedback: studentVisibleFeedback(liveSession?.grading) || item?.student_feedback || null,
         },
-        studentName,
+        canonicalStudentName,
       )
     }),
   )
-  return { classroom, assignments: assignmentsWithFeedback }
+  return { classroom, assignments: assignmentsWithFeedback, canonical_student_name: canonicalStudentName || null }
 }
 
 export async function buildStudentAssignmentConfig(
@@ -1490,24 +1787,30 @@ export async function buildStudentAssignmentConfig(
     return { classroom: null, assignment: null }
   }
 
-  if (!assignmentTargetsStudent(assignment, studentName)) {
+  const canonicalStudentName = canonicalStudentNameForClassroom(classroom, studentName)
+  if (studentRemovedFromClassroom(classroom, canonicalStudentName)) {
+    return { classroom: null, assignment: null, canonical_student_name: canonicalStudentName || null }
+  }
+
+  if (!assignmentTargetsStudent(assignment, canonicalStudentName)) {
     return { classroom, assignment: null }
   }
 
   const liveSession = await getLiveSessionForAssignmentStudentCompat(
     store,
     assignment.id,
-    studentName,
+    canonicalStudentName,
     assignment.tenant_id,
   )
   return {
     classroom,
+    canonical_student_name: canonicalStudentName || null,
     assignment: assignmentForStudentConfig(
       {
         ...assignment,
-        student_feedback: liveSession?.grading || null,
+        student_feedback: studentVisibleFeedback(liveSession?.grading) || assignment?.student_feedback || null,
       },
-      studentName,
+      canonicalStudentName,
     ),
   }
 }

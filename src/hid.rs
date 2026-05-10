@@ -205,6 +205,13 @@ const K_HID_PAGE_GENERIC_DESKTOP: i32 = 0x01;
 // Apple Inc. vendor ID — restricts capture to Apple-manufactured keyboards only
 const K_APPLE_VENDOR_ID: i32 = 0x05AC;
 
+fn is_builtin_transport(transport: &str) -> bool {
+    let normalized = transport.trim();
+    BUILTIN_TRANSPORTS
+        .iter()
+        .any(|accepted| accepted.eq_ignore_ascii_case(normalized))
+}
+
 const K_OPTIONS_NONE: IOOptionBits = 0;
 // IOHIDRequestType enum: PostEvent=0, ListenEvent=1
 const K_IOHID_REQUEST_TYPE_LISTEN_EVENT: u32 = 1;
@@ -295,7 +302,7 @@ unsafe extern "C" fn hid_input_callback(
     }
 
     let transport = device_property_string(device, "Transport").unwrap_or_else(|| "unknown".into());
-    if !BUILTIN_TRANSPORTS.contains(&transport.as_str()) {
+    if !is_builtin_transport(&transport) {
         return;
     }
 
@@ -415,7 +422,7 @@ unsafe extern "C" fn hid_device_matched_callback(
         transport, vendor_id, product_id
     ));
 
-    if BUILTIN_TRANSPORTS.contains(&transport.as_str()) {
+    if is_builtin_transport(&transport) {
         if let Ok(mut ki) = ctx.state.keyboard_info.lock() {
             *ki = Some(KeyboardInfo {
                 vendor_id,
@@ -666,9 +673,10 @@ mod tests {
 
     #[test]
     fn test_builtin_transports_include_spi_and_fifo() {
-        assert!(BUILTIN_TRANSPORTS.contains(&"SPI"));
-        assert!(BUILTIN_TRANSPORTS.contains(&"FIFO"));
-        assert!(!BUILTIN_TRANSPORTS.contains(&"USB"));
+        assert!(is_builtin_transport("SPI"));
+        assert!(is_builtin_transport("FIFO"));
+        assert!(is_builtin_transport(" fifo "));
+        assert!(!is_builtin_transport("USB"));
     }
 
     #[test]

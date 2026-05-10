@@ -107,6 +107,9 @@ fn build_replay_attestation_payload(
     let keyboard_transport = keyboard
         .as_ref()
         .map(|k| k.transport.clone())
+        // Older runs can observe HID activity before the matched-device callback
+        // has populated metadata. SPI is the historical safe default here; FIFO
+        // will be reported when the matched callback is available.
         .or_else(|| hid_active.then(|| "SPI".to_string()));
 
     ReplayAttestationPayload {

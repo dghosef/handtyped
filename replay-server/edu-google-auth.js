@@ -1,21 +1,5 @@
 import { normalizeTeacherEmail } from './edu-schema.js'
 
-function decodeJwtPayload(credential) {
-  const parts = String(credential || '').split('.')
-  if (parts.length < 2) {
-    return null
-  }
-
-  try {
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
-    const json = Buffer.from(padded, 'base64').toString('utf8')
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
-}
-
 function coerceMockProfile(profile = {}) {
   return {
     sub: String(profile.sub || profile.user_id || ''),
@@ -41,17 +25,13 @@ export async function verifyGoogleIdToken({
     return coerceMockProfile(await mockVerifier(credential))
   }
 
-  const decoded = decodeJwtPayload(credential)
-  if (decoded?.email && decoded?.email_verified) {
-    const aud = String(decoded.aud || '')
-    const hd = String(decoded.hd || '')
-    if ((!clientId || aud === clientId) && (!hostedDomain || hd === hostedDomain)) {
-      return coerceMockProfile(decoded)
-    }
+  const rawCredential = String(credential || '').trim()
+  if (!rawCredential) {
+    throw new Error('Google credential is required')
   }
 
   const response = await fetchImpl(
-    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(String(credential || ''))}`,
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(rawCredential)}`,
   )
 
   if (!response.ok) {
@@ -62,7 +42,7 @@ export async function verifyGoogleIdToken({
   if (!profile.email || !profile.email_verified) {
     throw new Error('Google account email is not verified')
   }
-  if (clientId && profile.aud && profile.aud !== clientId) {
+  if (clientId && profile.aud !== clientId) {
     throw new Error('Google token audience mismatch')
   }
   if (hostedDomain && profile.hd && profile.hd !== hostedDomain) {

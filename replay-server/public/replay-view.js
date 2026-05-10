@@ -102,24 +102,24 @@ export function formatAbsoluteReplayTime(session, elapsedMs) {
     return 'Unknown time'
   }
 
-  const offsetMinutes = Number(session?.recorded_timezone_offset_minutes)
-  const normalizedOffset = Number.isFinite(offsetMinutes) ? offsetMinutes : 0
-  const shifted = new Date(origin + Math.max(0, Number(elapsedMs) || 0) + normalizedOffset * 60_000)
-  const month = shifted.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
-  const day = shifted.getUTCDate()
-  const year = shifted.getUTCFullYear()
-  let hours = shifted.getUTCHours()
-  const minutes = String(shifted.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(shifted.getUTCSeconds()).padStart(2, '0')
+  const local = new Date(origin + Math.max(0, Number(elapsedMs) || 0))
+  const month = local.toLocaleString('en-US', { month: 'short' })
+  const day = local.getDate()
+  const year = local.getFullYear()
+  let hours = local.getHours()
+  const minutes = String(local.getMinutes()).padStart(2, '0')
+  const seconds = String(local.getSeconds()).padStart(2, '0')
   const meridiem = hours >= 12 ? 'PM' : 'AM'
   hours = hours % 12 || 12
 
-  const offsetSign = normalizedOffset >= 0 ? '+' : '-'
-  const absoluteOffset = Math.abs(normalizedOffset)
+  const offsetMinutes = -local.getTimezoneOffset()
+  const offsetSign = offsetMinutes >= 0 ? '+' : '-'
+  const absoluteOffset = Math.abs(offsetMinutes)
   const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
   const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
-  const timezone = session?.recorded_timezone
-    ? `${session.recorded_timezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = localTimezone
+    ? `${localTimezone} (UTC${offsetSign}${offsetHours}:${offsetMins})`
     : `UTC${offsetSign}${offsetHours}:${offsetMins}`
 
   return `${month} ${day}, ${year}, ${hours}:${minutes}:${seconds} ${meridiem} ${timezone}`
@@ -320,6 +320,180 @@ export function compressIdleGaps(history, maxGapMs = 5000) {
   return makeStrictlyIncreasingTimeline(dedupeHistory(compressed))
 }
 
+function keyEventElapsedMs(event, replayOriginWallMs, fallbackOriginNs) {
+  const rawT = Number(event?.t)
+  if (!Number.isFinite(rawT)) {
+    return null
+  }
+
+  if (Number.isFinite(replayOriginWallMs) && replayOriginWallMs > 0) {
+    if (rawT >= 1e12) {
+      return Math.max(0, Math.round((rawT / 1e6) - replayOriginWallMs))
+    }
+    return Math.max(0, Math.round(rawT - replayOriginWallMs))
+  }
+
+  if (Number.isFinite(fallbackOriginNs) && fallbackOriginNs > 0 && rawT >= fallbackOriginNs) {
+    return Math.max(0, Math.round((rawT - fallbackOriginNs) / 1e6))
+  }
+
+  return Math.max(0, Math.round(rawT))
+}
+
+function buildOperationTimes(operationCount, startT, endT, keydownTimes = []) {
+  if (operationCount <= 0) {
+    return []
+  }
+
+  const normalizedStart = Math.max(0, Number(startT) || 0)
+  const normalizedEnd = Math.max(normalizedStart, Number(endT) || 0)
+  const usableKeydowns = keydownTimes
+    .map((time) => Math.max(normalizedStart, Math.min(normalizedEnd, Number(time) || 0)))
+    .filter((time) => Number.isFinite(time))
+
+  if (!usableKeydowns.length) {
+    return Array.from({ length: operationCount }, (_, index) => {
+      if (normalizedEnd === normalizedStart) {
+        return normalizedStart + index + 1
+      }
+      const pct = (index + 1) / operationCount
+      return Math.round(normalizedStart + ((normalizedEnd - normalizedStart) * pct))
+    })
+  }
+
+  if (usableKeydowns.length === 1) {
+    return Array.from({ length: operationCount }, () => usableKeydowns[0])
+  }
+
+  return Array.from({ length: operationCount }, (_, index) => {
+    if (operationCount === 1) {
+      return usableKeydowns[usableKeydowns.length - 1]
+    }
+
+    const scaledIndex = (index * (usableKeydowns.length - 1)) / (operationCount - 1)
+    const lowerIndex = Math.floor(scaledIndex)
+    const upperIndex = Math.min(usableKeydowns.length - 1, Math.ceil(scaledIndex))
+    const pct = scaledIndex - lowerIndex
+    return Math.round(
+      usableKeydowns[lowerIndex] +
+      ((usableKeydowns[upperIndex] - usableKeydowns[lowerIndex]) * pct),
+    )
+  })
+}
+
+function buildTransitionSteps(previousText, nextText, startT, endT, keydownTimes = []) {
+  const previousChars = Array.from(String(previousText || ''))
+  const nextChars = Array.from(String(nextText || ''))
+  let prefix = 0
+
+  while (
+    prefix < previousChars.length &&
+    prefix < nextChars.length &&
+    previousChars[prefix] === nextChars[prefix]
+  ) {
+    prefix += 1
+  }
+
+  let previousSuffix = previousChars.length
+  let nextSuffix = nextChars.length
+  while (
+    previousSuffix > prefix &&
+    nextSuffix > prefix &&
+    previousChars[previousSuffix - 1] === nextChars[nextSuffix - 1]
+  ) {
+    previousSuffix -= 1
+    nextSuffix -= 1
+  }
+
+  const removals = Math.max(0, previousSuffix - prefix)
+  const insertions = nextChars.slice(prefix, nextSuffix)
+  const operationCount = removals + insertions.length
+  if (operationCount === 0) {
+    return []
+  }
+
+  const currentChars = previousChars.slice()
+  const steps = []
+  const operationTimes = buildOperationTimes(operationCount, startT, endT, keydownTimes)
+  let operationIndex = 0
+
+  for (let i = 0; i < removals; i += 1) {
+    currentChars.splice(prefix, 1)
+    steps.push({
+      t: operationTimes[operationIndex] ?? Math.max(0, Number(endT) || 0),
+      text: currentChars.join(''),
+    })
+    operationIndex += 1
+  }
+
+  for (let i = 0; i < insertions.length; i += 1) {
+    currentChars.splice(prefix + i, 0, insertions[i])
+    steps.push({
+      t: operationTimes[operationIndex] ?? Math.max(0, Number(endT) || 0),
+      text: currentChars.join(''),
+    })
+    operationIndex += 1
+  }
+
+  return steps
+}
+
+export function buildCharacterReplayHistory(history, keyEvents = [], options = {}) {
+  if (!Array.isArray(history) || history.length === 0) {
+    return []
+  }
+
+  const replayOriginWallMs = Number(options?.replayOriginWallMs)
+  const fallbackOriginNs = Number(options?.startWallNs)
+  const keydownTimes = Array.isArray(keyEvents)
+    ? keyEvents
+      .map((event) => keyEventElapsedMs(event, replayOriginWallMs, fallbackOriginNs))
+      .filter((time) => Number.isFinite(time))
+      .sort((a, b) => a - b)
+    : []
+  const steps = []
+  let previousText = ''
+  let previousT = 0
+  let keydownIndex = 0
+
+  for (const entry of history) {
+    const nextText = String(entry?.text || '')
+    const nextT = Math.max(0, Number(entry?.t) || 0)
+    while (keydownIndex < keydownTimes.length && keydownTimes[keydownIndex] < previousT) {
+      keydownIndex += 1
+    }
+
+    let keydownEndIndex = keydownIndex
+    while (keydownEndIndex < keydownTimes.length && keydownTimes[keydownEndIndex] <= nextT) {
+      keydownEndIndex += 1
+    }
+
+    const transitionSteps = buildTransitionSteps(
+      previousText,
+      nextText,
+      previousT,
+      nextT,
+      keydownTimes.slice(keydownIndex, keydownEndIndex),
+    )
+
+    if (transitionSteps.length) {
+      steps.push(...transitionSteps)
+    } else if (!steps.length || steps[steps.length - 1]?.text !== nextText) {
+      steps.push({ t: nextT, text: nextText })
+    }
+
+    previousText = nextText
+    previousT = nextT
+    keydownIndex = keydownEndIndex
+  }
+
+  if (!steps.length) {
+    return [{ t: previousT, text: previousText }]
+  }
+
+  return makeStrictlyIncreasingTimeline(dedupeHistory(steps))
+}
+
 export function buildRhythmSamples(history, keyEvents = []) {
   if (Array.isArray(history) && history.length > 1) {
     const samples = []
@@ -385,19 +559,208 @@ export function escapeHtml(text) {
     .replace(/'/g, '&#39;')
 }
 
+export function stripHandtypedInlineMarkup(markdown = '') {
+  return String(markdown || '').replace(/\[(\/?)(size|font|u|highlight)(?:[ =][^\]]+)?\]/gi, '')
+}
+
+const HANDTYPED_REPLAY_FONT_FAMILIES = Object.freeze({
+  arial: 'Arial, Helvetica, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+  sans: 'Inter, Arial, Helvetica, sans-serif',
+  mono: '"Courier New", monospace',
+  georgia: 'Georgia, serif',
+  times: '"Times New Roman", Times, serif',
+  garamond: 'Garamond, Georgia, serif',
+  palatino: 'Palatino, "Palatino Linotype", serif',
+  baskerville: 'Baskerville, Georgia, serif',
+  verdana: 'Verdana, Geneva, sans-serif',
+  trebuchet: '"Trebuchet MS", Arial, sans-serif',
+  tahoma: 'Tahoma, Geneva, sans-serif',
+  helvetica: 'Helvetica, Arial, sans-serif',
+  courier: '"Courier New", Courier, monospace',
+  'comic-sans': '"Comic Sans MS", "Comic Sans", cursive',
+  lucida: '"Lucida Sans Unicode", "Lucida Grande", sans-serif',
+})
+
+function safeHandtypedFontFamily(value) {
+  return HANDTYPED_REPLAY_FONT_FAMILIES[String(value || '').trim().toLowerCase()] || ''
+}
+
+function safeHandtypedFontSize(value) {
+  const size = Number.parseInt(value, 10)
+  return Number.isFinite(size) && size >= 10 && size <= 100 ? size : null
+}
+
+export function renderHandtypedInlineMarkupHtml(html = '') {
+  const source = String(html || '')
+  const tokenPattern = /\[(\/?)(size|font|u|highlight)(?:[ =]([^\]]+))?\]/gi
+  const stacks = {
+    font: [],
+    highlight: [],
+    size: [],
+    u: [],
+  }
+  let result = ''
+  let cursor = 0
+  let match = tokenPattern.exec(source)
+
+  while (match) {
+    result += source.slice(cursor, match.index)
+    cursor = match.index + match[0].length
+
+    const closing = Boolean(match[1])
+    const mark = String(match[2] || '').toLowerCase()
+    const value = match[3]
+
+    if (closing) {
+      const opened = stacks[mark]?.pop()
+      if (opened) {
+        result += mark === 'u' ? '</u>' : mark === 'highlight' ? '</mark>' : '</span>'
+      }
+      match = tokenPattern.exec(source)
+      continue
+    }
+
+    if (mark === 'u') {
+      stacks.u.push(true)
+      result += '<u>'
+    } else if (mark === 'highlight') {
+      stacks.highlight.push(true)
+      result += '<mark class="handtyped-replay-highlight">'
+    } else if (mark === 'font') {
+      const fontFamily = safeHandtypedFontFamily(value)
+      stacks.font.push(Boolean(fontFamily))
+      if (fontFamily) {
+        result += `<span style="font-family:${escapeHtml(fontFamily)}">`
+      }
+    } else if (mark === 'size') {
+      const fontSize = safeHandtypedFontSize(value)
+      stacks.size.push(Boolean(fontSize))
+      if (fontSize) {
+        result += `<span style="font-size:${fontSize}px">`
+      }
+    }
+
+    match = tokenPattern.exec(source)
+  }
+
+  return result + source.slice(cursor)
+}
+
+export function handtypedMarkdownDisplayText(markdown = '') {
+  const raw = stripHandtypedInlineMarkup(markdown).replace(/\r/g, '')
+  let text = ''
+  let index = 0
+  let atLineStart = true
+
+  while (index < raw.length) {
+    const rest = raw.slice(index)
+    if (atLineStart) {
+      const headingMatch = rest.match(/^(#{1,3})[ \t]+/)
+      if (headingMatch) {
+        index += headingMatch[0].length
+        atLineStart = false
+        continue
+      }
+    }
+
+    if (rest.startsWith('**') || rest.startsWith('__')) {
+      index += 2
+      continue
+    }
+    if ((rest[0] === '*' && rest[1] !== '*') || (rest[0] === '_' && rest[1] !== '_')) {
+      index += 1
+      continue
+    }
+
+    text += raw[index]
+    atLineStart = raw[index] === '\n'
+    index += 1
+  }
+
+  return text
+}
+
 function toAttributedChars(text, insertedAtMs) {
   return Array.from(String(text || '')).map((char) => ({ char, insertedAtMs }))
+}
+
+function reconcileAttributedCharsWithFinalText(chars, finalText) {
+  const finalChars = Array.from(String(finalText || ''))
+  const knownText = chars.map((entry) => entry.char).join('')
+  if (!knownText) {
+    return toAttributedChars(finalText, null)
+  }
+
+  const knownIndex = finalChars.join('').indexOf(knownText)
+  if (knownIndex >= 0) {
+    return [
+      ...toAttributedChars(finalChars.slice(0, knownIndex).join(''), null),
+      ...chars,
+      ...toAttributedChars(finalChars.slice(knownIndex + Array.from(knownText).length).join(''), null),
+    ]
+  }
+
+  const knownChars = chars.map((entry) => entry.char)
+  if (knownChars.length * finalChars.length <= 2_000_000) {
+    const columns = finalChars.length + 1
+    const lengths = new Uint16Array((knownChars.length + 1) * columns)
+    for (let knownIndex = knownChars.length - 1; knownIndex >= 0; knownIndex -= 1) {
+      for (let finalIndex = finalChars.length - 1; finalIndex >= 0; finalIndex -= 1) {
+        const offset = knownIndex * columns + finalIndex
+        lengths[offset] = knownChars[knownIndex] === finalChars[finalIndex]
+          ? lengths[(knownIndex + 1) * columns + finalIndex + 1] + 1
+          : Math.max(lengths[(knownIndex + 1) * columns + finalIndex], lengths[knownIndex * columns + finalIndex + 1])
+      }
+    }
+
+    const reconciled = []
+    let knownIndex = 0
+    let finalIndex = 0
+    while (finalIndex < finalChars.length) {
+      if (knownIndex < knownChars.length && knownChars[knownIndex] === finalChars[finalIndex]) {
+        reconciled.push(chars[knownIndex])
+        knownIndex += 1
+        finalIndex += 1
+      } else if (
+        knownIndex < knownChars.length &&
+        lengths[(knownIndex + 1) * columns + finalIndex] >= lengths[knownIndex * columns + finalIndex + 1]
+      ) {
+        knownIndex += 1
+      } else {
+        reconciled.push({ char: finalChars[finalIndex], insertedAtMs: null })
+        finalIndex += 1
+      }
+    }
+    return reconciled
+  }
+
+  const reconciled = []
+  let knownCursor = 0
+  for (const char of finalChars) {
+    if (knownCursor < chars.length && chars[knownCursor]?.char === char) {
+      reconciled.push(chars[knownCursor])
+      knownCursor += 1
+    } else {
+      reconciled.push({ char, insertedAtMs: null })
+    }
+  }
+  return reconciled
 }
 
 function applyDeltaEntry(currentText, entry) {
   if (!Number.isInteger(entry?.pos) || typeof entry?.ins !== 'string') {
     return null
   }
-  const chars = Array.from(String(currentText || ''))
+  const current = String(currentText || '')
+  const chars = Array.from(current)
   const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
   const delCount = typeof entry.del === 'string'
     ? Array.from(entry.del).length
     : Math.max(0, Number(entry.del) || 0)
+  if (delCount === 0 && pos === 0 && current && entry.ins.startsWith(current)) {
+    return entry.ins
+  }
   chars.splice(pos, delCount, ...Array.from(entry.ins))
   return chars.join('')
 }
@@ -422,6 +785,9 @@ function nextHistoryText(currentText, entry) {
   }
   if (typeof entry.text === 'string' && !entry.op) {
     return entry.text
+  }
+  if (entry.op && typeof entry.text === 'string') {
+    return applyLegacyHistoryEntry(currentText, entry)
   }
   return applyDeltaEntry(currentText, entry) ?? applyLegacyHistoryEntry(currentText, entry)
 }
@@ -488,20 +854,20 @@ export function renderMarkdownToHtml(markdown) {
 
   const markedState = getSafeMarkedRenderer()
   if (!markedState) {
-    return renderPlainTextHtml(source)
+    return renderHandtypedInlineMarkupHtml(renderPlainTextHtml(source))
   }
 
   try {
-    return markedState.markedApi.parse(source, {
+    return renderHandtypedInlineMarkupHtml(markedState.markedApi.parse(source, {
       async: false,
       gfm: true,
       breaks: false,
       headerIds: false,
       mangle: false,
       renderer: markedState.renderer,
-    })
+    }))
   } catch {
-    return renderPlainTextHtml(source)
+    return renderHandtypedInlineMarkupHtml(renderPlainTextHtml(source))
   }
 }
 
@@ -554,14 +920,19 @@ export function buildAttributedDocument(session = {}) {
 
   let chars = []
   let latestRawT = 0
+  let sawPartialDelta = false
 
-  const absoluteFromRawT = (rawT) => {
+  const absoluteFromRawT = (rawT, entry = null) => {
+    const absoluteWallMs = Number(entry?.absolute_wall_ms)
+    if (Number.isFinite(absoluteWallMs) && absoluteWallMs > 0) {
+      return absoluteWallMs
+    }
     const normalizedRawT = Math.max(0, Number(rawT) || 0)
     latestRawT = Math.max(latestRawT, normalizedRawT)
     return Number.isFinite(originWallMs) ? originWallMs + normalizedRawT : null
   }
 
-  const applySnapshot = (nextText, rawT) => {
+  const applySnapshot = (nextText, rawT, entry = null) => {
     const nextChars = Array.from(String(nextText || ''))
     const previousChars = chars.map((entry) => entry.char)
     let prefix = 0
@@ -587,7 +958,7 @@ export function buildAttributedDocument(session = {}) {
 
     chars = [
       ...chars.slice(0, prefix),
-      ...toAttributedChars(nextChars.slice(prefix, nextSuffix).join(''), absoluteFromRawT(rawT)),
+      ...toAttributedChars(nextChars.slice(prefix, nextSuffix).join(''), absoluteFromRawT(rawT, entry)),
       ...chars.slice(previousSuffix),
     ]
   }
@@ -599,19 +970,26 @@ export function buildAttributedDocument(session = {}) {
     if (typeof nextText === 'string') {
       if (applyDeltaEntry(chars.map((item) => item.char).join(''), entry) != null && !entry.op) {
         const pos = Math.max(0, Math.min(chars.length, Number(entry.pos)))
+        if (Number(entry.pos) > chars.length) {
+          sawPartialDelta = true
+        }
         const delCount = typeof entry.del === 'string'
           ? Array.from(entry.del).length
           : Math.max(0, Number(entry.del) || 0)
-        chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT)))
+        chars.splice(pos, delCount, ...toAttributedChars(entry.ins, absoluteFromRawT(rawT, entry)))
       } else {
-        applySnapshot(nextText, rawT)
+        applySnapshot(nextText, rawT, entry)
       }
     }
   }
 
   const finalText = String(session?.doc_text || latestTextFromHistory(session) || '')
   if (chars.map((entry) => entry.char).join('') !== finalText) {
-    applySnapshot(finalText, latestRawT)
+    if (sawPartialDelta || chars.length) {
+      chars = reconcileAttributedCharsWithFinalText(chars, finalText)
+    } else {
+      applySnapshot(finalText, latestRawT)
+    }
   }
 
   const insertedAtValues = chars

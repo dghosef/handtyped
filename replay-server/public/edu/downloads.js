@@ -1,4 +1,4 @@
-export const STUDENT_RELEASE_ID = '0.1.1-20260510.0148-windows-private-desktop-signed'
+export const STUDENT_RELEASE_ID = '0.1.1-20260508.1858-webview-compat-windows-signed'
 
 export const STUDENT_DOWNLOADS = Object.freeze({
   macosAppleSilicon: Object.freeze({

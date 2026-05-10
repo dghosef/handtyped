@@ -1,5 +1,5 @@
 {
-  "studentReleaseId": "0.1.1-20260508.1858-webview-compat-windows-signed",
+  "studentReleaseId": "0.1.1-20260510.0206-windows-lockdown-shields-signed",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
@@ -15,7 +15,7 @@
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "c5670ae695ae457ada8d16bd34415499440e8dd14e7c35865905bfc7abb48514"
+      "sha256": "74a6864367ed84c9d2aef1c09eda4af84ea1ea92ffd894a32e33d39f71f8ddf7"
     }
   }
 }

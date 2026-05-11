@@ -1,5 +1,5 @@
 {
-  "studentReleaseId": "0.1.1-20260511.2108-windows-key-recapture-signed",
+  "studentReleaseId": "0.1.1-20260511.2210-windows-shell-gesture-signed",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
@@ -15,7 +15,7 @@
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "153122773308d521a6eab1b6013864b9d952eba7bd16ea338f68fe64df213d60"
+      "sha256": "22b75a063322e05bb51c69a5f45e67f5d37018236ab7edd6247b1a5709939a58"
     }
   }
 }

@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { buildAttributedDocument, latestTextFromHistory } from './public/replay-view.js'
+import {
+  reviewDraftRenderMode,
+  reviewDraftRenderSignature,
+} from './public/edu/app-ui.js'
 
 function createStubElement() {
   const listeners = new Map()
@@ -135,6 +139,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     'todayAtLocalTime',
     'todayAtLocalTimeIso',
     'wholeClassExtensionLabel',
+    'reviewDraftRenderMode',
+    'reviewDraftRenderSignature',
     'buildAttributedDocument',
     'latestTextFromHistory',
     'document',
@@ -148,6 +154,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     'clearTimeout',
     'setInterval',
     'clearInterval',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
     `${source}
     return {
       handleRealtimeDashboard,
@@ -326,6 +334,8 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     () => new Date(),
     () => new Date().toISOString(),
     () => null,
+    reviewDraftRenderMode,
+    reviewDraftRenderSignature,
     buildAttributedDocument,
     latestTextFromHistory,
     documentStub,
@@ -339,6 +349,11 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     clearTimeout,
     setInterval,
     clearInterval,
+    (callback) => {
+      callback()
+      return 0
+    },
+    () => {},
   )
   harness.dispatchWindowEvent = (type, event = {}) => {
     for (const listener of windowListeners.get(type) || []) {

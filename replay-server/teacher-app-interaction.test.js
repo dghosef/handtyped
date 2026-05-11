@@ -5,6 +5,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { Window } from 'happy-dom'
 import { createApp } from './server-lib.js'
+import {
+  reviewDraftRenderMode,
+  reviewDraftRenderSignature,
+} from './public/edu/app-ui.js'
 
 const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
 const TEST_TEACHER_PASSWORD = 'actual-teacher-password'
@@ -332,6 +336,8 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     'todayAtLocalTime',
     'todayAtLocalTimeIso',
     'wholeClassExtensionLabel',
+    'reviewDraftRenderMode',
+    'reviewDraftRenderSignature',
     'buildAttributedDocument',
     'latestTextFromHistory',
     'document',
@@ -343,6 +349,8 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     'clearTimeout',
     'setInterval',
     'clearInterval',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
     `${source}
     return {
       wireModalButtons,
@@ -387,6 +395,8 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     () => new Date(),
     () => new Date().toISOString(),
     () => '',
+    reviewDraftRenderMode,
+    reviewDraftRenderSignature,
     () => {},
     () => '',
     window.document,
@@ -398,6 +408,11 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     clearTimeout,
     setInterval,
     clearInterval,
+    (callback) => {
+      callback()
+      return 0
+    },
+    () => {},
   )
 
   return {

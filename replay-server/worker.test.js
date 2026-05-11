@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { generateKeyPairSync, sign as signDetached, randomUUID } from 'crypto'
 import { gzipSync, gunzipSync } from 'zlib'
 import worker from './worker.js'
@@ -3458,6 +3458,135 @@ describe('worker per-student assignment extensions', () => {
         'ada lovelace': approvedUntil,
       },
     })
+  })
+
+  it('lets protected students rejoin in a later scheduled period', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-05-04T09:30:00-04:00'))
+    try {
+      const env = makeEnv()
+      const { cookie } = await loginTeacher(env)
+      const joinCode = `PER${randomUUID().replace(/-/g, '').slice(0, 5).toUpperCase()}`
+
+      const classroomRes = await worker.fetch(
+        new Request('https://edu.handtyped.app/api/edu/classrooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            name: 'Period Rejoin',
+            teacher_name: 'Ms. Keating',
+            join_code: joinCode,
+          }),
+        }),
+        env,
+      )
+      const classroom = await classroomRes.json()
+      expect(classroomRes.status).toBe(201)
+
+      const assignmentRes = await worker.fetch(
+        new Request('https://edu.handtyped.app/api/edu/assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({
+            title: 'Two-period draft',
+            course: classroom.name,
+            classroom_id: classroom.id,
+            classroom_name: classroom.name,
+            assigned_students: ['Ada Lovelace'],
+            windows: [
+              {
+                label: 'First period',
+                days: {
+                  monday: true,
+                  tuesday: false,
+                  wednesday: false,
+                  thursday: false,
+                  friday: false,
+                  saturday: false,
+                  sunday: false,
+                },
+                end_date: '2026-05-04',
+                start_hour: 9,
+                start_minute: 0,
+                end_hour: 10,
+                end_minute: 0,
+              },
+              {
+                label: 'Second period',
+                days: {
+                  monday: true,
+                  tuesday: false,
+                  wednesday: false,
+                  thursday: false,
+                  friday: false,
+                  saturday: false,
+                  sunday: false,
+                },
+                end_date: '2026-05-04',
+                start_hour: 11,
+                start_minute: 0,
+                end_hour: 12,
+                end_minute: 0,
+              },
+            ],
+            policy: {
+              require_lockdown: true,
+              require_permission_to_rejoin: true,
+            },
+          }),
+        }),
+        env,
+      )
+      const assignment = await assignmentRes.json()
+      expect(assignmentRes.status).toBe(201)
+
+      const closeRes = await worker.fetch(
+        new Request(`https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}/close`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            join_code: joinCode,
+            student_name: 'Ada Lovelace',
+          }),
+        }),
+        env,
+      )
+      expect(closeRes.status).toBe(201)
+
+      const blockedRes = await worker.fetch(
+        new Request(
+          `https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+          { method: 'GET' },
+        ),
+        env,
+      )
+      expect(blockedRes.status).toBe(200)
+      expect(await blockedRes.json()).toMatchObject({
+        schedule_open: false,
+        assignment: {
+          access_revoked: true,
+        },
+      })
+
+      vi.setSystemTime(new Date('2026-05-04T11:30:00-04:00'))
+      const laterRes = await worker.fetch(
+        new Request(
+          `https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+          { method: 'GET' },
+        ),
+        env,
+      )
+      expect(laterRes.status).toBe(200)
+      expect(await laterRes.json()).toMatchObject({
+        schedule_open: true,
+        session_end_at: '2026-05-04T16:00:00.000Z',
+        assignment: {
+          access_revoked: false,
+        },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('surfaces per-student instant access revocation in student config', async () => {

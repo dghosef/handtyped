@@ -35,6 +35,44 @@ fn build_script_is_valid_bash() {
 }
 
 #[test]
+fn build_script_creates_universal_older_macos_release_by_default() {
+    let script = fs::read_to_string("build-release-app.sh").unwrap();
+
+    assert!(
+        script.contains("HANDTYPED_RELEASE_UNIVERSAL:-1"),
+        "default Handtyped macOS releases should be universal"
+    );
+    assert!(
+        script.contains("HANDTYPED_MACOS_MIN_VERSION_INTEL:-10.13"),
+        "Intel Handtyped releases should support macOS 10.13+"
+    );
+    assert!(
+        script.contains("HANDTYPED_MACOS_MIN_VERSION_APPLE_SILICON:-11.0"),
+        "Apple Silicon Handtyped releases should target macOS 11+"
+    );
+    assert!(
+        script.contains("build_release_binary \"aarch64-apple-darwin\" \"$MACOS_MIN_VERSION_APPLE_SILICON\""),
+        "universal Handtyped releases should build an Apple Silicon slice"
+    );
+    assert!(
+        script.contains("build_release_binary \"x86_64-apple-darwin\" \"$MACOS_MIN_VERSION_INTEL\""),
+        "universal Handtyped releases should build an Intel slice"
+    );
+    assert!(
+        script.contains("lipo -create"),
+        "universal Handtyped releases should merge both architecture slices"
+    );
+    assert!(
+        script.contains("<key>LSMinimumSystemVersion</key><string>${MACOS_MIN_VERSION}</string>"),
+        "published Handtyped bundles should advertise the selected macOS minimum"
+    );
+    assert!(
+        !script.contains("<key>LSMinimumSystemVersion</key><string>14.0</string>"),
+        "Handtyped releases must not require Sonoma in Info.plist"
+    );
+}
+
+#[test]
 fn create_notary_archive_uses_ditto_and_writes_archive() {
     let temp = TempDir::new().unwrap();
     let bin_dir = temp.path().join("bin");

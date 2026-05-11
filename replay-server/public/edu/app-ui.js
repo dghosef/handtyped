@@ -1,6 +1,30 @@
 export const LIVE_SESSION_STALE_MS = 15000
 export const RECENT_EDIT_WINDOW_MS = 5 * 60 * 1000
 export const RECENT_EDIT_BUCKET_MS = 60 * 1000
+export const REVIEW_DRAFT_LARGE_DOC_CHARS = 50_000
+
+export function reviewDraftRenderMode(text, largeDocChars = REVIEW_DRAFT_LARGE_DOC_CHARS) {
+  return String(text || '').length >= largeDocChars ? 'plain' : 'rich'
+}
+
+export function reviewDraftRenderSignature({
+  text = '',
+  annotationVersion = '',
+  highlightVersion = '',
+  mode = reviewDraftRenderMode(text),
+} = {}) {
+  return [
+    mode,
+    String(text || '').length,
+    String(text || ''),
+    String(annotationVersion || ''),
+    String(highlightVersion || ''),
+  ].join('\u001f')
+}
+
+export function shouldRenderReviewDraftSurface(previousSignature, nextInput = {}) {
+  return previousSignature !== reviewDraftRenderSignature(nextInput)
+}
 
 export function parseTimestamp(value) {
   const parsed = Date.parse(String(value || ''))
@@ -68,6 +92,30 @@ function historyEntryIsDocumentEdit(entry) {
     return true
   }
   return Boolean(entry.marks || entry.formatting || entry.format || entry.style || entry.attrs)
+}
+
+function applyDocumentHistoryEntry(text, entry) {
+  if (!entry || typeof entry !== 'object') {
+    return text
+  }
+  if (Object.hasOwn(entry, 'text') || Object.hasOwn(entry, 'snapshot')) {
+    return String(entry.text ?? entry.snapshot ?? '')
+  }
+  const chars = Array.from(String(text || ''))
+  const pos = Math.max(0, Math.min(chars.length, Number(entry.pos ?? chars.length) || 0))
+  const insertText = String(entry.ins ?? '')
+  let deleteCount = 0
+  if (typeof entry.del === 'string') {
+    deleteCount = Array.from(entry.del).length
+  } else if (Number.isFinite(Number(entry.del))) {
+    deleteCount = Math.max(0, Number(entry.del) || 0)
+  }
+  chars.splice(pos, deleteCount, ...Array.from(insertText))
+  return chars.join('')
+}
+
+function applyDocumentHistoryTail(text, tail = []) {
+  return (tail || []).reduce((current, entry) => applyDocumentHistoryEntry(current, entry), String(text || ''))
 }
 
 function documentEditHistory(session) {
@@ -275,6 +323,9 @@ export function applyLiveReplayUpdates(baseReplay, updates) {
           }
         }),
       )
+      if (typeof event?.current_text !== 'string') {
+        replay.current_text = applyDocumentHistoryTail(replay.current_text, event.document_history_tail)
+      }
     }
     if (Array.isArray(event?.url_history_tail) && event.url_history_tail.length) {
       replay.url_history.push(...event.url_history_tail)

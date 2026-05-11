@@ -14,24 +14,39 @@
     <header class="teacher-topbar">
       <a class="teacher-brand" href="https://edu.handtyped.app">Handtyped EDU</a>
       <div class="teacher-topbar-actions">
-        <a
-          class="button button-secondary"
-          id="student-download-apple-silicon-button"
-          href="/downloads/Handtyped-EDU-Student-macos.dmg"
-          download="Handtyped-EDU-Student-macos.dmg"
-        >Apple Silicon</a>
-        <a
-          class="button button-secondary"
-          id="student-download-intel-button"
-          href="/downloads/Handtyped-EDU-Student-macos-intel.dmg"
-          download="Handtyped-EDU-Student-macos-intel.dmg"
-        >Intel Mac</a>
-        <a
-          class="button button-secondary"
-          id="student-download-windows-button"
-          href="/downloads/Handtyped-EDU-Student-windows-x86_64.zip"
-          download="Handtyped-EDU-Student-windows-x86_64.zip"
-        >Windows x86-64</a>
+        <div class="student-download-control student-download-control-compact">
+          <a
+            class="button button-secondary"
+            id="student-download-button"
+            data-student-download-auto
+            data-student-download-label="compact"
+            href="/downloads/Handtyped-EDU-Student-macos.dmg"
+            download="Handtyped-EDU-Student-macos.dmg"
+          >Student app</a>
+          <div class="download-options download-options-compact" aria-label="Other student app downloads">
+            <a
+              class="download-option"
+              id="student-download-apple-silicon-button"
+              data-student-download-option="macosAppleSilicon"
+              href="/downloads/Handtyped-EDU-Student-macos.dmg"
+              download="Handtyped-EDU-Student-macos.dmg"
+            >Apple Silicon</a>
+            <a
+              class="download-option"
+              id="student-download-intel-button"
+              data-student-download-option="macosIntel"
+              href="/downloads/Handtyped-EDU-Student-macos-intel.dmg"
+              download="Handtyped-EDU-Student-macos-intel.dmg"
+            >Intel Mac</a>
+            <a
+              class="download-option"
+              id="student-download-windows-button"
+              data-student-download-option="windowsX64"
+              href="/downloads/Handtyped-EDU-Student-windows-x86_64.zip"
+              download="Handtyped-EDU-Student-windows-x86_64.zip"
+            >Windows</a>
+          </div>
+        </div>
         <button class="button button-secondary" id="feedback-button" type="button">Send feedback</button>
         <a class="button button-secondary" href="/">Main site</a>
         <button class="button button-secondary" id="logout-button" type="button" hidden>Sign out</button>
@@ -543,6 +558,7 @@
     </div>
   </div>
 
+  <script type="module" src="/edu/downloads.js"></script>
   <script type="module" src="/edu/app.js"></script>
 </body>
 </html>

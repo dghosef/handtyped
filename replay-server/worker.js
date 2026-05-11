@@ -2048,6 +2048,10 @@ export default {
 
       const normalizedKey = studentName.toLowerCase()
       const shouldRequireApproval = Boolean(result.assignment.policy?.require_permission_to_rejoin)
+      const closedAt = nowIso()
+      const rejoinBlockedUntil = shouldRequireApproval
+        ? scheduleStateForAssignment(existing, studentName, new Date(closedAt)).session_end_at
+        : null
       const updatedAssignment = shouldRequireApproval
         ? buildAssignment({
             ...existing,
@@ -2055,14 +2059,17 @@ export default {
               ...(existing.student_access_revoked || {}),
               [normalizedKey]: true,
             },
-            updated_at: nowIso(),
+            student_access_revoked_until: {
+              ...(existing.student_access_revoked_until || {}),
+              ...(rejoinBlockedUntil ? { [normalizedKey]: rejoinBlockedUntil } : {}),
+            },
+            updated_at: closedAt,
           })
         : existing
 
       if (updatedAssignment !== existing) {
         await store.putAssignment(updatedAssignment)
       }
-      const closedAt = nowIso()
       const liveSessionId = `${studentName}:${updatedAssignment.id}`
       const existingLiveSession = await store.getLiveSession(liveSessionId)
       let closedLiveSession = null

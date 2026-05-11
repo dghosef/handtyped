@@ -19,30 +19,46 @@
           Handtyped EDU is currently under active development. The teacher web app and the native
           student app are still being built out.
         </p>
-        <div class="topbar-actions" style="margin-top: 18px;">
-          <a
-            class="button"
-            id="student-download-apple-silicon-button"
-            href="/downloads/Handtyped-EDU-Student-macos.dmg"
-            download="Handtyped-EDU-Student-macos.dmg"
-          >Download Apple Silicon</a>
-          <a
-            class="button button-secondary"
-            id="student-download-intel-button"
-            href="/downloads/Handtyped-EDU-Student-macos-intel.dmg"
-            download="Handtyped-EDU-Student-macos-intel.dmg"
-          >Download Intel Mac</a>
-          <a
-            class="button button-secondary"
-            id="student-download-windows-button"
-            href="/downloads/Handtyped-EDU-Student-windows-x86_64.zip"
-            download="Handtyped-EDU-Student-windows-x86_64.zip"
-          >Download Windows x86-64</a>
+        <div class="topbar-actions landing-actions">
+          <div class="student-download-control">
+            <a
+              class="button"
+              id="student-download-button"
+              data-student-download-auto
+              href="/downloads/Handtyped-EDU-Student-macos.dmg"
+              download="Handtyped-EDU-Student-macos.dmg"
+            >Download student app</a>
+            <div class="download-options" aria-label="Other student app downloads">
+              <a
+                class="download-option"
+                id="student-download-apple-silicon-button"
+                data-student-download-option="macosAppleSilicon"
+                href="/downloads/Handtyped-EDU-Student-macos.dmg"
+                download="Handtyped-EDU-Student-macos.dmg"
+              >Apple Silicon Mac</a>
+              <a
+                class="download-option"
+                id="student-download-intel-button"
+                data-student-download-option="macosIntel"
+                href="/downloads/Handtyped-EDU-Student-macos-intel.dmg"
+                download="Handtyped-EDU-Student-macos-intel.dmg"
+              >Intel Mac</a>
+              <a
+                class="download-option"
+                id="student-download-windows-button"
+                data-student-download-option="windowsX64"
+                href="/downloads/Handtyped-EDU-Student-windows-x86_64.zip"
+                download="Handtyped-EDU-Student-windows-x86_64.zip"
+              >Windows x86-64</a>
+            </div>
+            <div class="download-note" data-student-download-note>Detecting your system...</div>
+          </div>
           <a class="button" href="/login">Teacher sign in</a>
           <a class="button button-secondary" href="https://handtyped.app">Back to Handtyped</a>
         </div>
       </section>
     </main>
   </div>
+  <script type="module" src="/edu/downloads.js"></script>
 </body>
 </html>

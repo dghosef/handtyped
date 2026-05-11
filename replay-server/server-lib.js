@@ -3,6 +3,7 @@
  * without starting a listening server.
  */
 import express from 'express'
+import { createHash } from 'crypto'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import os from 'os'
@@ -33,6 +34,7 @@ import {
   ensureEduSeedData,
   removeClassroomStudent,
   renameClassroomStudent,
+  scheduleStateForAssignment,
 } from './edu-store.js'
 import {
   authenticateTeacher,
@@ -48,7 +50,8 @@ import { verifyGoogleIdToken } from './edu-google-auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PUBLIC_ORIGIN = process.env.REPLAY_SERVER_PUBLIC_ORIGIN || 'https://replay.handtyped.app'
-  const RESERVED_REPLAY_ROOTS = new Set(['api', 'replay'])
+const RESERVED_REPLAY_ROOTS = new Set(['api', 'replay'])
+const LIVE_REPLAY_INLINE_TEXT_LIMIT = 50_000
 
 function teacherTenantId(session) {
   return session?.tenant_id || DEFAULT_TENANT_ID
@@ -252,7 +255,20 @@ function liveReplayHeadFromSession(session, existingHead = null, replay = null) 
   })
 }
 
+function textSnapshotMetadata(text) {
+  const value = String(text || '')
+  return {
+    current_text_length: value.length,
+    current_text_hash: createHash('sha256').update(value).digest('hex'),
+  }
+}
+
+function shouldInlineLiveReplayText(text) {
+  return String(text || '').length <= LIVE_REPLAY_INLINE_TEXT_LIMIT
+}
+
 function buildLiveReplayResponse(head, events = [], replay = null) {
+  const textMetadata = textSnapshotMetadata(head.current_text)
   return {
     id: head.id,
     live_session_id: head.live_session_id || head.id,
@@ -263,6 +279,7 @@ function buildLiveReplayResponse(head, events = [], replay = null) {
     classroom: head.classroom,
     student_name: head.student_name,
     current_text: head.current_text,
+    ...textMetadata,
     document_history: Array.isArray(head.document_history) ? head.document_history : [],
     focus_events: Array.isArray(head.focus_events) ? head.focus_events : [],
     keystroke_log: String(head.keystroke_log || ''),
@@ -315,12 +332,13 @@ async function appendLiveReplayUpdate(eduStore, session, replay = null) {
   const urlHistory = Array.isArray(session.url_history) ? session.url_history : []
   const documentHistoryTail = history.slice(Math.max(0, previousHistoryCount))
   const urlHistoryTail = urlHistory.slice(Math.max(0, previousUrlHistoryCount))
+  const textChanged = String(existingHead?.current_text || '') !== String(session.current_text || '')
 
   const hasMeaningfulChange =
     !existingHead ||
     documentHistoryTail.length > 0 ||
     urlHistoryTail.length > 0 ||
-    String(existingHead.current_text || '') !== String(session.current_text || '') ||
+    textChanged ||
     String(existingHead.current_url || '') !== String(session.current_url || '') ||
     String(existingHead.current_url_title || '') !== String(session.current_url_title || '') ||
     String(existingHead.last_activity_at || '') !== String(session.last_activity_at || '')
@@ -353,7 +371,10 @@ async function appendLiveReplayUpdate(eduStore, session, replay = null) {
     assignment_id: session.assignment_id,
     student_name: session.student_name,
     seq: nextSeq,
-    current_text: session.current_text,
+    ...(textChanged && (!documentHistoryTail.length || shouldInlineLiveReplayText(session.current_text))
+      ? { current_text: session.current_text }
+      : {}),
+    ...textSnapshotMetadata(session.current_text),
     current_url: session.current_url,
     current_url_title: session.current_url_title,
     document_history_tail: documentHistoryTail,
@@ -1090,7 +1111,8 @@ export function createApp(sessionsDir, config = {}) {
       id: head.id,
       live_session_id: head.live_session_id || head.id,
       replay_session_id: head.replay_session_id || replay?.id || null,
-      current_text: head.current_text,
+      ...(shouldInlineLiveReplayText(head.current_text) ? { current_text: head.current_text } : {}),
+      ...textSnapshotMetadata(head.current_text),
       current_url: head.current_url ?? null,
       current_url_title: head.current_url_title ?? null,
       last_activity_at: head.last_activity_at,
@@ -1400,6 +1422,10 @@ export function createApp(sessionsDir, config = {}) {
 
     const normalizedKey = studentName.toLowerCase()
     const shouldRequireApproval = Boolean(result.assignment.policy?.require_permission_to_rejoin)
+    const closedAt = nowIso()
+    const rejoinBlockedUntil = shouldRequireApproval
+      ? scheduleStateForAssignment(existing, studentName, new Date(closedAt)).session_end_at
+      : null
     const updatedAssignment = shouldRequireApproval
       ? buildAssignment({
           ...existing,
@@ -1407,7 +1433,11 @@ export function createApp(sessionsDir, config = {}) {
             ...(existing.student_access_revoked || {}),
             [normalizedKey]: true,
           },
-          updated_at: nowIso(),
+          student_access_revoked_until: {
+            ...(existing.student_access_revoked_until || {}),
+            ...(rejoinBlockedUntil ? { [normalizedKey]: rejoinBlockedUntil } : {}),
+          },
+          updated_at: closedAt,
         })
       : existing
 
@@ -1435,8 +1465,8 @@ export function createApp(sessionsDir, config = {}) {
           },
         ],
         snapshot: updatedAssignment,
-        created_at: nowIso(),
-        updated_at: nowIso(),
+        created_at: closedAt,
+        updated_at: closedAt,
       },
     )
     res.status(201).json({

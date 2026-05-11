@@ -10,6 +10,8 @@ import {
   localDateTimeInputValue,
   recentEditActivityCurve,
   reconcileTeacherNavigation,
+  reviewDraftRenderMode,
+  reviewDraftRenderSignature,
   sessionPresenceTimestamp,
   sessionStatusLabel,
   sessionsForAssignment,
@@ -71,6 +73,8 @@ let assignmentFormSubmitting = false
 let classroomFormSubmitting = false
 let assignmentFormToastTimer = null
 let reviewDraftSurfaceHtml = ''
+let reviewDraftSurfaceSignature = ''
+let reviewLiveContentRenderRaf = 0
 let teacherHistoryInitialized = false
 let teacherHistoryRestoring = false
 let lastTeacherHistoryKey = ''
@@ -672,6 +676,33 @@ async function handleReferenceDocumentUpload(fileList) {
 }
 
 function buildReviewReplayCacheEntry(replay) {
+  return buildReviewReplayCacheEntryFromPrevious(replay, null)
+}
+
+function reviewReplayAttributionSignature(replay = {}) {
+  const history = Array.isArray(replay?.document_history) ? replay.document_history : []
+  const lastHistory = history[history.length - 1] || {}
+  return [
+    String(replay?.current_text || ''),
+    String(replay?.last_seq ?? ''),
+    String(replay?.last_activity_at || ''),
+    String(replay?.updated_at || ''),
+    String(history.length),
+    String(lastHistory.t ?? ''),
+    String(lastHistory.pos ?? ''),
+    String(lastHistory.ins ?? '').length,
+    String(lastHistory.del ?? '').length,
+  ].join('\u001f')
+}
+
+function buildReviewReplayCacheEntryFromPrevious(replay, previousEntry = null) {
+  const attributionSignature = reviewReplayAttributionSignature(replay)
+  if (previousEntry?.attributionSignature === attributionSignature) {
+    return {
+      ...previousEntry,
+      replay,
+    }
+  }
   const documentHistory = documentHistoryForReviewAttribution(replay)
   const hasReliableOrigin = replayOriginWallMs(replay) != null
   const hasExplicitCurrentText = Object.hasOwn(replay || {}, 'current_text')
@@ -689,6 +720,7 @@ function buildReviewReplayCacheEntry(replay) {
   return {
     replay,
     attributedDocument,
+    attributionSignature,
   }
 }
 
@@ -899,7 +931,7 @@ function syncReviewReplayDataWithLiveSession(session = currentReviewSession()) {
   }
   const mergedReplay = mergeReviewReplayWithLiveSession(cached.replay, session)
   if (mergedReplay !== cached.replay) {
-    cached = buildReviewReplayCacheEntry(mergedReplay)
+    cached = buildReviewReplayCacheEntryFromPrevious(mergedReplay, cached)
     reviewReplayCache.set(session.id, cached)
   }
   reviewState.replayData = cached
@@ -4373,7 +4405,7 @@ async function loadReviewReplayData(session) {
     } else {
       const mergedReplay = mergeReviewReplayWithLiveSession(cached.replay, currentReviewSession() || session)
       if (mergedReplay !== cached.replay) {
-        cached = buildReviewReplayCacheEntry(mergedReplay)
+        cached = buildReviewReplayCacheEntryFromPrevious(mergedReplay, cached)
         reviewReplayCache.set(session.id, cached)
       }
     }
@@ -4441,7 +4473,7 @@ function handleRealtimeAssignment(payload) {
     if (updatedSelectedSession && reviewWorkspaceOpen) {
       selectedReviewSessionSnapshot = { ...updatedSelectedSession }
       if (reviewState?.sessionId === updatedSelectedSession.id || reviewState?.sessionId === selectedReviewSessionId) {
-        renderReviewWorkspaceLiveContent(getSelectedAssignment())
+        scheduleReviewWorkspaceLiveContent(getSelectedAssignment())
       }
     }
     renderStudentCards({ skipReviewWorkspace: preserveReviewInputs })
@@ -4460,8 +4492,9 @@ function handleRealtimeAccessRequest(payload) {
 
 function handleRealtimeReplay(payload) {
   if (!payload?.id) return
+  const cached = reviewReplayCache.get(payload.id)
   const mergedReplay = mergeReviewReplayWithLiveSession(payload, currentReviewSession())
-  const nextCache = buildReviewReplayCacheEntry(mergedReplay)
+  const nextCache = buildReviewReplayCacheEntryFromPrevious(mergedReplay, cached)
   reviewReplayCache.set(payload.id, nextCache)
   mergeReplayIntoSessionState(payload.id, mergedReplay)
   if (!reviewState || reviewState.sessionId !== payload.id) {
@@ -4469,7 +4502,7 @@ function handleRealtimeReplay(payload) {
   }
   reviewState.replayData = nextCache
   reviewState.replayLoadState = 'ready'
-  renderReviewWorkspaceLiveContent(getSelectedAssignment())
+  scheduleReviewWorkspaceLiveContent(getSelectedAssignment())
 }
 
 function syncRealtimeSubscriptions() {
@@ -4543,7 +4576,7 @@ async function refreshSelectedReviewReplayData() {
   }
 
   const mergedReplay = mergeReviewReplayWithLiveSession(applyLiveReplayUpdates(cached.replay, updates), currentReviewSession())
-  const nextCache = buildReviewReplayCacheEntry(mergedReplay)
+  const nextCache = buildReviewReplayCacheEntryFromPrevious(mergedReplay, cached)
   reviewReplayCache.set(session.id, nextCache)
   mergeReplayIntoSessionState(session.id, mergedReplay)
 
@@ -4553,7 +4586,7 @@ async function refreshSelectedReviewReplayData() {
 
   reviewState.replayData = nextCache
   reviewState.replayLoadState = 'ready'
-  renderReviewWorkspace(getSelectedAssignment())
+  scheduleReviewWorkspaceLiveContent(getSelectedAssignment())
 }
 
 async function refreshSelectedReviewSessionData() {
@@ -4578,20 +4611,104 @@ async function refreshSelectedReviewSessionData() {
 
   if (reviewState?.sessionId === selectedSession.id) {
     syncReviewReplayDataWithLiveSession(selectedSession)
-    renderReviewWorkspaceLiveContent(getSelectedAssignment())
+    scheduleReviewWorkspaceLiveContent(getSelectedAssignment())
   } else {
     renderStudentCards({ skipReviewWorkspace: true })
   }
 }
 
+function cancelScheduledReviewWorkspaceLiveContent() {
+  if (reviewLiveContentRenderRaf) {
+    const cancelFrame = typeof cancelAnimationFrame === 'function'
+      ? cancelAnimationFrame
+      : window.cancelAnimationFrame
+    if (typeof cancelFrame === 'function') {
+      cancelFrame(reviewLiveContentRenderRaf)
+    } else {
+      clearTimeout(reviewLiveContentRenderRaf)
+    }
+    reviewLiveContentRenderRaf = 0
+  }
+}
+
+function requestReviewWorkspaceFrame(callback) {
+  const requestFrame = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : window.requestAnimationFrame
+  if (typeof requestFrame === 'function') {
+    return requestFrame(callback)
+  }
+  return window.setTimeout(callback, 0)
+}
+
+function scheduleReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssignment()) {
+  if (!reviewWorkspaceOpen || !reviewState) {
+    return
+  }
+  if (reviewLiveContentRenderRaf) {
+    return
+  }
+  reviewLiveContentRenderRaf = requestReviewWorkspaceFrame(() => {
+    reviewLiveContentRenderRaf = 0
+    renderReviewWorkspaceLiveContent(selectedAssignment)
+  })
+}
+
+function reviewAnnotationVersion(annotations = []) {
+  return visibleReviewAnnotations(annotations)
+    .map((annotation) => [
+      annotation.id,
+      annotation.start,
+      annotation.end,
+      annotation.quote,
+      annotation.note,
+      annotation.updated_at,
+      annotation.resolved_by_student,
+    ].map((part) => String(part ?? '')).join(':'))
+    .join('|')
+}
+
+function reviewHighlightVersion(session = currentReviewSession(), assignment = getSelectedAssignment()) {
+  return [
+    reviewState?.highlightDate || '',
+    reviewState?.highlightDates || '',
+    reviewState?.highlightStartTime || '',
+    reviewState?.highlightEndTime || '',
+    reviewState?.highlightWeekdays ? JSON.stringify(reviewState.highlightWeekdays) : '',
+    (reviewHighlightRangesForState(session, assignment) || [])
+      .map((range) => `${range.start}:${range.end}`)
+      .join('|'),
+  ].join('\u001f')
+}
+
 function renderDraftSurface(text, annotations) {
   const model = handtypedMarkdownDisplayModel(text)
   const safeText = model.text
+  const mode = reviewDraftRenderMode(safeText)
+  const nextSignature = reviewDraftRenderSignature({
+    text: safeText,
+    annotationVersion: reviewAnnotationVersion(annotations),
+    highlightVersion: reviewHighlightVersion(),
+    mode,
+  })
+  if (reviewDraftSurfaceSignature === nextSignature) {
+    return
+  }
+  reviewDraftSurfaceSignature = nextSignature
+
   if (!safeText) {
     const emptyHtml = '<span class="student-meta">(empty draft)</span>'
     if (reviewDraftSurfaceHtml !== emptyHtml) {
       elements.reviewDraftSurface.innerHTML = emptyHtml
       reviewDraftSurfaceHtml = emptyHtml
+    }
+    return
+  }
+  if (mode === 'plain') {
+    const plainHtml = `<pre class="review-draft-large-doc">${escapeHtml(safeText)}</pre>`
+    if (reviewDraftSurfaceHtml !== plainHtml) {
+      elements.reviewDraftSurface.innerHTML = plainHtml
+      reviewDraftSurfaceHtml = plainHtml
     }
     return
   }
@@ -4810,10 +4927,13 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
 
 function renderReviewWorkspace(selectedAssignment) {
   if (!elements.reviewWorkspace) return
+  cancelScheduledReviewWorkspaceLiveContent()
   elements.reviewLayout?.classList.toggle('is-review-open', reviewWorkspaceOpen)
   elements.assignmentView?.classList.toggle('is-review-open', reviewWorkspaceOpen)
   elements.reviewWorkspace.hidden = !reviewWorkspaceOpen
   if (!reviewWorkspaceOpen) {
+    reviewDraftSurfaceHtml = ''
+    reviewDraftSurfaceSignature = ''
     renderReviewEditActivity(null)
     renderReviewActivityStatus(null)
     return
@@ -4822,6 +4942,8 @@ function renderReviewWorkspace(selectedAssignment) {
   if (!session || !selectedAssignment) {
     reviewState = null
     selectedAnnotationId = null
+    reviewDraftSurfaceHtml = ''
+    reviewDraftSurfaceSignature = ''
     elements.reviewWorkspaceEmpty.hidden = false
     elements.reviewWorkspaceContent.hidden = true
     renderReviewEditActivity(null)
@@ -5711,7 +5833,7 @@ function applyDashboardDelta(delta) {
   if (selectedSession) {
     selectedReviewSessionSnapshot = { ...selectedSession }
     if (reviewState?.sessionId === selectedSession.id) {
-      renderReviewWorkspaceLiveContent(getSelectedAssignment())
+      scheduleReviewWorkspaceLiveContent(getSelectedAssignment())
     }
   }
   if (activeReviewEditorElement()) {

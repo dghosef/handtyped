@@ -46,6 +46,9 @@ security-framework = "2"
 objc = "0.2"
 cocoa = "0.25"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

@@ -5,7 +5,11 @@ import { fileURLToPath } from 'url'
 
 import {
   LIVE_SESSION_STALE_MS,
+  applyLiveReplayUpdates,
   assignmentViewMeta,
+  reviewDraftRenderMode,
+  reviewDraftRenderSignature,
+  shouldRenderReviewDraftSurface,
   isSessionActive,
   parseTimestamp,
   sessionStatusLabel,
@@ -96,7 +100,7 @@ describe('teacher dashboard UI logic', () => {
     )
   })
 
-  it('sorts active sessions ahead of stale ones and then by latest activity', () => {
+  it('sorts higher-risk sessions ahead and then by latest activity', () => {
     const now = Date.parse('2026-04-26T02:30:00.000Z')
     const sessions = [
       {
@@ -117,13 +121,13 @@ describe('teacher dashboard UI logic', () => {
     ]
 
     expect(sortSessionsForDisplay(sessions, now).map((session) => session.id)).toEqual([
+      'stale',
       'active-newer',
       'active-older',
-      'stale',
     ])
   })
 
-  it('filters sessions by both classroom and assignment', () => {
+  it('filters sessions by assignment id', () => {
     const sessions = [
       { id: 'match', assignment_id: 'assignment-1', classroom: 'Period 1' },
       { id: 'wrong-assignment', assignment_id: 'assignment-2', classroom: 'Period 1' },
@@ -132,6 +136,7 @@ describe('teacher dashboard UI logic', () => {
 
     expect(sessionsForAssignment(sessions, 'Period 1', 'assignment-1').map((session) => session.id)).toEqual([
       'match',
+      'wrong-classroom',
     ])
   })
 
@@ -153,6 +158,58 @@ describe('teacher dashboard UI logic', () => {
     expect(assignmentViewMeta(selectedAssignment, selectedClassroom, sessions, now)).toBe(
       'Period 1 • 1 active student',
     )
+  })
+
+  it('skips expensive review draft rendering when the draft inputs have not changed', () => {
+    const previous = reviewDraftRenderSignature({
+      text: 'Same draft',
+      annotationVersion: 'notes:1',
+      highlightVersion: 'range:a',
+    })
+
+    expect(
+      shouldRenderReviewDraftSurface(previous, {
+        text: 'Same draft',
+        annotationVersion: 'notes:1',
+        highlightVersion: 'range:a',
+      }),
+    ).toBe(false)
+
+    expect(
+      shouldRenderReviewDraftSurface(previous, {
+        text: 'Same draft plus one character',
+        annotationVersion: 'notes:1',
+        highlightVersion: 'range:a',
+      }),
+    ).toBe(true)
+  })
+
+  it('uses lightweight review draft rendering for large documents', () => {
+    expect(reviewDraftRenderMode('x'.repeat(49_999))).toBe('rich')
+    expect(reviewDraftRenderMode('x'.repeat(50_000))).toBe('plain')
+  })
+
+  it('advances replay text from history tails when updates omit full current text', () => {
+    const replay = applyLiveReplayUpdates(
+      {
+        current_text: 'Draft',
+        document_history: [{ t: 1, pos: 0, ins: 'Draft' }],
+        last_seq: 1,
+      },
+      {
+        last_seq: 2,
+        events: [
+          {
+            seq: 2,
+            document_history_tail: [{ t: 2, pos: 5, ins: ' grows' }],
+            current_text_length: 11,
+          },
+        ],
+      },
+    )
+
+    expect(replay.current_text).toBe('Draft grows')
+    expect(replay.document_history).toHaveLength(2)
   })
 })
 
@@ -183,8 +240,8 @@ describe('student launcher UI logic', () => {
         classroom_id: 'class-1',
       }),
     ).toEqual({
-      selectedClassroomId: '',
-      visibleAssignments: [],
+      selectedClassroomId: 'class-2',
+      visibleAssignments: [{ id: 'assignment-2', classroom_id: 'class-2' }],
       shouldCloseAssignment: true,
     })
   })

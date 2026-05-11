@@ -253,6 +253,7 @@ pub fn build_inline_layout_job(
 fn build_editor_layout_job(ui: &egui::Ui, text: &str, wrap_width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = wrap_width;
+    job.wrap.break_anywhere = true;
     let blocks = parse_blocks(text);
 
     let base_font = FontId::monospace(14.0);
@@ -2211,6 +2212,18 @@ mod tests {
             let job = build_editor_layout_job(ui, source, 400.0);
             assert_eq!(job.text, source);
             assert!(job.sections.len() >= 4);
+        });
+    }
+
+    #[test]
+    fn editor_layouter_enables_anywhere_wrapping_for_overlong_words() {
+        egui::__run_test_ui(|ui| {
+            let wrap_width = 96.0;
+            let text = "W".repeat(1_000);
+            let job = build_editor_layout_job(ui, &text, wrap_width);
+
+            assert_eq!(job.wrap.max_width, wrap_width);
+            assert!(job.wrap.break_anywhere);
         });
     }
 }

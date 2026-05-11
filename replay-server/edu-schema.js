@@ -75,6 +75,17 @@ function normalizeStudentAccessRequests(input = {}) {
   return normalized
 }
 
+function normalizeStudentIsoMap(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(input)
+      .map(([key, value]) => [normalizeStudentOverrideKey(key), value ? String(value) : null])
+      .filter(([key, value]) => key && value),
+  )
+}
+
 function normalizeStudentFeedbackRequest(input = {}, fallbackKey = '') {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return null
@@ -421,6 +432,7 @@ export function buildAssignment(input = {}) {
               .filter(([, value]) => value),
           )
         : {},
+    student_access_revoked_until: normalizeStudentIsoMap(input.student_access_revoked_until),
     student_overrides: normalizeStudentOverrides(input.student_overrides),
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,
@@ -780,7 +792,11 @@ export function buildLiveReplayEvent(input = {}) {
     assignment_id: String(input.assignment_id || ''),
     student_name: String(input.student_name || 'Student'),
     seq: Math.max(1, Number(input.seq ?? 1) || 1),
-    current_text: String(input.current_text || ''),
+    ...(Object.hasOwn(input, 'current_text') ? { current_text: String(input.current_text || '') } : {}),
+    ...(Number.isFinite(Number(input.current_text_length))
+      ? { current_text_length: Math.max(0, Number(input.current_text_length) || 0) }
+      : {}),
+    ...(input.current_text_hash ? { current_text_hash: String(input.current_text_hash) } : {}),
     current_url: input.current_url ?? null,
     current_url_title: input.current_url_title ?? null,
     document_history_tail: Array.isArray(input.document_history_tail) ? input.document_history_tail : [],

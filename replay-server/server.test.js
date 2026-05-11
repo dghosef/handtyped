@@ -1,7 +1,7 @@
 /**
  * Integration tests for the Handtyped replay server.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { randomUUID, generateKeyPairSync, sign as signDetached } from 'crypto'
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
@@ -3074,6 +3074,134 @@ describe('per-student assignment extensions', () => {
         student_access_request: null,
       },
     })
+  })
+
+  it('allows a student to rejoin a protected assignment when a later scheduled period starts', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-05-04T09:30:00-04:00'))
+    try {
+      const joinCode = `PER${shortId(5)}`
+      const login = await teacherLogin()
+      expect(login.status).toBe(200)
+
+      const classroom = await request(
+        'POST',
+        '/api/edu/classrooms',
+        {
+          name: 'Period Rejoin',
+          teacher_name: 'Ms. Keating',
+          join_code: joinCode,
+        },
+        { Cookie: login.cookie },
+      )
+      expect(classroom.status).toBe(201)
+
+      const assignment = await request(
+        'POST',
+        '/api/edu/assignments',
+        {
+          title: 'Two-period draft',
+          course: classroom.body.name,
+          classroom_id: classroom.body.id,
+          classroom_name: classroom.body.name,
+          assigned_students: ['Ada Lovelace'],
+          windows: [
+            {
+              label: 'First period',
+              days: {
+                monday: true,
+                tuesday: false,
+                wednesday: false,
+                thursday: false,
+                friday: false,
+                saturday: false,
+                sunday: false,
+              },
+              end_date: '2026-05-04',
+              start_hour: 9,
+              start_minute: 0,
+              end_hour: 10,
+              end_minute: 0,
+            },
+            {
+              label: 'Second period',
+              days: {
+                monday: true,
+                tuesday: false,
+                wednesday: false,
+                thursday: false,
+                friday: false,
+                saturday: false,
+                sunday: false,
+              },
+              end_date: '2026-05-04',
+              start_hour: 11,
+              start_minute: 0,
+              end_hour: 12,
+              end_minute: 0,
+            },
+          ],
+          policy: {
+            require_lockdown: true,
+            require_permission_to_rejoin: true,
+          },
+        },
+        { Cookie: login.cookie },
+      )
+      expect(assignment.status).toBe(201)
+
+      const firstPeriod = await request(
+        'GET',
+        `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+      )
+      expect(firstPeriod.status).toBe(200)
+      expect(firstPeriod.body).toMatchObject({
+        schedule_open: true,
+        session_end_at: '2026-05-04T14:00:00.000Z',
+        assignment: {
+          access_revoked: false,
+        },
+      })
+
+      const close = await request(
+        'POST',
+        `/api/edu/student/assignments/${assignment.body.id}/close`,
+        {
+          join_code: joinCode,
+          student_name: 'Ada Lovelace',
+        },
+      )
+      expect(close.status).toBe(201)
+
+      const blockedSamePeriod = await request(
+        'GET',
+        `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+      )
+      expect(blockedSamePeriod.status).toBe(200)
+      expect(blockedSamePeriod.body).toMatchObject({
+        schedule_open: false,
+        assignment: {
+          access_revoked: true,
+        },
+      })
+
+      vi.setSystemTime(new Date('2026-05-04T11:30:00-04:00'))
+      const laterPeriod = await request(
+        'GET',
+        `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+      )
+      expect(laterPeriod.status).toBe(200)
+      expect(laterPeriod.body).toMatchObject({
+        schedule_open: true,
+        session_end_at: '2026-05-04T16:00:00.000Z',
+        assignment: {
+          access_revoked: false,
+          student_access_request: null,
+        },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('surfaces per-student instant access revocation in student config', async () => {

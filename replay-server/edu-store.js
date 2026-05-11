@@ -213,6 +213,7 @@ function assignmentWithRenamedStudent(assignment, oldName, newName) {
     assigned_students: mapStudentNameList(assignment.assigned_students, oldName, newName),
     student_temporary_access_until: renameStudentKeyedMap(assignment.student_temporary_access_until, oldName, newName),
     student_access_revoked: renameStudentKeyedMap(assignment.student_access_revoked, oldName, newName),
+    student_access_revoked_until: renameStudentKeyedMap(assignment.student_access_revoked_until, oldName, newName),
     student_overrides: renameStudentKeyedMap(assignment.student_overrides, oldName, newName),
     student_access_requests: renameStudentRequestEntries(assignment.student_access_requests, oldName, newName),
     student_feedback_requests: renameStudentRequestEntries(assignment.student_feedback_requests, oldName, newName),
@@ -229,6 +230,7 @@ function assignmentWithoutStudent(assignment, studentName) {
     ),
     student_temporary_access_until: removeStudentKeyedMap(assignment.student_temporary_access_until, studentName),
     student_access_revoked: removeStudentKeyedMap(assignment.student_access_revoked, studentName),
+    student_access_revoked_until: removeStudentKeyedMap(assignment.student_access_revoked_until, studentName),
     student_overrides: removeStudentKeyedMap(assignment.student_overrides, studentName),
     student_access_requests: removeStudentRequestEntries(assignment.student_access_requests, studentName),
     student_feedback_requests: removeStudentRequestEntries(assignment.student_feedback_requests, studentName),
@@ -398,7 +400,7 @@ function assignmentWindowDeadline(window, now = new Date()) {
 
 export function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
   const normalized = buildAssignment(assignment)
-  if (assignment?.access_revoked || normalized.access_revoked || studentAccessRevokedForAssignment(normalized, studentName)) {
+  if (assignment?.access_revoked || normalized.access_revoked || studentAccessRevokedForAssignment(normalized, studentName, now)) {
     return { schedule_open: false, session_end_at: null }
   }
   const temporaryUntil = parseDateOrNull(effectiveStudentTemporaryAccessUntil(normalized, studentName))
@@ -481,12 +483,16 @@ async function getLiveSessionForAssignmentStudentCompat(store, assignmentId, stu
   return matching[0] || null
 }
 
-function studentAccessRevokedForAssignment(assignment, studentName) {
+function studentAccessRevokedForAssignment(assignment, studentName, now = new Date()) {
   const key = normalizeStudentOverrideKey(studentName)
   if (!key) {
     return false
   }
-  return Boolean(assignment?.student_access_revoked?.[key])
+  if (!assignment?.student_access_revoked?.[key]) {
+    return false
+  }
+  const revokedUntil = parseDateOrNull(assignment?.student_access_revoked_until?.[key])
+  return !revokedUntil || revokedUntil >= now
 }
 
 function effectiveStudentSettingsOverride(assignment, studentName) {
@@ -556,6 +562,7 @@ function assignmentForStudentConfig(assignment, studentName) {
     student_access_requests: {},
     student_feedback_requests: {},
     student_access_revoked: {},
+    student_access_revoked_until: {},
     student_temporary_access_until: {},
     student_overrides: {},
   }

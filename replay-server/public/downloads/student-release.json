@@ -1,5 +1,5 @@
 {
-  "studentReleaseId": "0.1.1-20260511.2005-windows-no-private-desktop-signed",
+  "studentReleaseId": "0.1.1-20260511.2038-windows-50ms-watchdog-signed",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
@@ -15,7 +15,7 @@
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "b17b75db261cb6fd15b2139b034462b52e95a314bb6f3897c87637653fba0d3b"
+      "sha256": "9a96f9140ffd5fb0d953bf4110a0b3ddce46c6d09a9538927fc367a196d721ee"
     }
   }
 }

@@ -1747,9 +1747,9 @@ describe('teacher almost end-to-end workflow', () => {
           require_permission_to_rejoin: false,
         },
         editor_policy: {
-          font_family: 'arial',
+          font_family: 'times',
           font_size: 12,
-          line_height: 'relaxed',
+          line_height: 'double',
           font_locked: false,
         },
         browser_policy: {
@@ -1828,9 +1828,9 @@ describe('teacher almost end-to-end workflow', () => {
           require_permission_to_rejoin: false,
         },
         editor_policy: {
-          font_family: 'arial',
+          font_family: 'times',
           font_size: 12,
-          line_height: 'relaxed',
+          line_height: 'double',
           font_locked: false,
         },
         browser_policy: {
@@ -2952,7 +2952,7 @@ describe('teacher almost end-to-end workflow', () => {
     expect(afterStrip.body.assignment.editor_policy).toMatchObject({
       font_family: 'sans',
       font_size: 12,
-      line_height: 'relaxed',
+      line_height: 'double',
       font_locked: false,
     })
     expect(afterStrip.body.assignment.browser_policy).toMatchObject({
@@ -5478,7 +5478,7 @@ describe('teacher almost end-to-end workflow', () => {
         require_permission_to_rejoin: false,
       },
       editor_policy: {
-        font_family: 'arial',
+        font_family: 'times',
         font_size: 18,
         line_height: 'single',
         font_locked: true,
@@ -5498,7 +5498,7 @@ describe('teacher almost end-to-end workflow', () => {
         require_permission_to_rejoin: false,
       },
       editor_policy: {
-        font_family: 'arial',
+        font_family: 'times',
         font_size: 18,
         line_height: 'single',
         font_locked: true,

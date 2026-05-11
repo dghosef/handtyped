@@ -6363,9 +6363,9 @@ function resetAssignmentModal() {
   elements.assignmentForm.elements.namedItem('require_lockdown').checked = true
   elements.assignmentForm.elements.namedItem('editor_font_locked').checked = false
   setStarterDocumentMarkdown('')
-  elements.assignmentForm.elements.namedItem('editor_font_family').value = 'arial'
+  elements.assignmentForm.elements.namedItem('editor_font_family').value = 'times'
   elements.assignmentForm.elements.namedItem('editor_font_size').value = '12'
-  elements.assignmentForm.elements.namedItem('editor_line_height').value = 'relaxed'
+  elements.assignmentForm.elements.namedItem('editor_line_height').value = 'double'
   if (elements.quickExtendStatus) {
     elements.quickExtendStatus.hidden = true
     elements.quickExtendStatus.textContent = ''
@@ -6423,9 +6423,9 @@ function populateAssignmentModalForEdit(assignment) {
 
   if (assignment.editor_policy) {
     setStarterDocumentMarkdown(assignment.starter_document || '')
-    field('editor_font_family').value = assignment.editor_policy.font_family || 'arial'
+    field('editor_font_family').value = assignment.editor_policy.font_family || 'times'
     field('editor_font_size').value = String(assignment.editor_policy.font_size ?? 12)
-    field('editor_line_height').value = assignment.editor_policy.line_height || 'relaxed'
+    field('editor_line_height').value = assignment.editor_policy.line_height || 'double'
     field('editor_font_locked').checked = assignment.editor_policy.font_locked ?? false
   } else {
     setStarterDocumentMarkdown(assignment.starter_document || '')
@@ -6545,9 +6545,9 @@ function wireForms() {
           show_rubric_to_student: form.get('show_rubric_to_student') === 'on',
         },
         editor_policy: {
-          font_family: String(form.get('editor_font_family') || 'arial'),
+          font_family: String(form.get('editor_font_family') || 'times'),
           font_size: Number(form.get('editor_font_size') || 12),
-          line_height: String(form.get('editor_line_height') || 'relaxed'),
+          line_height: String(form.get('editor_line_height') || 'double'),
           font_locked: form.get('editor_font_locked') === 'on',
         },
         browser_policy: {

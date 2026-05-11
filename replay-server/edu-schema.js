@@ -153,6 +153,13 @@ function normalizeStudentEditorOverride(input = {}) {
   return output
 }
 
+function isLegacyDefaultEditorPolicy(input = {}) {
+  return input?.font_family === 'arial'
+    && Number(input?.font_size ?? 12) === 12
+    && input?.line_height === 'relaxed'
+    && !input?.font_locked
+}
+
 function normalizeStudentBrowserOverride(input = {}) {
   const output = {}
   if (typeof input?.browser_enabled === 'boolean') {
@@ -364,6 +371,7 @@ export function buildAssignment(input = {}) {
   const assignedStudents = Array.isArray(input.assigned_students)
     ? [...new Set(input.assigned_students.map((value) => String(value || '').trim()).filter(Boolean))]
     : []
+  const legacyDefaultEditorPolicy = isLegacyDefaultEditorPolicy(input.editor_policy)
   return {
     id: input.id || randomId('assignment'),
     tenant_id: String(input.tenant_id || DEFAULT_TENANT_ID),
@@ -389,16 +397,20 @@ export function buildAssignment(input = {}) {
       show_rubric_to_student: Boolean(input.policy?.show_rubric_to_student),
     },
     editor_policy: {
-      font_family: EDU_EDITOR_FONT_FAMILIES.includes(input.editor_policy?.font_family)
+      font_family: legacyDefaultEditorPolicy
+        ? 'times'
+        : EDU_EDITOR_FONT_FAMILIES.includes(input.editor_policy?.font_family)
         ? input.editor_policy.font_family
-        : 'arial',
+        : 'times',
       font_size:
         Number(input.editor_policy?.font_size) >= 10 && Number(input.editor_policy?.font_size) <= 100
         ? Number(input.editor_policy.font_size)
         : 12,
-      line_height: ['compact', 'single', 'relaxed', 'one-half', 'double'].includes(input.editor_policy?.line_height)
+      line_height: legacyDefaultEditorPolicy
+        ? 'double'
+        : ['compact', 'single', 'relaxed', 'one-half', 'double'].includes(input.editor_policy?.line_height)
         ? input.editor_policy.line_height
-        : 'relaxed',
+        : 'double',
       font_locked: Boolean(input.editor_policy?.font_locked),
     },
     browser_policy: {

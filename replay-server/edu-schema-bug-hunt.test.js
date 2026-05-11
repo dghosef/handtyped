@@ -330,9 +330,9 @@ describe('edu schema bug hunt', () => {
       allowed_domains: [],
     })
     expect(assignment.editor_policy).toMatchObject({
-      font_family: 'arial',
+      font_family: 'times',
       font_size: 12,
-      line_height: 'relaxed',
+      line_height: 'double',
     })
   })
 })

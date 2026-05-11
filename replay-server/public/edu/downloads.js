@@ -1,4 +1,4 @@
-export const STUDENT_RELEASE_ID = '0.1.1-20260510.0148-windows-private-desktop-signed'
+export const STUDENT_RELEASE_ID = '0.1.1-20260511.1632-mla-ready'
 
 export const STUDENT_DOWNLOADS = Object.freeze({
   macosAppleSilicon: Object.freeze({

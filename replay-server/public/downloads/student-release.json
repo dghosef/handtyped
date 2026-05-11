@@ -1,5 +1,5 @@
 {
-  "studentReleaseId": "0.1.1-20260511.1523-mac-lockdown-fix",
+  "studentReleaseId": "0.1.1-20260511.2005-windows-no-private-desktop-signed",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
@@ -15,7 +15,7 @@
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "8b63243d2f174954281c7af0f1e6102ef18796f288f3244401007f3426d105a8"
+      "sha256": "b17b75db261cb6fd15b2139b034462b52e95a314bb6f3897c87637653fba0d3b"
     }
   }
 }

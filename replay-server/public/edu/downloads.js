@@ -1,4 +1,4 @@
-export const STUDENT_RELEASE_ID = '0.1.1-20260511.2210-windows-shell-gesture-signed'
+export const STUDENT_RELEASE_ID = '0.1.1-20260511.2255-windows-touchpad-shell-signed'
 
 export const STUDENT_DOWNLOADS = Object.freeze({
   macosAppleSilicon: Object.freeze({

@@ -1,5 +1,5 @@
 {
-  "studentReleaseId": "0.1.1-20260511.2210-windows-shell-gesture-signed",
+  "studentReleaseId": "0.1.1-20260511.2255-windows-touchpad-shell-signed",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
@@ -15,7 +15,7 @@
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "22b75a063322e05bb51c69a5f45e67f5d37018236ab7edd6247b1a5709939a58"
+      "sha256": "608ac1a411975e57f0f6958c2464caeafd181a27be65b80893a17310801dacab"
     }
   }
 }

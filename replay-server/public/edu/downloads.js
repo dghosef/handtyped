@@ -1,4 +1,4 @@
-export const STUDENT_RELEASE_ID = '0.1.1-20260511.1430-vm-block'
+export const STUDENT_RELEASE_ID = '0.1.1-20260511.1523-mac-lockdown-fix'
 
 export const STUDENT_DOWNLOADS = Object.freeze({
   macosAppleSilicon: Object.freeze({

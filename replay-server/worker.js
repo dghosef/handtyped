@@ -325,6 +325,10 @@ async function serveEduLoginHtml(request, env) {
   return env.ASSETS.fetch(new URL('/edu/login.html', request.url))
 }
 
+async function serveUnsignedWindowsHtml(request, env) {
+  return env.ASSETS.fetch(new URL('/unsigned-windows.html', request.url))
+}
+
 function isCanonicalReplayPath(pathname) {
   if (!/^\/[^/.]+$/.test(pathname)) {
     return false
@@ -881,6 +885,10 @@ export default {
 
     if (eduHost && request.method === 'GET' && url.pathname === '/login') {
       return serveEduLoginHtml(request, env)
+    }
+
+    if (eduHost && request.method === 'GET' && url.pathname === '/unsigned-windows') {
+      return serveUnsignedWindowsHtml(request, env)
     }
 
     if (eduHost && request.method === 'GET' && /^\/edu\/replay\/[^/]+$/.test(url.pathname)) {

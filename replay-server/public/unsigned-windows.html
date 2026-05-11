@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Unsigned Windows Test Build - Handtyped EDU</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f6f8fb;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+      }
+      main {
+        width: min(720px, 100%);
+        background: #fff;
+        border: 1px solid #dbe3ec;
+        border-radius: 8px;
+        padding: 28px;
+        box-shadow: 0 18px 45px rgba(23, 32, 51, 0.08);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: clamp(1.7rem, 4vw, 2.4rem);
+        line-height: 1.08;
+      }
+      p {
+        margin: 0 0 16px;
+        line-height: 1.55;
+        color: #4b5870;
+      }
+      a.download {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 6px;
+        background: #172033;
+        color: #fff;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      code {
+        display: block;
+        overflow-wrap: anywhere;
+        padding: 12px;
+        border-radius: 6px;
+        background: #f0f4f8;
+        color: #263244;
+      }
+      .warning {
+        margin-top: 18px;
+        padding: 14px;
+        border-left: 4px solid #c94f45;
+        background: #fff7f5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Unsigned Windows Test Build</h1>
+      <p>This is a temporary unsigned GNU Windows build for testing only. Windows SmartScreen may warn because it is not the signed release build.</p>
+      <p><a class="download" href="/downloads/Handtyped-EDU-Student-windows-gnu-test.zip">Download Windows test zip</a></p>
+      <p>SHA256</p>
+      <code>77476577a0f60f1d776653b779eb46e813cf2e18e79e6fcd28f9054a1935c6de</code>
+      <p class="warning">Use this only if you specifically need the local low-write test build before the signed Windows release is ready.</p>
+    </main>
+  </body>
+</html>

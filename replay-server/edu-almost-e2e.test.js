@@ -3220,6 +3220,156 @@ describe('teacher almost end-to-end workflow', () => {
     ])
   })
 
+  it('allows one student quit per assignment window, then requires teacher approval after the second quit', async () => {
+    const joinCode = `RJN${randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`
+    const login = await teacherLogin()
+    expect(login.status).toBe(200)
+
+    const classroom = await request(
+      'POST',
+      '/api/edu/classrooms',
+      {
+        name: `Rejoin Guard ${randomUUID().replace(/-/g, '').slice(0, 5)}`,
+        teacher_name: 'Ms. Keating',
+        join_code: joinCode,
+      },
+      { Cookie: login.cookie },
+    )
+    expect(classroom.status).toBe(201)
+
+    const alwaysOpenWindow = {
+      label: 'Live test window',
+      days: {
+        sunday: true,
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: true,
+      },
+      start_hour: 0,
+      start_minute: 0,
+      end_hour: 23,
+      end_minute: 59,
+    }
+    const assignment = await request(
+      'POST',
+      '/api/edu/assignments',
+      {
+        title: `Rejoin Guard Essay ${randomUUID().replace(/-/g, '').slice(0, 5)}`,
+        classroom_id: classroom.body.id,
+        classroom_name: classroom.body.name,
+        course: classroom.body.name,
+        assigned_students: ['Ada Lovelace'],
+        prompt: 'Keep the test window calm.',
+        windows: [alwaysOpenWindow],
+        policy: {
+          require_lockdown: true,
+          require_permission_to_rejoin: false,
+        },
+      },
+      { Cookie: login.cookie },
+    )
+    expect(assignment.status).toBe(201)
+
+    const openFirst = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/open`, {
+      join_code: joinCode,
+      student_name: 'Ada Lovelace',
+    })
+    expect(openFirst.status).toBe(201)
+    expect(openFirst.body.access_revoked).toBe(false)
+
+    const closeFirst = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/close`, {
+      join_code: joinCode,
+      student_name: 'Ada Lovelace',
+    })
+    expect(closeFirst.status).toBe(201)
+    expect(closeFirst.body).toMatchObject({
+      access_revoked: false,
+      close_count: 1,
+    })
+
+    const afterFirstClose = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(afterFirstClose.status).toBe(200)
+    expect(afterFirstClose.body.assignment.access_revoked).toBe(false)
+
+    const openSecond = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/open`, {
+      join_code: joinCode,
+      student_name: 'Ada Lovelace',
+    })
+    expect(openSecond.status).toBe(201)
+    expect(openSecond.body.access_revoked).toBe(false)
+
+    const closeSecond = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/close`, {
+      join_code: joinCode,
+      student_name: 'Ada Lovelace',
+    })
+    expect(closeSecond.status).toBe(201)
+    expect(closeSecond.body).toMatchObject({
+      access_revoked: true,
+      close_count: 2,
+    })
+
+    const blocked = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(blocked.status).toBe(200)
+    expect(blocked.body).toMatchObject({
+      schedule_open: false,
+      assignment: {
+        access_revoked: true,
+        rejoin_history: expect.objectContaining({
+          close_count: 2,
+          events: expect.arrayContaining([
+            expect.objectContaining({ type: 'opened' }),
+            expect.objectContaining({ type: 'closed' }),
+          ]),
+        }),
+      },
+    })
+
+    const teacherAssignment = await request(
+      'GET',
+      `/api/edu/assignments/${assignment.body.id}`,
+      undefined,
+      { Cookie: login.cookie },
+    )
+    expect(teacherAssignment.status).toBe(200)
+    expect(teacherAssignment.body.student_rejoin_history['ada lovelace']).toMatchObject({
+      student_name: 'Ada Lovelace',
+      close_count: 2,
+    })
+
+    const editedTime = await request(
+      'PUT',
+      `/api/edu/assignments/${assignment.body.id}`,
+      {
+        windows: [
+          {
+            ...alwaysOpenWindow,
+            end_minute: 58,
+          },
+        ],
+      },
+      { Cookie: login.cookie },
+    )
+    expect(editedTime.status).toBe(200)
+    expect(editedTime.body.student_rejoin_history).toEqual({})
+    expect(editedTime.body.student_access_revoked).toEqual({})
+
+    const afterTimeEdit = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(afterTimeEdit.status).toBe(200)
+    expect(afterTimeEdit.body.assignment.access_revoked).toBe(false)
+  })
+
   it('deletes one classroom without disturbing another classroom for the same student or teacher dashboard', async () => {
     const doomedCode = `DEL${randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`
     const survivorCode = `SAV${randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`

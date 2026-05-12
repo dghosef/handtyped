@@ -23,6 +23,10 @@ import {
   createD1EduStore,
   createKvEduStore,
   ensureEduSeedData,
+  assignmentTimingFieldsChanged,
+  assignmentWithRejoinHistoryReset,
+  recordStudentAssignmentClose,
+  recordStudentAssignmentOpen,
   removeClassroomStudent,
   renameClassroomStudent,
 } from './edu-store.js'
@@ -1546,7 +1550,11 @@ export default {
       if (!existing || existing.tenant_id !== teacherTenantId(session)) {
         return json({ error: 'Not found' }, { status: 404 })
       }
-      const assignment = buildAssignment({ ...existing, ...(await parseJsonRequest(request)), id, updated_at: nowIso() })
+      const input = await parseJsonRequest(request)
+      const builtAssignment = buildAssignment({ ...existing, ...input, id, updated_at: nowIso() })
+      const assignment = assignmentTimingFieldsChanged(input)
+        ? assignmentWithRejoinHistoryReset(builtAssignment)
+        : builtAssignment
       await store.putAssignment(assignment)
       await store.putAssignmentAudit(
         buildAssignmentAuditRecord({
@@ -1950,22 +1958,50 @@ export default {
       if (!result.classroom || !result.assignment || !studentName) {
         return json({ error: 'Not found' }, { status: 404 })
       }
+      const existing = await store.getAssignment(result.assignment.id)
+      if (!existing) {
+        return json({ error: 'Not found' }, { status: 404 })
+      }
+      const openedAt = new Date()
+      const openResult = recordStudentAssignmentOpen(existing, studentName, openedAt)
+      if (openResult.assignment.updated_at !== existing.updated_at || openResult.recorded) {
+        await store.putAssignment(openResult.assignment)
+      }
       await store.putAssignmentAudit({
-        tenant_id: result.assignment.tenant_id,
-        assignment_id: result.assignment.id,
-        classroom_id: result.assignment.classroom_id,
-        assignment_title: result.assignment.title,
+        tenant_id: openResult.assignment.tenant_id,
+        assignment_id: openResult.assignment.id,
+        classroom_id: openResult.assignment.classroom_id,
+        assignment_title: openResult.assignment.title,
         action: 'student_opened',
         actor_id: null,
         actor_name: null,
         actor_email: null,
         summary: `${studentName} opened the assignment`,
         changes: [{ label: 'Student assignment open', before: null, after: studentName }],
-        snapshot: result.assignment,
-        created_at: nowIso(),
-        updated_at: nowIso(),
+        snapshot: openResult.assignment,
+        created_at: openedAt.toISOString(),
+        updated_at: openedAt.toISOString(),
       })
-      return json({ recorded: true, assignment_id: result.assignment.id, student_name: studentName }, { status: 201 })
+      const publishPromise = Promise.allSettled([
+        publishTeacherDashboard(env, openResult.assignment.tenant_id),
+        publishAssignmentSummary(env, openResult.assignment.id, openResult.assignment.tenant_id),
+        publishStudentAssignment(env, openResult.assignment, studentName, result.classroom.join_code),
+      ])
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(publishPromise)
+      } else {
+        await publishPromise
+      }
+      return json(
+        {
+          recorded: true,
+          assignment_id: openResult.assignment.id,
+          student_name: studentName,
+          access_revoked: openResult.access_revoked,
+          close_count: openResult.close_count,
+        },
+        { status: 201 },
+      )
     }
 
     if (eduHost && request.method === 'POST' && /^\/api\/edu\/student\/assignments\/[^/]+\/feedback-resolutions$/.test(url.pathname)) {
@@ -2057,28 +2093,11 @@ export default {
         return json({ error: 'Not found' }, { status: 404 })
       }
 
-      const normalizedKey = studentName.toLowerCase()
-      const shouldRequireApproval = Boolean(result.assignment.policy?.require_permission_to_rejoin)
-      const closedAt = nowIso()
-      const rejoinBlockedUntil = shouldRequireApproval
-        ? scheduleStateForAssignment(existing, studentName, new Date(closedAt)).session_end_at
-        : null
-      const updatedAssignment = shouldRequireApproval
-        ? buildAssignment({
-            ...existing,
-            student_access_revoked: {
-              ...(existing.student_access_revoked || {}),
-              [normalizedKey]: true,
-            },
-            student_access_revoked_until: {
-              ...(existing.student_access_revoked_until || {}),
-              ...(rejoinBlockedUntil ? { [normalizedKey]: rejoinBlockedUntil } : {}),
-            },
-            updated_at: closedAt,
-          })
-        : existing
+      const closedAt = new Date()
+      const closeResult = recordStudentAssignmentClose(existing, studentName, closedAt)
+      const updatedAssignment = closeResult.assignment
 
-      if (updatedAssignment !== existing) {
+      if (updatedAssignment.updated_at !== existing.updated_at || closeResult.history) {
         await store.putAssignment(updatedAssignment)
       }
       const liveSessionId = `${studentName}:${updatedAssignment.id}`
@@ -2089,8 +2108,8 @@ export default {
           ...existingLiveSession,
           focused: false,
           schedule_open: false,
-          last_activity_at: closedAt,
-          updated_at: closedAt,
+          last_activity_at: closedAt.toISOString(),
+          updated_at: closedAt.toISOString(),
         })
         await store.putLiveSession(closedLiveSession)
       }
@@ -2103,19 +2122,19 @@ export default {
         actor_id: null,
         actor_name: null,
         actor_email: null,
-        summary: shouldRequireApproval
-          ? `${studentName} left and now needs approval to return`
+        summary: closeResult.access_revoked
+          ? `${studentName} left twice and now needs approval to return`
           : `${studentName} left the assignment`,
         changes: [
           {
-            label: shouldRequireApproval ? 'Student re-entry approval required' : 'Student assignment close',
+            label: closeResult.access_revoked ? 'Student re-entry approval required' : 'Student assignment close',
             before: null,
             after: studentName,
           },
         ],
         snapshot: updatedAssignment,
-        created_at: closedAt,
-        updated_at: closedAt,
+        created_at: closedAt.toISOString(),
+        updated_at: closedAt.toISOString(),
       })
       const publishTasks = [
         publishTeacherDashboard(env, updatedAssignment.tenant_id),
@@ -2132,7 +2151,8 @@ export default {
           recorded: true,
           assignment_id: updatedAssignment.id,
           student_name: studentName,
-          access_revoked: shouldRequireApproval,
+          access_revoked: closeResult.access_revoked,
+          close_count: closeResult.close_count,
         },
         { status: 201 },
       )

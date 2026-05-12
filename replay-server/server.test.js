@@ -2944,7 +2944,7 @@ describe('per-student assignment extensions', () => {
     )
   })
 
-  it('requires teacher approval before a student can rejoin after leaving a protected assignment', async () => {
+  it('requires teacher approval before a student can rejoin after leaving a protected assignment twice', async () => {
     const joinCode = `REJ${shortId(5)}`
     const login = await teacherLogin()
     expect(login.status).toBe(200)
@@ -3005,7 +3005,46 @@ describe('per-student assignment extensions', () => {
     expect(close.status).toBe(201)
     expect(close.body).toMatchObject({
       recorded: true,
+      access_revoked: false,
+      close_count: 1,
+      student_name: 'Ada Lovelace',
+    })
+
+    const allowedRejoin = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(allowedRejoin.status).toBe(200)
+    expect(allowedRejoin.body).toMatchObject({
+      schedule_open: true,
+      assignment: {
+        access_revoked: false,
+      },
+    })
+
+    const reopened = await request(
+      'POST',
+      `/api/edu/student/assignments/${assignment.body.id}/open`,
+      {
+        join_code: joinCode,
+        student_name: 'Ada Lovelace',
+      },
+    )
+    expect(reopened.status).toBe(201)
+
+    const secondClose = await request(
+      'POST',
+      `/api/edu/student/assignments/${assignment.body.id}/close`,
+      {
+        join_code: joinCode,
+        student_name: 'Ada Lovelace',
+      },
+    )
+    expect(secondClose.status).toBe(201)
+    expect(secondClose.body).toMatchObject({
+      recorded: true,
       access_revoked: true,
+      close_count: 2,
       student_name: 'Ada Lovelace',
     })
 
@@ -3172,6 +3211,28 @@ describe('per-student assignment extensions', () => {
         },
       )
       expect(close.status).toBe(201)
+      expect(close.body).toMatchObject({ access_revoked: false, close_count: 1 })
+
+      const reopen = await request(
+        'POST',
+        `/api/edu/student/assignments/${assignment.body.id}/open`,
+        {
+          join_code: joinCode,
+          student_name: 'Ada Lovelace',
+        },
+      )
+      expect(reopen.status).toBe(201)
+
+      const secondClose = await request(
+        'POST',
+        `/api/edu/student/assignments/${assignment.body.id}/close`,
+        {
+          join_code: joinCode,
+          student_name: 'Ada Lovelace',
+        },
+      )
+      expect(secondClose.status).toBe(201)
+      expect(secondClose.body).toMatchObject({ access_revoked: true, close_count: 2 })
 
       const blockedSamePeriod = await request(
         'GET',

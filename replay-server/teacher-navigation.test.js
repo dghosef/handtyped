@@ -24,6 +24,7 @@ import {
   sessionStatusLabel,
   sessionsForAssignment,
   sortSessionsForDisplay,
+  studentRejoinHistorySummary,
   timeAgoLabel,
   todayAtLocalTime,
   todayAtLocalTimeIso,
@@ -103,7 +104,7 @@ describe('teacher navigation', () => {
     expect(teacherAppHtml).toContain('support@handtyped.app')
     expect(teacherAppHtml).toContain('Locked line spacing')
     expect(teacherAppHtml).toContain('Keep students in Handtyped until the writing window ends')
-    expect(teacherAppHtml).toContain('leave Handtyped and come back on their own later')
+    expect(teacherAppHtml).toContain('The first quit is allowed; the second quit in the same window locks re-entry until approved.')
     expect(teacherAppHtml.indexOf('Teacher mode editor')).toBeLessThan(teacherAppHtml.indexOf('Rubric and feedback'))
     expect(teacherAppHtml.indexOf('<section id="assignments-view" hidden>')).toBeGreaterThan(
       teacherAppHtml.indexOf('</section>\n\n      <!-- Assignments View -->'),
@@ -1041,6 +1042,31 @@ describe('teacher navigation', () => {
       'stale',
       'calm',
     ])
+  })
+
+  it('summarizes student quit and rejoin history with visible timestamps', () => {
+    const summary = studentRejoinHistorySummary(
+      {
+        student_rejoin_history: {
+          'ada lovelace': {
+            student_name: 'Ada Lovelace',
+            close_count: 2,
+            events: [
+              { type: 'opened', at: '2026-05-07T19:00:00.000Z' },
+              { type: 'closed', at: '2026-05-07T19:05:00.000Z' },
+              { type: 'opened', at: '2026-05-07T19:08:00.000Z' },
+              { type: 'locked', at: '2026-05-07T19:12:00.000Z' },
+            ],
+          },
+        },
+      },
+      'Ada Lovelace',
+    )
+
+    expect(summary).toContain('2 quits this window')
+    expect(summary).toContain('left')
+    expect(summary).toContain('locked')
+    expect(summary).toMatch(/May 7/)
   })
 
   it('uses latest activity to break ties when students have the same risk score', () => {

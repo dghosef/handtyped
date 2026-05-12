@@ -86,6 +86,67 @@ function normalizeStudentIsoMap(input = {}) {
   )
 }
 
+function normalizeStudentBoolMap(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(input)
+      .map(([key, value]) => [normalizeStudentOverrideKey(key), Boolean(value)])
+      .filter(([key, value]) => key && value),
+  )
+}
+
+function normalizeStudentStringMap(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(input)
+      .map(([key, value]) => [normalizeStudentOverrideKey(key), String(value || '')])
+      .filter(([key, value]) => key && value),
+  )
+}
+
+function normalizeStudentRejoinHistory(input = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {}
+  }
+  const normalized = {}
+  for (const [rawKey, rawValue] of Object.entries(input)) {
+    if (!rawValue || typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+      continue
+    }
+    const studentName = String(rawValue.student_name || rawKey || '').trim()
+    const key = normalizeStudentOverrideKey(studentName || rawKey)
+    const windowKey = String(rawValue.window_key || '')
+    if (!key || !windowKey) {
+      continue
+    }
+    const events = (Array.isArray(rawValue.events) ? rawValue.events : [])
+      .map((event) => ({
+        type: event?.type === 'closed' || event?.type === 'locked' ? event.type : 'opened',
+        at: String(event?.at || nowIso()),
+        window_key: String(event?.window_key || windowKey),
+      }))
+      .filter((event) => event.at)
+    const closeCount = Number.isFinite(Number(rawValue.close_count))
+      ? Math.max(0, Number(rawValue.close_count))
+      : events.filter((event) => event.type === 'closed').length
+    normalized[key] = {
+      student_name: studentName || rawKey,
+      window_key: windowKey,
+      window_label: String(rawValue.window_label || ''),
+      window_start_at: rawValue.window_start_at ? String(rawValue.window_start_at) : null,
+      window_end_at: rawValue.window_end_at ? String(rawValue.window_end_at) : null,
+      close_count: closeCount,
+      events,
+      updated_at: String(rawValue.updated_at || nowIso()),
+    }
+  }
+  return normalized
+}
+
 function normalizeStudentFeedbackRequest(input = {}, fallbackKey = '') {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return null
@@ -436,15 +497,10 @@ export function buildAssignment(input = {}) {
       input.student_temporary_access_until && typeof input.student_temporary_access_until === 'object'
         ? { ...input.student_temporary_access_until }
         : {},
-    student_access_revoked:
-      input.student_access_revoked && typeof input.student_access_revoked === 'object'
-        ? Object.fromEntries(
-            Object.entries(input.student_access_revoked)
-              .map(([key, value]) => [normalizeStudentOverrideKey(key), Boolean(value)])
-              .filter(([, value]) => value),
-          )
-        : {},
+    student_access_revoked: normalizeStudentBoolMap(input.student_access_revoked),
     student_access_revoked_until: normalizeStudentIsoMap(input.student_access_revoked_until),
+    student_access_revoked_rejoin_window: normalizeStudentStringMap(input.student_access_revoked_rejoin_window),
+    student_rejoin_history: normalizeStudentRejoinHistory(input.student_rejoin_history),
     student_overrides: normalizeStudentOverrides(input.student_overrides),
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,

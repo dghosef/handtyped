@@ -3552,6 +3552,34 @@ describe('worker per-student assignment extensions', () => {
         env,
       )
       expect(closeRes.status).toBe(201)
+      expect(await closeRes.clone().json()).toMatchObject({ access_revoked: false, close_count: 1 })
+
+      const openRes = await worker.fetch(
+        new Request(`https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}/open`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            join_code: joinCode,
+            student_name: 'Ada Lovelace',
+          }),
+        }),
+        env,
+      )
+      expect(openRes.status).toBe(201)
+
+      const secondCloseRes = await worker.fetch(
+        new Request(`https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}/close`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            join_code: joinCode,
+            student_name: 'Ada Lovelace',
+          }),
+        }),
+        env,
+      )
+      expect(secondCloseRes.status).toBe(201)
+      expect(await secondCloseRes.json()).toMatchObject({ access_revoked: true, close_count: 2 })
 
       const blockedRes = await worker.fetch(
         new Request(

@@ -32,6 +32,10 @@ import {
   buildStudentConfig,
   createNodeEduStore,
   ensureEduSeedData,
+  assignmentTimingFieldsChanged,
+  assignmentWithRejoinHistoryReset,
+  recordStudentAssignmentClose,
+  recordStudentAssignmentOpen,
   removeClassroomStudent,
   renameClassroomStudent,
   scheduleStateForAssignment,
@@ -972,7 +976,11 @@ export function createApp(sessionsDir, config = {}) {
     if (!existing || existing.tenant_id !== teacherTenantId(session)) {
       return res.status(404).json({ error: 'Not found' })
     }
-    const assignment = buildAssignment({ ...existing, ...(req.body || {}), id: req.params.id, updated_at: nowIso() })
+    const input = req.body || {}
+    const builtAssignment = buildAssignment({ ...existing, ...input, id: req.params.id, updated_at: nowIso() })
+    const assignment = assignmentTimingFieldsChanged(input)
+      ? assignmentWithRejoinHistoryReset(builtAssignment)
+      : builtAssignment
     const titleConflict = await findAssignmentTitleConflict(eduStore, assignment.title, assignment.id, assignment.tenant_id)
     if (titleConflict) {
       return res.status(409).json({ error: 'Assignment title already in use', title: assignment.title })
@@ -1330,24 +1338,37 @@ export function createApp(sessionsDir, config = {}) {
     if (!result.classroom || !result.assignment || !studentName) {
       return res.status(404).json({ error: 'Not found' })
     }
+    const existing = await eduStore.getAssignment(result.assignment.id)
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    const openedAt = new Date()
+    const openResult = recordStudentAssignmentOpen(existing, studentName, openedAt)
+    if (openResult.assignment.updated_at !== existing.updated_at || openResult.recorded) {
+      await eduStore.putAssignment(openResult.assignment)
+    }
     await eduStore.putAssignmentAudit(
       {
-        tenant_id: result.assignment.tenant_id,
-        assignment_id: result.assignment.id,
-        classroom_id: result.assignment.classroom_id,
-        assignment_title: result.assignment.title,
+        tenant_id: openResult.assignment.tenant_id,
+        assignment_id: openResult.assignment.id,
+        classroom_id: openResult.assignment.classroom_id,
+        assignment_title: openResult.assignment.title,
         action: 'student_opened',
         actor_id: null,
         actor_name: null,
         actor_email: null,
         summary: `${studentName} opened the assignment`,
         changes: [{ label: 'Student assignment open', before: null, after: studentName }],
-        snapshot: result.assignment,
-        created_at: nowIso(),
-        updated_at: nowIso(),
+        snapshot: openResult.assignment,
+        created_at: openedAt.toISOString(),
+        updated_at: openedAt.toISOString(),
       },
     )
-    res.status(201).json({ recorded: true, assignment_id: result.assignment.id, student_name: studentName })
+    res.status(201).json({
+      recorded: true,
+      assignment_id: openResult.assignment.id,
+      student_name: studentName,
+      access_revoked: openResult.access_revoked,
+      close_count: openResult.close_count,
+    })
   })
 
   app.post('/api/edu/student/assignments/:id/feedback-resolutions', async (req, res) => {
@@ -1423,28 +1444,11 @@ export function createApp(sessionsDir, config = {}) {
     const existing = await eduStore.getAssignment(result.assignment.id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
 
-    const normalizedKey = studentName.toLowerCase()
-    const shouldRequireApproval = Boolean(result.assignment.policy?.require_permission_to_rejoin)
-    const closedAt = nowIso()
-    const rejoinBlockedUntil = shouldRequireApproval
-      ? scheduleStateForAssignment(existing, studentName, new Date(closedAt)).session_end_at
-      : null
-    const updatedAssignment = shouldRequireApproval
-      ? buildAssignment({
-          ...existing,
-          student_access_revoked: {
-            ...(existing.student_access_revoked || {}),
-            [normalizedKey]: true,
-          },
-          student_access_revoked_until: {
-            ...(existing.student_access_revoked_until || {}),
-            ...(rejoinBlockedUntil ? { [normalizedKey]: rejoinBlockedUntil } : {}),
-          },
-          updated_at: closedAt,
-        })
-      : existing
+    const closedAt = new Date()
+    const closeResult = recordStudentAssignmentClose(existing, studentName, closedAt)
+    const updatedAssignment = closeResult.assignment
 
-    if (updatedAssignment !== existing) {
+    if (updatedAssignment.updated_at !== existing.updated_at || closeResult.history) {
       await eduStore.putAssignment(updatedAssignment)
     }
     await eduStore.putAssignmentAudit(
@@ -1457,26 +1461,27 @@ export function createApp(sessionsDir, config = {}) {
         actor_id: null,
         actor_name: null,
         actor_email: null,
-        summary: shouldRequireApproval
-          ? `${studentName} left and now needs approval to return`
+        summary: closeResult.access_revoked
+          ? `${studentName} left twice and now needs approval to return`
           : `${studentName} left the assignment`,
         changes: [
           {
-            label: shouldRequireApproval ? 'Student re-entry approval required' : 'Student assignment close',
+            label: closeResult.access_revoked ? 'Student re-entry approval required' : 'Student assignment close',
             before: null,
             after: studentName,
           },
         ],
         snapshot: updatedAssignment,
-        created_at: closedAt,
-        updated_at: closedAt,
+        created_at: closedAt.toISOString(),
+        updated_at: closedAt.toISOString(),
       },
     )
     res.status(201).json({
       recorded: true,
       assignment_id: updatedAssignment.id,
       student_name: studentName,
-      access_revoked: shouldRequireApproval,
+      access_revoked: closeResult.access_revoked,
+      close_count: closeResult.close_count,
     })
   })
 

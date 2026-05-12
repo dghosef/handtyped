@@ -218,6 +218,12 @@ function assignmentWithRenamedStudent(assignment, oldName, newName) {
     student_temporary_access_until: renameStudentKeyedMap(assignment.student_temporary_access_until, oldName, newName),
     student_access_revoked: renameStudentKeyedMap(assignment.student_access_revoked, oldName, newName),
     student_access_revoked_until: renameStudentKeyedMap(assignment.student_access_revoked_until, oldName, newName),
+    student_access_revoked_rejoin_window: renameStudentKeyedMap(
+      assignment.student_access_revoked_rejoin_window,
+      oldName,
+      newName,
+    ),
+    student_rejoin_history: renameStudentKeyedMap(assignment.student_rejoin_history, oldName, newName),
     student_overrides: renameStudentKeyedMap(assignment.student_overrides, oldName, newName),
     student_access_requests: renameStudentRequestEntries(assignment.student_access_requests, oldName, newName),
     student_feedback_requests: renameStudentRequestEntries(assignment.student_feedback_requests, oldName, newName),
@@ -235,6 +241,11 @@ function assignmentWithoutStudent(assignment, studentName) {
     student_temporary_access_until: removeStudentKeyedMap(assignment.student_temporary_access_until, studentName),
     student_access_revoked: removeStudentKeyedMap(assignment.student_access_revoked, studentName),
     student_access_revoked_until: removeStudentKeyedMap(assignment.student_access_revoked_until, studentName),
+    student_access_revoked_rejoin_window: removeStudentKeyedMap(
+      assignment.student_access_revoked_rejoin_window,
+      studentName,
+    ),
+    student_rejoin_history: removeStudentKeyedMap(assignment.student_rejoin_history, studentName),
     student_overrides: removeStudentKeyedMap(assignment.student_overrides, studentName),
     student_access_requests: removeStudentRequestEntries(assignment.student_access_requests, studentName),
     student_feedback_requests: removeStudentRequestEntries(assignment.student_feedback_requests, studentName),
@@ -402,6 +413,220 @@ function assignmentWindowDeadline(window, now = new Date()) {
   return deadline
 }
 
+function windowAnchorDate(window, now = new Date()) {
+  const startMinutes = (Number(window?.start_hour) || 0) * 60 + (Number(window?.start_minute) || 0)
+  const endMinutes = (Number(window?.end_hour) || 0) * 60 + (Number(window?.end_minute) || 0)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const anchor = new Date(now)
+  if (startMinutes > endMinutes && nowMinutes <= endMinutes) {
+    anchor.setDate(anchor.getDate() - 1)
+  }
+  anchor.setHours(0, 0, 0, 0)
+  return anchor
+}
+
+function dateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function activeAssignmentWindowIdentity(assignment, studentName, now = new Date()) {
+  const normalized = buildAssignment(assignment)
+  const activeWindows = (normalized.windows || [])
+    .map((window, index) => {
+      const endAt = assignmentWindowDeadline(window, now)
+      if (!endAt) {
+        return null
+      }
+      const anchor = windowAnchorDate(window, now)
+      const startAt = new Date(anchor)
+      startAt.setHours(Number(window.start_hour) || 0, Number(window.start_minute) || 0, 0, 0)
+      const scheduleSignature = [
+        window.label || '',
+        JSON.stringify(window.days || {}),
+        window.end_date || '',
+        Number(window.start_hour) || 0,
+        Number(window.start_minute) || 0,
+        Number(window.end_hour) || 0,
+        Number(window.end_minute) || 0,
+      ].join('|')
+      return {
+        key: `window:${dateKey(anchor)}:${index}:${scheduleSignature}`,
+        label: window.label || 'Writing window',
+        start_at: startAt.toISOString(),
+        end_at: endAt.toISOString(),
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.end_at).localeCompare(String(b.end_at)))
+
+  if (activeWindows.length) {
+    return activeWindows[0]
+  }
+
+  const temporaryUntil = parseDateOrNull(effectiveStudentTemporaryAccessUntil(normalized, studentName))
+  if (temporaryUntil && temporaryUntil >= now) {
+    return {
+      key: `temporary:${temporaryUntil.toISOString()}`,
+      label: 'Teacher-granted time',
+      start_at: null,
+      end_at: temporaryUntil.toISOString(),
+    }
+  }
+
+  return null
+}
+
+function currentRejoinHistory(assignment, studentName, windowIdentity, now = new Date()) {
+  const key = normalizeStudentOverrideKey(studentName)
+  const existing = key ? assignment?.student_rejoin_history?.[key] : null
+  if (existing?.window_key === windowIdentity?.key) {
+    return {
+      ...existing,
+      events: Array.isArray(existing.events) ? existing.events : [],
+    }
+  }
+  return {
+    student_name: String(studentName || '').trim(),
+    window_key: windowIdentity?.key || `unknown:${now.toISOString()}`,
+    window_label: windowIdentity?.label || '',
+    window_start_at: windowIdentity?.start_at || null,
+    window_end_at: windowIdentity?.end_at || null,
+    close_count: 0,
+    events: [],
+    updated_at: now.toISOString(),
+  }
+}
+
+function assignmentRequiresRepeatedQuitLockout(assignment) {
+  return Boolean(assignment?.policy?.require_lockdown)
+}
+
+export function recordStudentAssignmentOpen(assignment, studentName, now = new Date()) {
+  const normalized = buildAssignment(assignment)
+  const key = normalizeStudentOverrideKey(studentName)
+  const windowIdentity = activeAssignmentWindowIdentity(normalized, studentName, now)
+  if (!key || !windowIdentity || studentAccessRevokedForAssignment(normalized, studentName, now)) {
+    return {
+      assignment: normalized,
+      recorded: false,
+      access_revoked: studentAccessRevokedForAssignment(normalized, studentName, now),
+      close_count: normalized.student_rejoin_history?.[key]?.close_count || 0,
+      history: normalized.student_rejoin_history?.[key] || null,
+    }
+  }
+  const history = currentRejoinHistory(normalized, studentName, windowIdentity, now)
+  const nextHistory = buildAssignment({
+    ...normalized,
+    student_rejoin_history: {
+      ...normalized.student_rejoin_history,
+      [key]: {
+        ...history,
+        events: [
+          ...history.events,
+          {
+            type: 'opened',
+            at: now.toISOString(),
+            window_key: history.window_key,
+          },
+        ].slice(-24),
+        updated_at: now.toISOString(),
+      },
+    },
+    updated_at: now.toISOString(),
+  })
+  return {
+    assignment: nextHistory,
+    recorded: true,
+    access_revoked: false,
+    close_count: nextHistory.student_rejoin_history[key]?.close_count || 0,
+    history: nextHistory.student_rejoin_history[key] || null,
+  }
+}
+
+export function recordStudentAssignmentClose(assignment, studentName, now = new Date()) {
+  const normalized = buildAssignment(assignment)
+  const key = normalizeStudentOverrideKey(studentName)
+  const windowIdentity = activeAssignmentWindowIdentity(normalized, studentName, now)
+  if (!key || !windowIdentity) {
+    return {
+      assignment: normalized,
+      access_revoked: studentAccessRevokedForAssignment(normalized, studentName, now),
+      close_count: normalized.student_rejoin_history?.[key]?.close_count || 0,
+      history: normalized.student_rejoin_history?.[key] || null,
+    }
+  }
+
+  const history = currentRejoinHistory(normalized, studentName, windowIdentity, now)
+  const closeCount = Math.max(Number(history.close_count) || 0, 0) + 1
+  const shouldLock =
+    assignmentRequiresRepeatedQuitLockout(normalized) && closeCount >= 2
+  const nextStudentAccessRevoked = { ...normalized.student_access_revoked }
+  const nextStudentAccessRevokedUntil = { ...normalized.student_access_revoked_until }
+  const nextStudentAccessRevokedRejoinWindow = { ...normalized.student_access_revoked_rejoin_window }
+  if (shouldLock) {
+    nextStudentAccessRevoked[key] = true
+    nextStudentAccessRevokedRejoinWindow[key] = history.window_key
+    if (history.window_end_at) {
+      nextStudentAccessRevokedUntil[key] = history.window_end_at
+    }
+  }
+
+  const updatedAssignment = buildAssignment({
+    ...normalized,
+    student_access_revoked: nextStudentAccessRevoked,
+    student_access_revoked_until: nextStudentAccessRevokedUntil,
+    student_access_revoked_rejoin_window: nextStudentAccessRevokedRejoinWindow,
+    student_rejoin_history: {
+      ...normalized.student_rejoin_history,
+      [key]: {
+        ...history,
+        close_count: closeCount,
+        events: [
+          ...history.events,
+          {
+            type: shouldLock ? 'locked' : 'closed',
+            at: now.toISOString(),
+            window_key: history.window_key,
+          },
+        ].slice(-24),
+        updated_at: now.toISOString(),
+      },
+    },
+    updated_at: now.toISOString(),
+  })
+  return {
+    assignment: updatedAssignment,
+    access_revoked: shouldLock,
+    close_count: closeCount,
+    history: updatedAssignment.student_rejoin_history[key] || null,
+  }
+}
+
+export function assignmentWithRejoinHistoryReset(assignment, now = new Date()) {
+  const normalized = buildAssignment(assignment)
+  const rejoinRevoked = normalized.student_access_revoked_rejoin_window || {}
+  const studentAccessRevoked = { ...normalized.student_access_revoked }
+  const studentAccessRevokedUntil = { ...normalized.student_access_revoked_until }
+  for (const key of Object.keys(rejoinRevoked)) {
+    delete studentAccessRevoked[key]
+    delete studentAccessRevokedUntil[key]
+  }
+  return buildAssignment({
+    ...normalized,
+    student_access_revoked: studentAccessRevoked,
+    student_access_revoked_until: studentAccessRevokedUntil,
+    student_access_revoked_rejoin_window: {},
+    student_rejoin_history: {},
+    updated_at: now.toISOString(),
+  })
+}
+
+export function assignmentTimingFieldsChanged(input = {}) {
+  return ['windows', 'temporary_access_until', 'student_temporary_access_until', 'student_overrides'].some((key) =>
+    Object.hasOwn(input || {}, key),
+  )
+}
+
 export function scheduleStateForAssignment(assignment, studentName, now = new Date()) {
   const normalized = buildAssignment(assignment)
   if (assignment?.access_revoked || normalized.access_revoked || studentAccessRevokedForAssignment(normalized, studentName, now)) {
@@ -563,10 +788,13 @@ function assignmentForStudentConfig(assignment, studentName) {
     student_feedback: normalized.student_feedback || null,
     student_access_request: studentAccessRequestForAssignment(normalized, studentName),
     student_feedback_request: studentFeedbackRequestForAssignment(normalized, studentName),
+    rejoin_history: normalized.student_rejoin_history?.[normalizeStudentOverrideKey(studentName)] || null,
     student_access_requests: {},
     student_feedback_requests: {},
     student_access_revoked: {},
     student_access_revoked_until: {},
+    student_access_revoked_rejoin_window: {},
+    student_rejoin_history: {},
     student_temporary_access_until: {},
     student_overrides: {},
   }

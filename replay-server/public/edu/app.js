@@ -16,6 +16,7 @@ import {
   sessionStatusLabel,
   sessionsForAssignment,
   sortSessionsForDisplay,
+  studentRejoinHistorySummary,
   timeAgoLabel,
   todayAtLocalTime,
   wholeClassExtensionLabel,
@@ -5310,6 +5311,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
       const pendingFeedbackRequest = selectedAssignment?.student_feedback_requests?.[requestKey]
       const feedbackRequestBadge = pendingFeedbackRequest ? badge('Feedback requested', 'warn') : ''
       const specialAccessBadge = specialAccessBadgeFor(selectedAssignment, session.student_name, now)
+      const rejoinHistory = studentRejoinHistorySummary(selectedAssignment, session.student_name)
       const accessRevoked = studentAccessRevokedFor(selectedAssignment, session.student_name)
       const accessActionPending = pendingStudentAccessActionFor(session.student_name)
       const closeActionPending = accessActionPending === 'close'
@@ -5340,6 +5342,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
             <div>
               <h2>${escapeHtml(session.student_name)}</h2>
               <div class="student-meta" data-student-last-activity>Last activity ${escapeHtml(timeAgoLabel(session.last_activity_at, now))}</div>
+              ${rejoinHistory ? `<div class="student-meta student-rejoin-history">${escapeHtml(rejoinHistory)}</div>` : ''}
             </div>
             <div class="student-badges"><span class="student-badge student-badge-${statusTone}" data-student-status-badge>${escapeHtml(statusLabel)}</span>${specialAccessBadge}${requestBadge}${feedbackRequestBadge}</div>
           </div>

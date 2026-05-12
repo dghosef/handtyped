@@ -635,6 +635,52 @@ export function timeAgoLabel(value, now = Date.now()) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+function normalizeStudentKey(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function compactTimestamp(value) {
+  const parsed = parseTimestamp(value)
+  if (!parsed) {
+    return 'unknown time'
+  }
+  return new Date(parsed).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+export function studentRejoinHistoryFor(assignment, studentName) {
+  const key = normalizeStudentKey(studentName)
+  const history = key ? assignment?.student_rejoin_history?.[key] : null
+  if (!history || typeof history !== 'object') {
+    return null
+  }
+  return history
+}
+
+export function studentRejoinHistorySummary(assignment, studentName) {
+  const history = studentRejoinHistoryFor(assignment, studentName)
+  if (!history) {
+    return ''
+  }
+  const closeCount = Math.max(0, Number(history.close_count || 0))
+  const events = (Array.isArray(history.events) ? history.events : []).slice(-5)
+  if (!closeCount || !events.length) {
+    return ''
+  }
+  const eventText = events
+    .map((event) => {
+      const label = event?.type === 'locked' ? 'locked' : event?.type === 'closed' ? 'left' : 'opened'
+      return `${label} ${compactTimestamp(event?.at)}`
+    })
+    .join(' · ')
+  const noun = closeCount === 1 ? 'quit' : 'quits'
+  return `${closeCount} ${noun} this window: ${eventText}`
+}
+
 export function formatClockTime(hour = 0, minute = 0) {
   const normalizedHour = Math.max(0, Math.min(23, Number(hour) || 0))
   const normalizedMinute = Math.max(0, Math.min(59, Number(minute) || 0))

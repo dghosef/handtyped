@@ -769,7 +769,7 @@ function assignmentForStudentConfig(assignment, studentName) {
   const effectiveTemporaryAccessUntil = Object.hasOwn(override || {}, 'temporary_access_until')
     ? override.temporary_access_until
     : effectiveStudentTemporaryAccessUntil(normalized, studentName)
-  return {
+  const configured = {
     ...normalized,
     temporary_access_until: effectiveTemporaryAccessUntil,
     access_revoked: studentAccessRevokedForAssignment(normalized, studentName),
@@ -797,6 +797,12 @@ function assignmentForStudentConfig(assignment, studentName) {
     student_rejoin_history: {},
     student_temporary_access_until: {},
     student_overrides: {},
+  }
+  const schedule = scheduleStateForAssignment(configured, studentName)
+  return {
+    ...configured,
+    schedule_open: schedule.schedule_open,
+    session_end_at: schedule.session_end_at,
   }
 }
 

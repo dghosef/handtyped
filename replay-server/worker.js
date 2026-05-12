@@ -1911,12 +1911,15 @@ export default {
 
     if (eduHost && request.method === 'GET' && url.pathname === '/api/edu/student/config') {
       const store = await prepareEduStore(getEduStore(env))
-      return json(
-        await buildStudentConfig(store, {
-          joinCode: url.searchParams.get('join_code') || '',
-          studentName: url.searchParams.get('student_name') || '',
-        }),
-      )
+      const result = await buildStudentConfig(store, {
+        joinCode: url.searchParams.get('join_code') || '',
+        studentName: url.searchParams.get('student_name') || '',
+        joining: url.searchParams.get('joining') === '1',
+      })
+      if (result.duplicate_student_name) {
+        return json({ error: 'A student with that name has already joined this class.' }, { status: 409 })
+      }
+      return json(result)
     }
 
     if (eduHost && request.method === 'GET' && url.pathname.startsWith('/api/edu/student/assignments/')) {

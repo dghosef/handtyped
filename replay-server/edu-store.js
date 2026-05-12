@@ -104,6 +104,13 @@ function studentRemovedFromClassroom(classroom, studentName) {
   )
 }
 
+function studentAlreadyInClassroom(classroom, studentName) {
+  const normalizedStudent = normalizeStudentOverrideKey(studentName)
+  return (Array.isArray(classroom?.students) ? classroom.students : []).some(
+    (value) => normalizeStudentOverrideKey(value) === normalizedStudent,
+  )
+}
+
 function mergeById(previous = [], incoming = []) {
   const merged = new Map()
   for (const item of Array.isArray(previous) ? previous : []) {
@@ -139,10 +146,7 @@ async function rememberStudentInClassroom(store, classroom, studentName) {
   }
 
   const existingStudents = Array.isArray(classroom.students) ? classroom.students : []
-  const alreadyPresent = existingStudents.some(
-    (value) => normalizeStudentOverrideKey(value) === normalizeStudentOverrideKey(normalizedStudent),
-  )
-  if (alreadyPresent) {
+  if (studentAlreadyInClassroom(classroom, normalizedStudent)) {
     return classroom
   }
 
@@ -1397,7 +1401,6 @@ export function createD1EduStore(db) {
         classroom_id: summary.assignment_id || null,
         student_key: normalizedStudentKey(summary.student_name),
       })
-      await recomputeDashboardSummary(session.tenant_id)
     },
     async getLiveSession(id) {
       return getByKindAndId('live_session', id)
@@ -1742,7 +1745,7 @@ export function buildAssignmentAuditRecord({
   })
 }
 
-export async function buildStudentConfig(store, { joinCode, studentName } = {}) {
+export async function buildStudentConfig(store, { joinCode, studentName, joining = false } = {}) {
   let classroom = await getClassroomByJoinCodeCompat(store, joinCode)
   if (!classroom) {
     return { classroom: null, assignments: [], canonical_student_name: null }
@@ -1750,6 +1753,14 @@ export async function buildStudentConfig(store, { joinCode, studentName } = {}) 
   const canonicalStudentName = canonicalStudentNameForClassroom(classroom, studentName)
   if (studentRemovedFromClassroom(classroom, canonicalStudentName)) {
     return { classroom: null, assignments: [], canonical_student_name: canonicalStudentName || null }
+  }
+  if (joining && studentAlreadyInClassroom(classroom, canonicalStudentName)) {
+    return {
+      classroom: null,
+      assignments: [],
+      canonical_student_name: canonicalStudentName || null,
+      duplicate_student_name: true,
+    }
   }
   classroom = await rememberStudentInClassroom(store, classroom, canonicalStudentName)
   if (!classroom) {

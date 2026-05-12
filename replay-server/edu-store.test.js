@@ -33,6 +33,7 @@ class FakeD1PreparedStatement {
 class FakeD1Database {
   constructor({ legacySchema = false } = {}) {
     this.records = new Map()
+    this.queryLog = []
     this.columns = legacySchema
       ? ['kind', 'id', 'updated_at', 'json', 'email', 'join_code', 'classroom_id']
       : ['kind', 'id', 'updated_at', 'json', 'tenant_id', 'email', 'join_code', 'classroom_id', 'student_key', 'parent_id', 'expires_at']
@@ -124,6 +125,7 @@ class FakeD1Database {
   }
 
   query(sql, args) {
+    this.queryLog.push({ sql, args })
     const records = [...this.records.values()]
 
     if (sql.startsWith('PRAGMA table_info(edu_records)')) {
@@ -300,6 +302,42 @@ describe('createD1EduStore', () => {
     await expect(store.getTeacherSession('session-1')).resolves.toBeNull()
   })
 
+  it('does not full-scan dashboard collections for each D1 live session heartbeat', async () => {
+    const db = new FakeD1Database()
+    const store = createD1EduStore(db)
+
+    const classroom = buildClassroom({ id: 'class-hot', name: 'English 11', join_code: 'HOT11' })
+    const assignment = buildAssignment({
+      id: 'essay-hot',
+      title: 'Timed Essay',
+      classroom_id: classroom.id,
+      classroom_name: classroom.name,
+    })
+
+    await store.putClassroom(classroom)
+    await store.putAssignment(assignment)
+    db.queryLog = []
+
+    await store.putLiveSession({
+      id: 'Ada Lovelace:essay-hot',
+      assignment_id: assignment.id,
+      assignment_title: assignment.title,
+      classroom: classroom.name,
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft',
+      document_history: [],
+      updated_at: '2026-05-11T18:00:00.000Z',
+    })
+
+    const fullDashboardKindScans = db.queryLog
+      .filter(({ sql }) =>
+        sql.startsWith('SELECT json, tenant_id, classroom_id, student_key, parent_id, expires_at FROM edu_records WHERE tenant_id = ? AND kind = ? ORDER BY updated_at DESC'),
+      )
+      .map(({ args }) => args[1])
+
+    expect(fullDashboardKindScans).toEqual([])
+  })
+
   it('upgrades a legacy D1 schema and backfills tenant-aware columns', async () => {
     const db = new FakeD1Database({ legacySchema: true })
     db.records.set(db.key('classroom', 'legacy-class'), {
@@ -427,6 +465,50 @@ describe('createD1EduStore', () => {
       temporary_access_until: '2026-04-27T18:00:00.000Z',
       student_temporary_access_until: {},
     })
+  })
+
+  it('deduplicates classroom joins by normalized first and last name', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-roster', name: 'English 11', join_code: 'ENG11' })
+
+    await store.putClassroom(classroom)
+
+    await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: ' ada   lovelace ',
+    })
+
+    const updated = await store.getClassroom(classroom.id)
+    expect(updated.students).toEqual(['Ada Lovelace'])
+  })
+
+  it('rejects fresh joins that reuse an existing student full name', async () => {
+    const store = createD1EduStore(new FakeD1Database())
+    const classroom = buildClassroom({ id: 'class-join-dedupe', name: 'English 11', join_code: 'ENG11' })
+
+    await store.putClassroom(classroom)
+
+    await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: 'Ada Lovelace',
+    })
+    const duplicate = await buildStudentConfig(store, {
+      joinCode: classroom.join_code,
+      studentName: ' ada   lovelace ',
+      joining: true,
+    })
+
+    expect(duplicate).toMatchObject({
+      classroom: null,
+      assignments: [],
+      canonical_student_name: 'ada lovelace',
+      duplicate_student_name: true,
+    })
+    expect((await store.getClassroom(classroom.id)).students).toEqual(['Ada Lovelace'])
   })
 
   it('keeps the later class extension when a student has an older personal extension', async () => {

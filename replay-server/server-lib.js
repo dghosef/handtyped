@@ -1293,12 +1293,15 @@ export function createApp(sessionsDir, config = {}) {
 
   app.get('/api/edu/student/config', async (req, res) => {
     await ensureEduSeedData(eduStore)
-    res.json(
-      await buildStudentConfig(eduStore, {
-        joinCode: req.query.join_code || '',
-        studentName: req.query.student_name || '',
-      }),
-    )
+    const result = await buildStudentConfig(eduStore, {
+      joinCode: req.query.join_code || '',
+      studentName: req.query.student_name || '',
+      joining: req.query.joining === '1',
+    })
+    if (result.duplicate_student_name) {
+      return res.status(409).json({ error: 'A student with that name has already joined this class.' })
+    }
+    res.json(result)
   })
 
   app.get('/api/edu/student/assignments/:id', async (req, res) => {

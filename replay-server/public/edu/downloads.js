@@ -1,4 +1,4 @@
-export const STUDENT_RELEASE_ID = '0.1.1-20260511.232436'
+export const STUDENT_RELEASE_ID = '0.1.1-20260512.000000-cmdq-lockdown'
 
 export const STUDENT_DOWNLOADS = Object.freeze({
   macosAppleSilicon: Object.freeze({

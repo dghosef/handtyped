@@ -1,16 +1,16 @@
 {
-  "studentReleaseId": "0.1.1-20260512.000000-cmdq-lockdown",
+  "studentReleaseId": "0.1.1-20260512.001500-rejoin-lockout-fix",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
       "href": "/downloads/Handtyped-EDU-Student-macos.dmg",
       "filename": "Handtyped-EDU-Student-macos.dmg",
-      "sha256": "2ad52a3c9e2c434d96f02fded2ecf569819aeeabe4f7103dfc0430fb6e6ccf13"
+      "sha256": "8929b0dac673fcbd5ad300644c0e53c5be542342d489b51ecfaf2bce389a68bc"
     },
     "macosIntel": {
       "href": "/downloads/Handtyped-EDU-Student-macos-intel.dmg",
       "filename": "Handtyped-EDU-Student-macos-intel.dmg",
-      "sha256": "2ad52a3c9e2c434d96f02fded2ecf569819aeeabe4f7103dfc0430fb6e6ccf13"
+      "sha256": "8929b0dac673fcbd5ad300644c0e53c5be542342d489b51ecfaf2bce389a68bc"
     },
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",

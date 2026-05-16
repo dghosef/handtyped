@@ -2944,7 +2944,7 @@ describe('per-student assignment extensions', () => {
     )
   })
 
-  it('requires teacher approval before a student can rejoin after leaving a protected assignment twice', async () => {
+  it('requires teacher approval before a student can enter a protected assignment a third time', async () => {
     const joinCode = `REJ${shortId(5)}`
     const login = await teacherLogin()
     expect(login.status).toBe(200)
@@ -2973,7 +2973,7 @@ describe('per-student assignment extensions', () => {
         assigned_students: ['Ada Lovelace'],
         temporary_access_until: openUntil,
         policy: {
-          require_lockdown: true,
+          require_lockdown: false,
           require_permission_to_rejoin: true,
         },
       },
@@ -2981,12 +2981,12 @@ describe('per-student assignment extensions', () => {
     )
     expect(assignment.status).toBe(201)
 
-    const beforeLeave = await request(
+    const beforeFirstEntry = await request(
       'GET',
       `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
     )
-    expect(beforeLeave.status).toBe(200)
-    expect(beforeLeave.body).toMatchObject({
+    expect(beforeFirstEntry.status).toBe(200)
+    expect(beforeFirstEntry.body).toMatchObject({
       schedule_open: true,
       assignment: {
         access_revoked: false,
@@ -2994,35 +2994,7 @@ describe('per-student assignment extensions', () => {
       },
     })
 
-    const close = await request(
-      'POST',
-      `/api/edu/student/assignments/${assignment.body.id}/close`,
-      {
-        join_code: joinCode,
-        student_name: 'Ada Lovelace',
-      },
-    )
-    expect(close.status).toBe(201)
-    expect(close.body).toMatchObject({
-      recorded: true,
-      access_revoked: false,
-      close_count: 1,
-      student_name: 'Ada Lovelace',
-    })
-
-    const allowedRejoin = await request(
-      'GET',
-      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
-    )
-    expect(allowedRejoin.status).toBe(200)
-    expect(allowedRejoin.body).toMatchObject({
-      schedule_open: true,
-      assignment: {
-        access_revoked: false,
-      },
-    })
-
-    const reopened = await request(
+    const firstEntry = await request(
       'POST',
       `/api/edu/student/assignments/${assignment.body.id}/open`,
       {
@@ -3030,35 +3002,60 @@ describe('per-student assignment extensions', () => {
         student_name: 'Ada Lovelace',
       },
     )
-    expect(reopened.status).toBe(201)
+    expect(firstEntry.status).toBe(201)
+    expect(firstEntry.body).toMatchObject({
+      recorded: true,
+      access_revoked: false,
+      entry_count: 1,
+      student_name: 'Ada Lovelace',
+    })
 
-    const secondClose = await request(
+    const beforeSecondEntry = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(beforeSecondEntry.status).toBe(200)
+    expect(beforeSecondEntry.body).toMatchObject({
+      schedule_open: true,
+      assignment: {
+        access_revoked: false,
+      },
+    })
+
+    const secondEntry = await request(
       'POST',
-      `/api/edu/student/assignments/${assignment.body.id}/close`,
+      `/api/edu/student/assignments/${assignment.body.id}/open`,
       {
         join_code: joinCode,
         student_name: 'Ada Lovelace',
       },
     )
-    expect(secondClose.status).toBe(201)
-    expect(secondClose.body).toMatchObject({
+    expect(secondEntry.status).toBe(201)
+    expect(secondEntry.body).toMatchObject({
       recorded: true,
-      access_revoked: true,
-      close_count: 2,
+      access_revoked: false,
+      entry_count: 2,
       student_name: 'Ada Lovelace',
     })
 
-    const blockedRejoin = await request(
+    const blockedThirdEntry = await request(
       'GET',
       `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
     )
-    expect(blockedRejoin.status).toBe(200)
-    expect(blockedRejoin.body).toMatchObject({
+    expect(blockedThirdEntry.status).toBe(200)
+    expect(blockedThirdEntry.body).toMatchObject({
       schedule_open: false,
       session_end_at: null,
       assignment: {
         access_revoked: true,
         policy: { require_permission_to_rejoin: true },
+        rejoin_history: expect.objectContaining({
+          entry_count: 2,
+          events: expect.arrayContaining([
+            expect.objectContaining({ type: 'opened' }),
+            expect.objectContaining({ type: 'locked' }),
+          ]),
+        }),
       },
     })
 
@@ -3202,18 +3199,7 @@ describe('per-student assignment extensions', () => {
         },
       })
 
-      const close = await request(
-        'POST',
-        `/api/edu/student/assignments/${assignment.body.id}/close`,
-        {
-          join_code: joinCode,
-          student_name: 'Ada Lovelace',
-        },
-      )
-      expect(close.status).toBe(201)
-      expect(close.body).toMatchObject({ access_revoked: false, close_count: 1 })
-
-      const reopen = await request(
+      const firstOpen = await request(
         'POST',
         `/api/edu/student/assignments/${assignment.body.id}/open`,
         {
@@ -3221,18 +3207,19 @@ describe('per-student assignment extensions', () => {
           student_name: 'Ada Lovelace',
         },
       )
-      expect(reopen.status).toBe(201)
+      expect(firstOpen.status).toBe(201)
+      expect(firstOpen.body).toMatchObject({ access_revoked: false, entry_count: 1 })
 
-      const secondClose = await request(
+      const secondOpen = await request(
         'POST',
-        `/api/edu/student/assignments/${assignment.body.id}/close`,
+        `/api/edu/student/assignments/${assignment.body.id}/open`,
         {
           join_code: joinCode,
           student_name: 'Ada Lovelace',
         },
       )
-      expect(secondClose.status).toBe(201)
-      expect(secondClose.body).toMatchObject({ access_revoked: true, close_count: 2 })
+      expect(secondOpen.status).toBe(201)
+      expect(secondOpen.body).toMatchObject({ access_revoked: false, entry_count: 2 })
 
       const blockedSamePeriod = await request(
         'GET',

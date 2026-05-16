@@ -1164,10 +1164,32 @@ textarea {
   border-radius: var(--radius-md);
   background: #fffdf9;
   padding: 20px 22px;
-  white-space: pre-wrap;
+  white-space: normal;
   line-height: 1.75;
   font-size: 1rem;
   font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.review-draft-line {
+  min-height: 1.75em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.review-draft-align-left {
+  text-align: left;
+}
+
+.review-draft-align-center {
+  text-align: center;
+}
+
+.review-draft-align-right {
+  text-align: right;
+}
+
+.review-draft-align-justify {
+  text-align: justify;
 }
 
 .review-draft-surface .review-highlight,
@@ -1522,6 +1544,16 @@ textarea {
 
 .review-edit-activity-card {
   padding: 14px 16px;
+}
+
+.review-focus-loss-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.review-focus-loss-card[hidden] {
+  display: none !important;
 }
 
 .edit-activity-meta {

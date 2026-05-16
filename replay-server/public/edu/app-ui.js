@@ -557,10 +557,57 @@ export function assignmentViewMeta(selectedAssignment, selectedClassroom, sessio
   return parts.join(' • ')
 }
 
+function isFocusLossEvent(event) {
+  const state = String(event?.state || '').toLowerCase()
+  return state && state !== 'focused' && state !== 'foreground'
+}
+
+export function focusLossEvents(session) {
+  return (Array.isArray(session?.focus_events) ? session.focus_events : [])
+    .filter(isFocusLossEvent)
+    .map((event) => ({
+      ...event,
+      state: String(event?.state || '').trim(),
+      t: Number(event?.t),
+      reason: String(event?.reason || '').trim(),
+    }))
+    .sort((a, b) => {
+      const left = Number.isFinite(a.t) ? a.t : 0
+      const right = Number.isFinite(b.t) ? b.t : 0
+      return left - right
+    })
+}
+
+function compactFocusEventTimestamp(event) {
+  const timestamp = Number(event?.t)
+  if (Number.isFinite(timestamp) && timestamp >= 946_684_800_000) {
+    return compactTimestamp(new Date(timestamp).toISOString())
+  }
+  if (Number.isFinite(timestamp) && timestamp >= 0) {
+    return `+${Math.round(timestamp / 1000)}s`
+  }
+  return 'unknown time'
+}
+
+export function focusLossSummary(session) {
+  const losses = focusLossEvents(session)
+  if (!losses.length) {
+    return ''
+  }
+  const noun = losses.length === 1 ? 'focus loss' : 'focus losses'
+  const details = losses
+    .map((event) => {
+      const reason = String(event.reason || '').trim()
+      const label = reason || `${String(event.state || 'unfocused').toLowerCase()}`
+      return `${label} at ${compactFocusEventTimestamp(event)}`
+    })
+    .join(' · ')
+  return `${losses.length} ${noun}: ${details}`
+}
+
 function countFocusLeaves(session) {
   return (session.focus_events || []).filter((event) => {
-    const state = String(event?.state || '').toLowerCase()
-    return state && state !== 'focused' && state !== 'foreground'
+    return isFocusLossEvent(event)
   }).length
 }
 
@@ -667,18 +714,35 @@ export function studentRejoinHistorySummary(assignment, studentName) {
     return ''
   }
   const closeCount = Math.max(0, Number(history.close_count || 0))
+  const entryCount = Math.max(0, Number(history.entry_count || 0))
   const events = (Array.isArray(history.events) ? history.events : []).slice(-5)
-  if (!closeCount || !events.length) {
+  if ((!closeCount && !entryCount) || !events.length) {
     return ''
   }
   const eventText = events
     .map((event) => {
-      const label = event?.type === 'locked' ? 'locked' : event?.type === 'closed' ? 'left' : 'opened'
-      return `${label} ${compactTimestamp(event?.at)}`
+      const label =
+        event?.type === 'focus_lost_locked'
+          ? 'focus lost at'
+          : event?.type === 'locked'
+            ? 'locked at'
+            : event?.type === 'closed'
+              ? 'left at'
+              : 'opened at'
+      const reason = String(event?.reason || '').trim()
+      return `${label} ${compactTimestamp(event?.at)}${reason ? ` (${reason})` : ''}`
     })
     .join(' · ')
   const noun = closeCount === 1 ? 'quit' : 'quits'
-  return `${closeCount} ${noun} this window: ${eventText}`
+  const entryNoun = entryCount === 1 ? 'entry' : 'entries'
+  const parts = []
+  if (entryCount) {
+    parts.push(`${entryCount} ${entryNoun}`)
+  }
+  if (closeCount) {
+    parts.push(`${closeCount} ${noun}`)
+  }
+  return `${parts.join(', ')} this window: ${eventText}`
 }
 
 export function formatClockTime(hour = 0, minute = 0) {

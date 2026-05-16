@@ -19,7 +19,9 @@ import {
   buildLiveReplayEvent,
   buildLiveReplayHead,
   buildLiveSession,
+  mergeFocusEvents,
   mergeLiveSessionDraft,
+  newFocusLossEvents,
   nowIso,
 } from './edu-schema.js'
 import {
@@ -32,8 +34,10 @@ import {
   buildStudentConfig,
   createNodeEduStore,
   ensureEduSeedData,
+  assignmentWithApprovedRejoinReset,
   assignmentTimingFieldsChanged,
   assignmentWithRejoinHistoryReset,
+  lockStudentAssignmentForFocusLoss,
   recordStudentAssignmentClose,
   recordStudentAssignmentOpen,
   removeClassroomStudent,
@@ -59,6 +63,16 @@ const LIVE_REPLAY_INLINE_TEXT_LIMIT = 50_000
 
 function teacherTenantId(session) {
   return session?.tenant_id || DEFAULT_TENANT_ID
+}
+
+function focusLossDate(focusLossEvents = []) {
+  const t = Number(focusLossEvents[0]?.t)
+  return Number.isFinite(t) && t >= 946_684_800_000 ? new Date(t) : new Date()
+}
+
+function focusLossReason(focusLossEvents = []) {
+  const value = String(focusLossEvents[0]?.reason || '').trim()
+  return value
 }
 
 function gradingHasStudentVisibleFeedback(grading = {}) {
@@ -247,6 +261,8 @@ function liveReplayHeadFromSession(session, existingHead = null, replay = null) 
     last_activity_at: session.last_activity_at,
     focused: session.focused,
     hid_active: session.hid_active,
+    client_platform: session.client_platform,
+    app_version: session.app_version,
     start_wall_ns: replay?.start_wall_ns || existingHead?.start_wall_ns || 0,
     replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? existingHead?.replay_origin_wall_ms ?? null,
     recorded_timezone_offset_minutes:
@@ -295,6 +311,8 @@ function buildLiveReplayResponse(head, events = [], replay = null) {
     last_activity_at: head.last_activity_at,
     focused: head.focused,
     hid_active: head.hid_active,
+    client_platform: head.client_platform,
+    app_version: head.app_version,
     start_wall_ns: replay?.start_wall_ns || head.start_wall_ns || 0,
     replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? head.replay_origin_wall_ms ?? null,
     recorded_timezone_offset_minutes:
@@ -325,6 +343,8 @@ function replayFromLiveSessionFallback(replayId, liveSession) {
     last_activity_at: liveSession.last_activity_at,
     focused: liveSession.focused,
     hid_active: liveSession.hid_active,
+    client_platform: liveSession.client_platform,
+    app_version: liveSession.app_version,
   })
 }
 
@@ -980,6 +1000,8 @@ export function createApp(sessionsDir, config = {}) {
     const builtAssignment = buildAssignment({ ...existing, ...input, id: req.params.id, updated_at: nowIso() })
     const assignment = assignmentTimingFieldsChanged(input)
       ? assignmentWithRejoinHistoryReset(builtAssignment)
+      : Object.hasOwn(input, 'student_access_revoked')
+      ? assignmentWithApprovedRejoinReset(existing, builtAssignment)
       : builtAssignment
     const titleConflict = await findAssignmentTitleConflict(eduStore, assignment.title, assignment.id, assignment.tenant_id)
     if (titleConflict) {
@@ -1038,19 +1060,65 @@ export function createApp(sessionsDir, config = {}) {
     if (draftMerge.error) {
       return res.status(draftMerge.error.status).json(draftMerge.error.body)
     }
-    const session = buildLiveSession({
+    const focusLosses = newFocusLossEvents(existing?.focus_events, req.body?.focus_events)
+    let session = buildLiveSession({
       ...existing,
       ...(req.body || {}),
       tenant_id: existing?.tenant_id || assignment?.tenant_id || req.body?.tenant_id,
       id: nextId,
       current_text: draftMerge.session.current_text,
       document_history: draftMerge.session.document_history,
+      focus_events: mergeFocusEvents(existing?.focus_events, req.body?.focus_events),
       grading:
         req.body?.grading && typeof req.body.grading === 'object'
           ? req.body.grading
-          : existing?.grading,
+        : existing?.grading,
       updated_at: nowIso(),
     })
+    let focusLockoutResult = null
+    if (assignment && focusLosses.length) {
+      const lockReason = focusLossReason(focusLosses)
+      focusLockoutResult = lockStudentAssignmentForFocusLoss(
+        assignment,
+        session.student_name,
+        focusLossDate(focusLosses),
+        { reason: lockReason },
+      )
+      if (focusLockoutResult.updated) {
+        assignment = focusLockoutResult.assignment
+        await eduStore.putAssignment(assignment)
+        await eduStore.putAssignmentAudit({
+          tenant_id: assignment.tenant_id,
+          assignment_id: assignment.id,
+          classroom_id: assignment.classroom_id,
+          assignment_title: assignment.title,
+          action: 'student_focus_lost',
+          actor_id: null,
+          actor_name: null,
+          actor_email: null,
+          summary: lockReason
+            ? `${session.student_name}: ${lockReason}`
+            : `${session.student_name} lost focus and now needs approval to return`,
+          changes: [
+            {
+              label: lockReason || 'Student focus loss lockout',
+              before: null,
+              after: session.student_name,
+            },
+          ],
+          snapshot: assignment,
+          created_at: focusLossDate(focusLosses).toISOString(),
+          updated_at: focusLossDate(focusLosses).toISOString(),
+        })
+        session = buildLiveSession({
+          ...session,
+          focused: false,
+          schedule_open: false,
+          last_activity_at: focusLossDate(focusLosses).toISOString(),
+          updated_at: nowIso(),
+        })
+      }
+    }
     await eduStore.putLiveSession(session)
     const feedbackRequest = studentFeedbackRequestForStudent(assignment, session.student_name)
     if (assignment && liveSessionActivityIsAfterFeedbackRequest(session, feedbackRequest)) {
@@ -1367,6 +1435,7 @@ export function createApp(sessionsDir, config = {}) {
       assignment_id: openResult.assignment.id,
       student_name: studentName,
       access_revoked: openResult.access_revoked,
+      entry_count: openResult.entry_count,
       close_count: openResult.close_count,
     })
   })

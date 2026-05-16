@@ -6,8 +6,10 @@ import path from 'node:path'
 import { Window } from 'happy-dom'
 import { createApp } from './server-lib.js'
 import {
+  focusLossSummary,
   reviewDraftRenderMode,
   reviewDraftRenderSignature,
+  studentRejoinHistorySummary,
 } from './public/edu/app-ui.js'
 
 const TEST_TEACHER_EMAIL = 'actual-teacher@edu.handtyped.app'
@@ -321,6 +323,7 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     'buildAfterSchoolRanges',
     'dashboardDeltaNeedsFullRefresh',
     'deriveSessionRisk',
+    'focusLossSummary',
     'formatClockTime',
     'formatWindowSummary',
     'isSessionActive',
@@ -332,6 +335,7 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     'sessionStatusLabel',
     'sessionsForAssignment',
     'sortSessionsForDisplay',
+    'studentRejoinHistorySummary',
     'timeAgoLabel',
     'todayAtLocalTime',
     'todayAtLocalTimeIso',
@@ -374,6 +378,7 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     () => [],
     () => false,
     () => ({ active: true, needsAttention: false, score: 0 }),
+    focusLossSummary,
     (hour = 0, minute = 0) => `${hour}:${minute}`,
     () => '',
     () => true,
@@ -391,6 +396,7 @@ function loadTeacherAppInDom({ fetchImpl } = {}) {
     () => 'Focused',
     (sessions, _classroomName, assignmentId) => (sessions || []).filter((session) => session.assignment_id === assignmentId),
     (sessions) => sessions || [],
+    studentRejoinHistorySummary,
     () => 'just now',
     () => new Date(),
     () => new Date().toISOString(),

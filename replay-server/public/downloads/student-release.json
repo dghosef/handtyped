@@ -1,21 +1,21 @@
 {
-  "studentReleaseId": "0.1.1-20260512.031917-apple-silicon",
+  "studentReleaseId": "0.1.1-20260516.223634",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
       "href": "/downloads/Handtyped-EDU-Student-macos.dmg",
       "filename": "Handtyped-EDU-Student-macos.dmg",
-      "sha256": "76a1bd8685cdb0511a273d526e8479a53d1652fe7f3e1c62bba91414ddf9eb13"
+      "sha256": "6d11ccb70cdd0c196b37744758b545104d69e4c10c1d77023bb27b29952d9308"
     },
     "macosIntel": {
       "href": "/downloads/Handtyped-EDU-Student-macos-intel.dmg",
       "filename": "Handtyped-EDU-Student-macos-intel.dmg",
-      "sha256": "8929b0dac673fcbd5ad300644c0e53c5be542342d489b51ecfaf2bce389a68bc"
+      "sha256": "6d11ccb70cdd0c196b37744758b545104d69e4c10c1d77023bb27b29952d9308"
     },
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "608ac1a411975e57f0f6958c2464caeafd181a27be65b80893a17310801dacab"
+      "sha256": "8c7c3832217fc76d8afc02bcd317de6681065733a8880fa711094d6ce11666fc"
     }
   }
 }

@@ -1,4 +1,4 @@
-export const STUDENT_RELEASE_ID = '0.1.1-20260512.031917-apple-silicon'
+export const STUDENT_RELEASE_ID = '0.1.1-20260516.223634'
 
 export const STUDENT_DOWNLOADS = Object.freeze({
   macosAppleSilicon: Object.freeze({

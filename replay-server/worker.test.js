@@ -1794,6 +1794,106 @@ describe('worker host routing', () => {
     })
   })
 
+  it('revokes lockdown student access when a new live focus loss is published', async () => {
+    const env = makeEnv()
+    const { cookie } = await loginTeacher(env)
+
+    const classroomRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/classrooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ name: 'Focus Lockout', join_code: 'FOCUS1' }),
+      }),
+      env,
+    )
+    expect(classroomRes.status).toBe(201)
+    const classroom = await classroomRes.json()
+
+    const assignmentRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          title: 'Lockdown focus loss',
+          course: classroom.name,
+          classroom_id: classroom.id,
+          classroom_name: classroom.name,
+          assigned_students: ['Ada Lovelace'],
+          temporary_access_until: '2099-01-01T23:59:59.000Z',
+          policy: {
+            require_lockdown: true,
+            require_permission_to_rejoin: true,
+          },
+        }),
+      }),
+      env,
+    )
+    expect(assignmentRes.status).toBe(201)
+    const assignment = await assignmentRes.json()
+    const focusLostAt = Date.UTC(2026, 4, 7, 21, 14, 28)
+
+    const publishRes = await worker.fetch(
+      new Request('https://edu.handtyped.app/api/edu/live-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `Ada Lovelace:${assignment.id}`,
+          assignment_id: assignment.id,
+          assignment_title: assignment.title,
+          course: assignment.course,
+          classroom: classroom.name,
+          student_name: 'Ada Lovelace',
+          current_text: 'Draft text',
+          document_history: [{ t: 1, ins: 'Draft text', del: '', pos: 0 }],
+          focus_events: [
+            {
+              t: focusLostAt,
+              state: 'fullscreen-exited',
+              reason: 'Attempted to leave fullscreen.',
+            },
+          ],
+          url_history: [],
+          violation_count: 0,
+          violations: [],
+          last_activity_at: new Date(focusLostAt).toISOString(),
+          schedule_open: true,
+          focused: false,
+          hid_active: true,
+          updated_at: new Date(focusLostAt).toISOString(),
+        }),
+      }),
+      env,
+    )
+    expect(publishRes.status).toBe(201)
+    expect(await publishRes.clone().json()).toMatchObject({
+      focused: false,
+      schedule_open: false,
+    })
+
+    const studentAssignmentRes = await worker.fetch(
+      new Request(
+        `https://edu.handtyped.app/api/edu/student/assignments/${assignment.id}?join_code=${classroom.join_code}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+      ),
+      env,
+    )
+    expect(studentAssignmentRes.status).toBe(200)
+    expect(await studentAssignmentRes.json()).toMatchObject({
+      schedule_open: false,
+      assignment: {
+        access_revoked: true,
+        rejoin_history: {
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'focus_lost_locked',
+              at: new Date(focusLostAt).toISOString(),
+              reason: 'Attempted to leave fullscreen.',
+            }),
+          ]),
+        },
+      },
+    })
+  })
+
   it('refreshes dashboard summary counts immediately after a live session publish', async () => {
     const env = makeEnv()
     const { cookie } = await loginTeacher(env)

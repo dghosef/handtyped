@@ -3,8 +3,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { buildAttributedDocument, latestTextFromHistory } from './public/replay-view.js'
 import {
+  focusLossSummary,
   reviewDraftRenderMode,
   reviewDraftRenderSignature,
+  studentRejoinHistorySummary,
 } from './public/edu/app-ui.js'
 
 function createStubElement() {
@@ -124,6 +126,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     'buildAfterSchoolRanges',
     'dashboardDeltaNeedsFullRefresh',
     'deriveSessionRisk',
+    'focusLossSummary',
     'formatClockTime',
     'formatWindowSummary',
     'isSessionActive',
@@ -135,6 +138,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     'sessionStatusLabel',
     'sessionsForAssignment',
     'sortSessionsForDisplay',
+    'studentRejoinHistorySummary',
     'timeAgoLabel',
     'todayAtLocalTime',
     'todayAtLocalTimeIso',
@@ -301,6 +305,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     () => [],
     () => false,
     () => ({ active: true, needsAttention: false, score: 0 }),
+    focusLossSummary,
     (hour = 0, minute = 0) => {
       const normalizedHour = Math.max(0, Math.min(23, Number(hour) || 0))
       const normalizedMinute = Math.max(0, Math.min(59, Number(minute) || 0))
@@ -330,6 +335,7 @@ function loadTeacherAppHarness({ fetchImpl } = {}) {
     () => 'Focused',
     (sessions, _classroomName, assignmentId) => (sessions || []).filter((session) => session.assignment_id === assignmentId),
     (sessions) => sessions || [],
+    studentRejoinHistorySummary,
     () => 'just now',
     () => new Date(),
     () => new Date().toISOString(),
@@ -1777,6 +1783,18 @@ describe('teacher review session regression', () => {
       current_text: 'First page\n\n---\n\nSecond page',
       schedule_open: true,
       focused: true,
+      focus_events: [
+        {
+          t: Date.UTC(2026, 4, 7, 21, 14, 28),
+          state: 'blurred',
+          reason: 'Attempted to leave the window with the Windows key.',
+        },
+        {
+          t: Date.UTC(2026, 4, 7, 21, 15, 2),
+          state: 'hidden',
+          reason: 'Attempted to leave fullscreen.',
+        },
+      ],
       last_activity_at: new Date().toISOString(),
       grading: { inline_annotations: [] },
     }
@@ -2573,6 +2591,43 @@ describe('teacher review session regression', () => {
     expect(harness.getElement('review-workspace-meta').textContent).toContain('Active')
     expect(harness.getElement('review-activity-status').textContent).toBe('Active')
     expect(harness.getElement('review-activity-status').className).toContain('student-badge-good')
+  })
+
+  it('shows student platform and version on the card and review workspace', () => {
+    const harness = loadTeacherAppHarness()
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: 'assignment-1',
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft one',
+      schedule_open: true,
+      focused: true,
+      client_platform: 'windows',
+      app_version: '0.1.1',
+      last_activity_at: new Date().toISOString(),
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [{ id: 'assignment-1', classroom_id: 'class-1', title: 'Essay 1' }],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: 'assignment-1',
+      selectedReviewSessionId: 'live-selected',
+      reviewWorkspaceOpen: true,
+      currentView: 'assignment',
+    })
+
+    harness.renderStudentCards()
+    harness.renderReviewWorkspace({ id: 'assignment-1', title: 'Essay 1' })
+
+    expect(harness.getElement('session-grid').innerHTML).toContain('Windows')
+    expect(harness.getElement('session-grid').innerHTML).toContain('v0.1.1')
+    expect(harness.getElement('review-workspace-meta').textContent).toContain('Windows')
+    expect(harness.getElement('review-workspace-meta').textContent).toContain('v0.1.1')
   })
 
   it('shows not active status in the focused review workspace meta for stale sessions', () => {
@@ -3781,6 +3836,122 @@ describe('teacher review session regression', () => {
     expect(html).not.toContain('[size=20]')
     expect(html).not.toContain('# Heading')
     expect(harness.getElement('review-draft-meta').textContent).toContain('Live draft is 34 characters')
+  })
+
+  it('renders stored alignment and soft-tab markers in the teacher draft view', () => {
+    const harness = loadTeacherAppHarness()
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+    }
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Name\n\n[align=center]Centered Title[/align]\n\n\\[handtyped-tab\\]Indented body',
+      schedule_open: true,
+      focused: true,
+      last_activity_at: new Date().toISOString(),
+      grading: { inline_annotations: [] },
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+
+    harness.renderReviewWorkspace(assignment)
+
+    const html = harness.getElement('review-draft-surface').innerHTML
+    expect(html).toContain('review-draft-align-center')
+    expect(html).toContain('Centered Title')
+    expect(html).toContain('\tIndented body')
+    expect(html).not.toContain('[align=center]')
+    expect(html).not.toContain('[/align]')
+    expect(html).not.toContain('[handtyped-tab]')
+    expect(html).not.toContain('\\[handtyped-tab\\]')
+    expect(harness.handtypedMarkdownDisplayText(selectedSession.current_text)).toBe(
+      'Name\n\nCentered Title\n\n\tIndented body',
+    )
+  })
+
+  it('shows student leave timestamps in the open review workspace', () => {
+    const harness = loadTeacherAppHarness()
+    const assignment = {
+      id: 'assignment-1',
+      classroom_id: 'class-1',
+      title: 'Essay 1',
+      student_rejoin_history: {
+        'ada lovelace': {
+          student_name: 'Ada Lovelace',
+          close_count: 2,
+          events: [
+            { type: 'opened', at: '2026-05-07T19:00:00.000Z' },
+            { type: 'closed', at: '2026-05-07T19:05:00.000Z' },
+            { type: 'opened', at: '2026-05-07T19:08:00.000Z' },
+            { type: 'locked', at: '2026-05-07T19:12:00.000Z' },
+          ],
+        },
+      },
+    }
+    const selectedSession = {
+      id: 'live-selected',
+      assignment_id: assignment.id,
+      student_name: 'Ada Lovelace',
+      current_text: 'Draft text',
+      schedule_open: true,
+      focused: true,
+      focus_events: [
+        {
+          t: Date.UTC(2026, 4, 7, 21, 14, 28),
+          state: 'blurred',
+          reason: 'Attempted to leave the window with the Windows key.',
+        },
+        {
+          t: Date.UTC(2026, 4, 7, 21, 15, 2),
+          state: 'hidden',
+          reason: 'Attempted to leave fullscreen.',
+        },
+      ],
+      last_activity_at: new Date().toISOString(),
+      grading: { inline_annotations: [] },
+    }
+    harness.setDashboardState({
+      classrooms: [{ id: 'class-1', name: 'English 11' }],
+      assignments: [assignment],
+      live_sessions: [selectedSession],
+      assignment_audits: [],
+      summary: {},
+    })
+    harness.setReviewSelection({
+      selectedClassroomId: 'class-1',
+      selectedAssignmentId: assignment.id,
+      selectedReviewSessionId: selectedSession.id,
+      reviewWorkspaceOpen: true,
+      selectedReviewSessionSnapshot: selectedSession,
+    })
+
+    harness.renderReviewWorkspace(assignment)
+
+    const meta = harness.getElement('review-draft-meta').textContent
+    expect(meta).toContain('2 quits this window')
+    expect(meta).toContain('left at')
+    expect(meta).toContain('locked at')
+    expect(meta).toMatch(/May 7/)
+    expect(harness.getElement('review-focus-losses').hidden).toBe(false)
+    expect(harness.getElement('review-focus-losses').innerHTML).toContain('2 focus losses')
+    expect(harness.getElement('review-focus-losses').innerHTML).toMatch(/May 7/)
+    expect(harness.getElement('review-focus-losses').innerHTML).toContain('Attempted to leave the window with the Windows key.')
   })
 
   it('hides inline comments resolved by the student from the teacher review workspace', () => {

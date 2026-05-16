@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { buildStudentConfig, createD1EduStore, createNodeEduStore, ensureEduSeedData } from './edu-store.js'
+import {
+  buildStudentConfig,
+  createD1EduStore,
+  createNodeEduStore,
+  ensureEduSeedData,
+  lockStudentAssignmentForFocusLoss,
+} from './edu-store.js'
 import { buildAssignment, buildClassroom, buildTeacher } from './edu-schema.js'
 
 class FakeD1PreparedStatement {
@@ -34,6 +40,7 @@ class FakeD1Database {
   constructor({ legacySchema = false } = {}) {
     this.records = new Map()
     this.queryLog = []
+    this.executeLog = []
     this.columns = legacySchema
       ? ['kind', 'id', 'updated_at', 'json', 'email', 'join_code', 'classroom_id']
       : ['kind', 'id', 'updated_at', 'json', 'tenant_id', 'email', 'join_code', 'classroom_id', 'student_key', 'parent_id', 'expires_at']
@@ -50,6 +57,7 @@ class FakeD1Database {
   }
 
   execute(sql, args) {
+    this.executeLog.push({ sql, args })
     if (sql.startsWith('CREATE TABLE IF NOT EXISTS edu_records')) {
       return
     }
@@ -383,6 +391,18 @@ describe('createD1EduStore', () => {
     )
     expect(db.records.get(db.key('classroom', 'legacy-class')).tenant_id).toBe('tenant_demo')
     expect(db.records.get(db.key('assignment', 'legacy-assignment')).tenant_id).toBe('tenant_demo')
+  })
+
+  it('only backfills legacy D1 columns when a missing value can actually be derived', async () => {
+    const db = new FakeD1Database({ legacySchema: true })
+    const store = createD1EduStore(db)
+
+    await store.listClassrooms()
+
+    const backfill = db.executeLog.find(({ sql }) => sql.startsWith('UPDATE edu_records'))
+    expect(backfill?.sql).toMatch(/\(classroom_id IS NULL OR classroom_id = ''\)\s+AND \(\s+NULLIF\(json_extract\(json, '\$\.classroom_id'\), ''\) IS NOT NULL/m)
+    expect(backfill?.sql).toMatch(/\(student_key IS NULL OR student_key = ''\)\s+AND NULLIF\(trim\(COALESCE\(json_extract\(json, '\$\.student_name'\), ''\)\), ''\) IS NOT NULL/m)
+    expect(backfill?.sql).toMatch(/\(parent_id IS NULL OR parent_id = ''\)\s+AND \(\s+NULLIF\(json_extract\(json, '\$\.live_session_id'\), ''\) IS NOT NULL/m)
   })
 
   it('deletes classrooms and assignments by id', async () => {
@@ -745,6 +765,64 @@ describe('createD1EduStore', () => {
         allowed_domains: ['gutenberg.org'],
       },
     })
+  })
+
+  it('revokes student access immediately when a lockdown assignment loses focus', () => {
+    const now = new Date('2026-05-07T21:14:28.000Z')
+    const assignment = buildAssignment({
+      id: 'assignment-focus-lockout',
+      title: 'Lockdown focus test',
+      classroom_id: 'class-focus-lockout',
+      classroom_name: 'English 11',
+      policy: {
+        require_lockdown: true,
+        require_permission_to_rejoin: true,
+      },
+      windows: [
+        {
+          label: 'Test window',
+          days: { thursday: true },
+          start_hour: 20,
+          start_minute: 0,
+          end_hour: 22,
+          end_minute: 0,
+        },
+      ],
+    })
+
+    const result = lockStudentAssignmentForFocusLoss(assignment, 'Ada Lovelace', now, {
+      reason: 'Attempted to leave the window with the Windows key + G.',
+    })
+
+    expect(result.updated).toBe(true)
+    expect(result.access_revoked).toBe(true)
+    expect(result.assignment.student_access_revoked['ada lovelace']).toBe(true)
+    expect(result.history.events).toEqual([
+      expect.objectContaining({
+        type: 'focus_lost_locked',
+        at: now.toISOString(),
+        reason: 'Attempted to leave the window with the Windows key + G.',
+      }),
+    ])
+  })
+
+  it('does not revoke student access for focus loss outside lockdown assignments', () => {
+    const assignment = buildAssignment({
+      id: 'assignment-free-focus',
+      title: 'Free focus test',
+      classroom_id: 'class-free-focus',
+      classroom_name: 'English 11',
+      policy: {
+        require_lockdown: false,
+        require_permission_to_rejoin: true,
+      },
+    })
+
+    const result = lockStudentAssignmentForFocusLoss(assignment, 'Ada Lovelace', new Date('2026-05-07T21:14:28.000Z'))
+
+    expect(result.updated).toBe(false)
+    expect(result.access_revoked).toBe(false)
+    expect(result.assignment.student_access_revoked['ada lovelace']).toBeUndefined()
   })
 
   it('keeps base settings when a student override only changes a few fields', async () => {

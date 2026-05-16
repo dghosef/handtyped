@@ -6,10 +6,28 @@ import {
   buildLiveReplayHead,
   buildLiveSession,
   buildLiveSessionSummary,
+  mergeFocusEvents,
   mergeLiveSessionDraft,
 } from './edu-schema.js'
 
 describe('edu schema bug hunt', () => {
+  it('mergeFocusEvents appends durable focus losses without duplicating retries', () => {
+    expect(
+      mergeFocusEvents(
+        [{ t: 1000, state: 'focused' }],
+        [
+          { t: 1500, state: 'blurred' },
+          { t: 1500, state: 'blurred' },
+          { t: 1200, state: 'hidden' },
+        ],
+      ),
+    ).toEqual([
+      { t: 1000, state: 'focused' },
+      { t: 1200, state: 'hidden' },
+      { t: 1500, state: 'blurred' },
+    ])
+  })
+
   it('normalizes malformed assignment targeting, references, and override payloads without leaking junk', () => {
     const assignment = buildAssignment({
       linked_assignment_ids: [' essay-1 ', '', null, 'essay-1', 'essay-2'],
@@ -97,6 +115,8 @@ describe('edu schema bug hunt', () => {
 
   it('buildLiveSession sanitizes grading scores and annotation ordering', () => {
     const session = buildLiveSession({
+      client_platform: '  WINDOWS ',
+      app_version: ' 0.1.1 ',
       grading: {
         grade_score: 'not-a-number',
         inline_annotations: [
@@ -107,6 +127,8 @@ describe('edu schema bug hunt', () => {
     })
 
     expect(session.grading.grade_score).toBeNull()
+    expect(session.client_platform).toBe('windows')
+    expect(session.app_version).toBe('0.1.1')
     expect(session.grading.inline_annotations).toEqual([
       expect.objectContaining({ type: 'suggestion', start: 3, replacement: 'b' }),
       expect.objectContaining({ type: 'comment', start: 12, replacement: '' }),

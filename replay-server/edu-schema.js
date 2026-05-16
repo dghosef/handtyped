@@ -125,20 +125,28 @@ function normalizeStudentRejoinHistory(input = {}) {
     }
     const events = (Array.isArray(rawValue.events) ? rawValue.events : [])
       .map((event) => ({
-        type: event?.type === 'closed' || event?.type === 'locked' ? event.type : 'opened',
+        type:
+          event?.type === 'closed' || event?.type === 'locked' || event?.type === 'focus_lost_locked'
+            ? event.type
+            : 'opened',
         at: String(event?.at || nowIso()),
         window_key: String(event?.window_key || windowKey),
+        reason: event?.reason ? String(event.reason) : '',
       }))
       .filter((event) => event.at)
     const closeCount = Number.isFinite(Number(rawValue.close_count))
       ? Math.max(0, Number(rawValue.close_count))
       : events.filter((event) => event.type === 'closed').length
+    const entryCount = Number.isFinite(Number(rawValue.entry_count))
+      ? Math.max(0, Number(rawValue.entry_count))
+      : events.filter((event) => event.type === 'opened').length
     normalized[key] = {
       student_name: studentName || rawKey,
       window_key: windowKey,
       window_label: String(rawValue.window_label || ''),
       window_start_at: rawValue.window_start_at ? String(rawValue.window_start_at) : null,
       window_end_at: rawValue.window_end_at ? String(rawValue.window_end_at) : null,
+      entry_count: entryCount,
       close_count: closeCount,
       events,
       updated_at: String(rawValue.updated_at || nowIso()),
@@ -565,6 +573,12 @@ export function buildLiveSession(input = {}) {
     focused: input.focused ?? true,
     hid_active: input.hid_active ?? true,
     replay_session_id: input.replay_session_id ?? null,
+    client_platform:
+      typeof input.client_platform === 'string' && input.client_platform.trim()
+        ? input.client_platform.trim().toLowerCase()
+        : null,
+    app_version:
+      typeof input.app_version === 'string' && input.app_version.trim() ? input.app_version.trim() : null,
     grading:
       input.grading && typeof input.grading === 'object'
         ? {
@@ -663,6 +677,56 @@ export function liveSessionHistoryAck(session = {}, { needsCheckpoint = false, u
     needs_checkpoint: Boolean(needsCheckpoint),
     used_checkpoint: Boolean(usedCheckpoint),
   }
+}
+
+export function mergeFocusEvents(existing = [], incoming = []) {
+  const result = []
+  const indexByKey = new Map()
+  for (const event of [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])]) {
+    if (!event || typeof event !== 'object') {
+      continue
+    }
+    const t = Math.max(0, Number(event.t ?? 0) || 0)
+    const state = String(event.state || '').trim()
+    if (!state) {
+      continue
+    }
+    const key = `${t}:${state}`
+    const reason = typeof event.reason === 'string' ? event.reason.trim() : ''
+    if (indexByKey.has(key)) {
+      const existingIndex = indexByKey.get(key)
+      const previous = result[existingIndex]
+      if (!previous.reason && reason) {
+        result[existingIndex] = { ...previous, reason }
+      }
+      continue
+    }
+    indexByKey.set(key, result.length)
+    result.push({ ...event, t, state, ...(reason ? { reason } : {}) })
+  }
+  return result.sort((a, b) => (Number(a.t) || 0) - (Number(b.t) || 0))
+}
+
+function focusEventKey(event) {
+  const t = Number(event?.t)
+  const state = String(event?.state || '').trim().toLowerCase()
+  return `${Number.isFinite(t) ? t : ''}:${state}`
+}
+
+function isFocusLossState(state) {
+  const normalized = String(state || '').trim().toLowerCase()
+  return normalized && normalized !== 'focused' && normalized !== 'foreground'
+}
+
+export function newFocusLossEvents(existing = [], incoming = []) {
+  const existingLossKeys = new Set(
+    mergeFocusEvents([], existing)
+      .filter((event) => isFocusLossState(event?.state))
+      .map(focusEventKey),
+  )
+  return mergeFocusEvents([], incoming).filter((event) => {
+    return isFocusLossState(event?.state) && !existingLossKeys.has(focusEventKey(event))
+  })
 }
 
 export function mergeLiveSessionDraft(input = {}, existing = {}) {
@@ -795,6 +859,8 @@ export function buildLiveSessionSummary(input = {}) {
     focused: session.focused,
     hid_active: session.hid_active,
     replay_session_id: session.replay_session_id,
+    client_platform: session.client_platform,
+    app_version: session.app_version,
     grading: session.grading,
     updated_at: session.updated_at,
   }
@@ -824,6 +890,12 @@ export function buildLiveReplayHead(input = {}) {
     last_activity_at: String(input.last_activity_at || now),
     focused: input.focused ?? true,
     hid_active: input.hid_active ?? true,
+    client_platform:
+      typeof input.client_platform === 'string' && input.client_platform.trim()
+        ? input.client_platform.trim().toLowerCase()
+        : null,
+    app_version:
+      typeof input.app_version === 'string' && input.app_version.trim() ? input.app_version.trim() : null,
     start_wall_ns: Number(input.start_wall_ns || 0),
     replay_origin_wall_ms:
       input.replay_origin_wall_ms == null ? null : Number(input.replay_origin_wall_ms || 0),

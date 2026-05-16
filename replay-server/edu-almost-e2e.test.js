@@ -3220,7 +3220,7 @@ describe('teacher almost end-to-end workflow', () => {
     ])
   })
 
-  it('allows one student quit per assignment window, then requires teacher approval after the second quit', async () => {
+  it('allows two student entries per assignment window, then requires teacher approval before the third entry', async () => {
     const joinCode = `RJN${randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`
     const login = await teacherLogin()
     expect(login.status).toBe(200)
@@ -3265,13 +3265,20 @@ describe('teacher almost end-to-end workflow', () => {
         prompt: 'Keep the test window calm.',
         windows: [alwaysOpenWindow],
         policy: {
-          require_lockdown: true,
-          require_permission_to_rejoin: false,
+          require_lockdown: false,
+          require_permission_to_rejoin: true,
         },
       },
       { Cookie: login.cookie },
     )
     expect(assignment.status).toBe(201)
+
+    const beforeFirstEntry = await request(
+      'GET',
+      `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
+    )
+    expect(beforeFirstEntry.status).toBe(200)
+    expect(beforeFirstEntry.body.assignment.access_revoked).toBe(false)
 
     const openFirst = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/open`, {
       join_code: joinCode,
@@ -3279,23 +3286,14 @@ describe('teacher almost end-to-end workflow', () => {
     })
     expect(openFirst.status).toBe(201)
     expect(openFirst.body.access_revoked).toBe(false)
+    expect(openFirst.body.entry_count).toBe(1)
 
-    const closeFirst = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/close`, {
-      join_code: joinCode,
-      student_name: 'Ada Lovelace',
-    })
-    expect(closeFirst.status).toBe(201)
-    expect(closeFirst.body).toMatchObject({
-      access_revoked: false,
-      close_count: 1,
-    })
-
-    const afterFirstClose = await request(
+    const afterFirstEntry = await request(
       'GET',
       `/api/edu/student/assignments/${assignment.body.id}?join_code=${joinCode}&student_name=${encodeURIComponent('Ada Lovelace')}`,
     )
-    expect(afterFirstClose.status).toBe(200)
-    expect(afterFirstClose.body.assignment.access_revoked).toBe(false)
+    expect(afterFirstEntry.status).toBe(200)
+    expect(afterFirstEntry.body.assignment.access_revoked).toBe(false)
 
     const openSecond = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/open`, {
       join_code: joinCode,
@@ -3303,16 +3301,7 @@ describe('teacher almost end-to-end workflow', () => {
     })
     expect(openSecond.status).toBe(201)
     expect(openSecond.body.access_revoked).toBe(false)
-
-    const closeSecond = await request('POST', `/api/edu/student/assignments/${assignment.body.id}/close`, {
-      join_code: joinCode,
-      student_name: 'Ada Lovelace',
-    })
-    expect(closeSecond.status).toBe(201)
-    expect(closeSecond.body).toMatchObject({
-      access_revoked: true,
-      close_count: 2,
-    })
+    expect(openSecond.body.entry_count).toBe(2)
 
     const blocked = await request(
       'GET',
@@ -3324,10 +3313,10 @@ describe('teacher almost end-to-end workflow', () => {
       assignment: {
         access_revoked: true,
         rejoin_history: expect.objectContaining({
-          close_count: 2,
+          entry_count: 2,
           events: expect.arrayContaining([
             expect.objectContaining({ type: 'opened' }),
-            expect.objectContaining({ type: 'closed' }),
+            expect.objectContaining({ type: 'locked' }),
           ]),
         }),
       },
@@ -3342,7 +3331,7 @@ describe('teacher almost end-to-end workflow', () => {
     expect(teacherAssignment.status).toBe(200)
     expect(teacherAssignment.body.student_rejoin_history['ada lovelace']).toMatchObject({
       student_name: 'Ada Lovelace',
-      close_count: 2,
+      entry_count: 2,
     })
 
     const editedTime = await request(

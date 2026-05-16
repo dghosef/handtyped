@@ -10,6 +10,8 @@ import {
   buildAfterSchoolRanges,
   dashboardDeltaNeedsFullRefresh,
   deriveSessionRisk,
+  focusLossEvents,
+  focusLossSummary,
   formatClockTime,
   formatWindowSummary,
   isSessionActive,
@@ -1064,9 +1066,59 @@ describe('teacher navigation', () => {
     )
 
     expect(summary).toContain('2 quits this window')
-    expect(summary).toContain('left')
-    expect(summary).toContain('locked')
+    expect(summary).toContain('left at')
+    expect(summary).toContain('locked at')
     expect(summary).toMatch(/May 7/)
+  })
+
+  it('summarizes every focus loss with visible timestamps', () => {
+    const losses = focusLossEvents({
+      focus_events: [
+        { t: Date.UTC(2026, 4, 7, 21, 14, 25), state: 'focused' },
+        {
+          t: Date.UTC(2026, 4, 7, 21, 14, 28),
+          state: 'blurred',
+          reason: 'Attempted to leave the window with the Windows key.',
+        },
+        {
+          t: Date.UTC(2026, 4, 7, 21, 15, 2),
+          state: 'hidden',
+          reason: 'Attempted to leave fullscreen.',
+        },
+        { t: Date.UTC(2026, 4, 7, 21, 15, 30), state: 'foreground' },
+      ],
+    })
+
+    expect(losses).toHaveLength(2)
+    expect(losses.map((event) => event.state)).toEqual(['blurred', 'hidden'])
+    expect(focusLossSummary({ focus_events: losses })).toMatch(/2 focus losses/)
+    expect(focusLossSummary({ focus_events: losses })).toMatch(/May 7/)
+    expect(focusLossSummary({ focus_events: losses })).toMatch(/Windows key/)
+    expect(focusLossSummary({ focus_events: losses })).toMatch(/leave fullscreen/)
+  })
+
+  it('includes lockout reasons in rejoin history summaries', () => {
+    const summary = studentRejoinHistorySummary(
+      {
+        student_rejoin_history: {
+          'ada lovelace': {
+            student_name: 'Ada Lovelace',
+            close_count: 0,
+            entry_count: 1,
+            events: [
+              {
+                type: 'focus_lost_locked',
+                at: '2026-05-07T21:14:28.000Z',
+                reason: 'Attempted to leave the window with the Windows key + G.',
+              },
+            ],
+          },
+        },
+      },
+      'Ada Lovelace',
+    )
+
+    expect(summary).toMatch(/Windows key \+ G/)
   })
 
   it('uses latest activity to break ties when students have the same risk score', () => {

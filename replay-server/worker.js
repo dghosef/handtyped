@@ -23,8 +23,10 @@ import {
   createD1EduStore,
   createKvEduStore,
   ensureEduSeedData,
+  assignmentWithApprovedRejoinReset,
   assignmentTimingFieldsChanged,
   assignmentWithRejoinHistoryReset,
+  lockStudentAssignmentForFocusLoss,
   recordStudentAssignmentClose,
   recordStudentAssignmentOpen,
   removeClassroomStudent,
@@ -38,7 +40,9 @@ import {
   buildLiveReplayEvent,
   buildLiveReplayHead,
   buildLiveSession,
+  mergeFocusEvents,
   mergeLiveSessionDraft,
+  newFocusLossEvents,
   nowIso,
 } from './edu-schema.js'
 import {
@@ -419,6 +423,8 @@ function liveReplayHeadFromSession(session, existingHead = null, replay = null) 
     last_activity_at: session.last_activity_at,
     focused: session.focused,
     hid_active: session.hid_active,
+    client_platform: session.client_platform,
+    app_version: session.app_version,
     start_wall_ns: replay?.start_wall_ns || existingHead?.start_wall_ns || 0,
     replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? existingHead?.replay_origin_wall_ms ?? null,
     recorded_timezone_offset_minutes:
@@ -453,6 +459,8 @@ function buildLiveReplayResponse(head, events = [], replay = null) {
     last_activity_at: head.last_activity_at,
     focused: head.focused,
     hid_active: head.hid_active,
+    client_platform: head.client_platform,
+    app_version: head.app_version,
     start_wall_ns: replay?.start_wall_ns || head.start_wall_ns || 0,
     replay_origin_wall_ms: replay?.replay_origin_wall_ms ?? head.replay_origin_wall_ms ?? null,
     recorded_timezone_offset_minutes:
@@ -483,6 +491,8 @@ function replayFromLiveSessionFallback(replayId, liveSession) {
     last_activity_at: liveSession.last_activity_at,
     focused: liveSession.focused,
     hid_active: liveSession.hid_active,
+    client_platform: liveSession.client_platform,
+    app_version: liveSession.app_version,
   })
 }
 
@@ -562,6 +572,15 @@ async function runScheduledEduMaintenance(env) {
 
 function teacherTenantId(session) {
   return session?.tenant_id || DEFAULT_TENANT_ID
+}
+
+function focusLossDate(focusLossEvents = []) {
+  const t = Number(focusLossEvents[0]?.t)
+  return Number.isFinite(t) && t >= 946_684_800_000 ? new Date(t) : new Date()
+}
+
+function focusLossReason(focusLossEvents = []) {
+  return String(focusLossEvents[0]?.reason || '').trim()
 }
 
 function maybeAuthSession(session) {
@@ -1554,6 +1573,8 @@ export default {
       const builtAssignment = buildAssignment({ ...existing, ...input, id, updated_at: nowIso() })
       const assignment = assignmentTimingFieldsChanged(input)
         ? assignmentWithRejoinHistoryReset(builtAssignment)
+        : Object.hasOwn(input, 'student_access_revoked')
+        ? assignmentWithApprovedRejoinReset(existing, builtAssignment)
         : builtAssignment
       await store.putAssignment(assignment)
       await store.putAssignmentAudit(
@@ -1653,19 +1674,67 @@ export default {
       if (draftMerge.error) {
         return json(draftMerge.error.body, { status: draftMerge.error.status })
       }
-      const session = buildLiveSession({
+      const focusLosses = newFocusLossEvents(existing?.focus_events, incoming?.focus_events)
+      let session = buildLiveSession({
         ...existing,
         ...incoming,
         tenant_id: existing?.tenant_id || assignment?.tenant_id || incoming.tenant_id || DEFAULT_TENANT_ID,
         id: nextId,
         current_text: draftMerge.session.current_text,
         document_history: draftMerge.session.document_history,
+        focus_events: mergeFocusEvents(existing?.focus_events, incoming?.focus_events),
         grading:
           incoming.grading && typeof incoming.grading === 'object'
             ? incoming.grading
             : existing?.grading,
         updated_at: nowIso(),
       })
+      let focusLockoutUpdated = false
+      if (assignment && focusLosses.length) {
+        const lockoutAt = focusLossDate(focusLosses)
+        const lockReason = focusLossReason(focusLosses)
+        const focusLockoutResult = lockStudentAssignmentForFocusLoss(
+          assignment,
+          session.student_name,
+          lockoutAt,
+          { reason: lockReason },
+        )
+        if (focusLockoutResult.updated) {
+          assignment = focusLockoutResult.assignment
+          await store.putAssignment(assignment)
+          await store.putAssignmentAudit({
+            tenant_id: assignment.tenant_id,
+            assignment_id: assignment.id,
+            classroom_id: assignment.classroom_id,
+            assignment_title: assignment.title,
+            action: 'student_focus_lost',
+            actor_id: null,
+            actor_name: null,
+            actor_email: null,
+            summary: lockReason
+              ? `${session.student_name}: ${lockReason}`
+              : `${session.student_name} lost focus and now needs approval to return`,
+            changes: [
+              {
+                label: lockReason || 'Student focus loss lockout',
+                before: null,
+                after: session.student_name,
+              },
+            ],
+            snapshot: assignment,
+            created_at: lockoutAt.toISOString(),
+            updated_at: lockoutAt.toISOString(),
+          })
+          session = buildLiveSession({
+            ...session,
+            focused: false,
+            schedule_open: false,
+            last_activity_at: lockoutAt.toISOString(),
+            updated_at: nowIso(),
+          })
+          focusLockoutUpdated = true
+        }
+      }
       await store.putLiveSession(session)
       const feedbackRequest = studentFeedbackRequestForStudent(assignment, session.student_name)
       let clearedFeedbackRequest = false
@@ -1687,7 +1756,19 @@ export default {
         if (clearedFeedbackRequest && assignment) {
           await publishTeacherDashboard(env, assignment.tenant_id)
         }
-        await publishAssignmentSummary(env, session.assignment_id, session.tenant_id, { includeAudits: false })
+        await publishAssignmentSummary(env, session.assignment_id, session.tenant_id, {
+          includeAudits: focusLockoutUpdated,
+        })
+        if (focusLockoutUpdated && assignment) {
+          await Promise.all([
+            publishTeacherDashboard(env, assignment.tenant_id),
+            publishStudentAssignmentInvalidation(env, assignment),
+            publishStudentBootstrapInvalidation(env, assignment, {
+              reason: 'focus-loss-lockout',
+              assignmentId: assignment.id,
+            }),
+          ])
+        }
         if (shouldCaptureReplay) {
           await publishReplayUpdate(env, session.id, session.tenant_id)
         }
@@ -1998,6 +2079,7 @@ export default {
           assignment_id: openResult.assignment.id,
           student_name: studentName,
           access_revoked: openResult.access_revoked,
+          entry_count: openResult.entry_count,
           close_count: openResult.close_count,
         },
         { status: 201 },

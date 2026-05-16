@@ -1,5 +1,5 @@
 {
-  "studentReleaseId": "0.1.1-20260516.223634",
+  "studentReleaseId": "0.1.1-20260516.185310",
   "version": "0.1.1",
   "downloads": {
     "macosAppleSilicon": {
@@ -15,7 +15,7 @@
     "windowsX64": {
       "href": "/downloads/Handtyped-EDU-Student-windows-x86_64.zip",
       "filename": "Handtyped-EDU-Student-windows-x86_64.zip",
-      "sha256": "8c7c3832217fc76d8afc02bcd317de6681065733a8880fa711094d6ce11666fc"
+      "sha256": "0eb70e921241c4e89fdb36d5204dfa2f3f7ffe77c92881b61b7e2fef62fedcde"
     }
   }
 }

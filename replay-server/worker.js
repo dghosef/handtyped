@@ -560,7 +560,6 @@ function getEduAuthStore(env) {
 
 async function prepareEduStore(store) {
   await ensureEduSeedData(store)
-  await store.runMaintenance?.()
   return store
 }
 

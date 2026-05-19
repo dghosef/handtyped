@@ -139,7 +139,7 @@ async function createTeacherWorkspace(baseUrl, assignmentOverrides = {}) {
   }
 }
 
-async function publishStudentDraft(baseUrl, workspace, text, liveSessionId) {
+async function publishStudentDraft(baseUrl, workspace, text, liveSessionId, studentName = 'Ada Lovelace') {
   const activityAt = new Date().toISOString()
   const result = await apiJson(baseUrl, '/api/edu/live-sessions', {
     method: 'POST',
@@ -149,7 +149,7 @@ async function publishStudentDraft(baseUrl, workspace, text, liveSessionId) {
       assignment_title: workspace.assignment.title,
       course: workspace.assignment.course,
       classroom: workspace.classroom.name,
-      student_name: 'Ada Lovelace',
+      student_name: studentName,
       current_text: text,
       document_history: [{ op: 'insert', text, ts_ms: Date.now() }],
       current_url: null,
@@ -581,6 +581,131 @@ describe('teacher app interactions', () => {
         'Evidence: I revised each sentence after rereading it.',
       )
       expect(app.document.getElementById('review-draft-meta').textContent).toContain('Live draft is')
+    } finally {
+      app?.cleanup()
+      await server.close()
+    }
+  })
+
+  it('navigates between students while grading and exports PDF feedback without handtyped tab markers', async () => {
+    const server = await startEduTestServer()
+    let app
+    try {
+      const workspace = await createTeacherWorkspace(server.baseUrl, {
+        rubric: [
+          { id: 'claim', title: 'Claim', description: 'Clear central idea', points: 4 },
+          { id: 'evidence', title: 'Evidence', description: 'Uses relevant support', points: 6 },
+        ],
+      })
+      const adaSessionId = `tandem:${workspace.assignment.id}:ada`
+      const graceSessionId = `tandem:${workspace.assignment.id}:grace`
+      const adaDraft = 'Claim[handtyped-tab][/handtyped-tab]with a tab marker.'
+      const graceDraft = 'Grace wrote the next response.'
+      let exportedHtml = ''
+      let printed = false
+
+      await publishStudentDraft(server.baseUrl, workspace, adaDraft, adaSessionId, 'Ada Lovelace')
+      await publishStudentDraft(server.baseUrl, workspace, graceDraft, graceSessionId, 'Grace Hopper')
+      await apiJson(server.baseUrl, `/api/edu/live-sessions/${adaSessionId}/grading`, {
+        method: 'PUT',
+        headers: { Cookie: workspace.cookie },
+        body: {
+          publish_feedback: false,
+          teacher_comment: '',
+          inline_annotations: [
+            {
+              id: 'annotation-claim',
+              type: 'comment',
+              start: 0,
+              end: 5,
+              quote: 'Claim',
+              note: 'This is the claim feedback.',
+              context_before: '',
+              context_after: ' with a tab marker.',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              resolved_by_student: false,
+            },
+          ],
+        },
+      })
+
+      app = loadTeacherAppInDom({
+        fetchImpl: teacherFetch(server.baseUrl, workspace.cookie),
+      })
+      app.window.open = () => ({
+        document: {
+          open() {},
+          write(html) {
+            exportedHtml += html
+          },
+          close() {},
+        },
+        focus() {},
+        print() {
+          printed = true
+        },
+      })
+      await app.loadApp()
+
+      app.document
+        .querySelector(`[data-classroom-id="${workspace.classroom.id}"]`)
+        .dispatchEvent(new app.window.MouseEvent('click', { bubbles: true }))
+      app.document
+        .querySelector(`[data-assignment-id="${workspace.assignment.id}"]`)
+        .dispatchEvent(new app.window.MouseEvent('click', { bubbles: true }))
+
+      await app.selectReviewSession(adaSessionId)
+      expect(app.document.getElementById('review-workspace-title').textContent).toBe('Ada Lovelace')
+      expect(app.document.getElementById('review-draft-surface').textContent).toContain('Claim\twith a tab marker.')
+      expect(app.document.getElementById('review-draft-surface').textContent).not.toContain('handtyped-tab')
+
+      const nextButton = app.document.getElementById('review-next-student')
+      const previousButton = app.document.getElementById('review-previous-student')
+      const awayButton = nextButton.disabled ? previousButton : nextButton
+      const returnButton = nextButton.disabled ? nextButton : previousButton
+
+      expect(awayButton.disabled).toBe(false)
+      awayButton.dispatchEvent(new app.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(app.document.getElementById('review-workspace-title').textContent).toBe('Grace Hopper')
+
+      expect(returnButton.disabled).toBe(false)
+      returnButton.dispatchEvent(new app.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(app.document.getElementById('review-workspace-title').textContent).toBe('Ada Lovelace')
+
+      const comment = app.document.getElementById('review-teacher-comment')
+      comment.value = 'Nice claim; expand the evidence.'
+      comment.dispatchEvent(new app.window.Event('input', { bubbles: true }))
+      const claimScore = app.document.querySelector('[data-review-rubric-score="claim"]')
+      const evidenceScore = app.document.querySelector('[data-review-rubric-score="evidence"]')
+      claimScore.value = '3'
+      claimScore.dispatchEvent(new app.window.Event('change', { bubbles: true }))
+      evidenceScore.value = '5'
+      evidenceScore.dispatchEvent(new app.window.Event('change', { bubbles: true }))
+      app.document.getElementById('review-export-pdf')
+        .dispatchEvent(new app.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      await new Promise((resolve) => setTimeout(resolve, 80))
+
+      expect(printed).toBe(true)
+      expect(exportedHtml).toContain('Ada Lovelace')
+      expect(exportedHtml).toContain('review-export-layout')
+      expect(exportedHtml).toContain('inline-comment')
+      expect(exportedHtml).not.toContain('margin-comment')
+      expect(exportedHtml).toContain('comment-highlight')
+      expect(exportedHtml).toContain('<span class="comment-highlight">Claim</span>')
+      expect(exportedHtml).toContain('border-bottom: 2px solid #ca8a04')
+      expect(exportedHtml).toContain('print-color-adjust: exact')
+      expect(exportedHtml).toContain('This is the claim feedback.')
+      expect(exportedHtml).toContain('Teacher Overall Feedback')
+      expect(exportedHtml).toContain('Rubric Score')
+      expect(exportedHtml).toContain('3/4')
+      expect(exportedHtml).toContain('5/6')
+      expect(exportedHtml).toContain('8/10')
+      expect(exportedHtml).toContain('\twith a tab marker.')
+      expect(exportedHtml).toContain('Nice claim; expand the evidence.')
+      expect(exportedHtml).not.toContain('handtyped-tab')
     } finally {
       app?.cleanup()
       await server.close()

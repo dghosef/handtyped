@@ -201,6 +201,9 @@ const elements = {
   reviewCancelAnnotation: document.getElementById('review-cancel-annotation'),
   reviewAnnotationMeta: document.getElementById('review-annotation-meta'),
   reviewAnnotationList: document.getElementById('review-annotation-list'),
+  reviewPreviousStudent: document.getElementById('review-previous-student'),
+  reviewNextStudent: document.getElementById('review-next-student'),
+  reviewExportPdf: document.getElementById('review-export-pdf'),
   reviewCloseButton: document.getElementById('review-close-button'),
   reviewBackButton: document.getElementById('review-back-button'),
 }
@@ -1312,6 +1315,61 @@ function currentReviewSession() {
       ? selectedReviewSessionSnapshot
       : null)
   )
+}
+
+function reviewNavigationSessions(
+  selectedClassroom = getSelectedClassroom(),
+  selectedAssignment = getSelectedAssignment(),
+) {
+  if (!selectedClassroom || !selectedAssignment) {
+    return []
+  }
+  return sortSessionsForDisplay(
+    sessionsForAssignment(getLiveSessions(), selectedClassroom.name, selectedAssignment.id),
+  )
+}
+
+function reviewNavigationState(session = currentReviewSession()) {
+  const sessions = reviewNavigationSessions()
+  const currentIndex = session ? sessions.findIndex((item) => item.id === session.id) : -1
+  return {
+    sessions,
+    currentIndex,
+    previousSession: currentIndex > 0 ? sessions[currentIndex - 1] : null,
+    nextSession: currentIndex >= 0 && currentIndex < sessions.length - 1 ? sessions[currentIndex + 1] : null,
+  }
+}
+
+function renderReviewNavigationControls(session = currentReviewSession()) {
+  const { currentIndex, sessions, previousSession, nextSession } = reviewNavigationState(session)
+  const positionLabel = currentIndex >= 0 && sessions.length > 0
+    ? `${currentIndex + 1} of ${sessions.length}`
+    : 'No student selected'
+  if (elements.reviewPreviousStudent) {
+    elements.reviewPreviousStudent.disabled = !previousSession
+    elements.reviewPreviousStudent.title = previousSession
+      ? `Previous student: ${previousSession.student_name || 'Student'}`
+      : positionLabel
+  }
+  if (elements.reviewNextStudent) {
+    elements.reviewNextStudent.disabled = !nextSession
+    elements.reviewNextStudent.title = nextSession
+      ? `Next student: ${nextSession.student_name || 'Student'}`
+      : positionLabel
+  }
+  if (elements.reviewExportPdf) {
+    elements.reviewExportPdf.disabled = !session || !reviewState
+  }
+}
+
+async function selectAdjacentReviewSession(direction) {
+  const { previousSession, nextSession } = reviewNavigationState()
+  const target = direction < 0 ? previousSession : nextSession
+  if (!target) {
+    renderReviewNavigationControls()
+    return
+  }
+  await selectReviewSession(target.id)
 }
 
 function annotationAnchorLabel(annotation) {
@@ -3712,6 +3770,296 @@ function annotationDisplayState(annotation, text) {
   }
 }
 
+function reviewPdfAnnotatedDraftHtml(text, annotations = []) {
+  const source = String(text || '')
+  if (!source) {
+    return escapeHtml('(empty draft)')
+  }
+  const markers = annotations
+    .map((annotation, index) => ({
+      label: index + 1,
+      start: Math.max(0, Math.min(source.length, Number(annotation.start ?? 0) || 0)),
+      end: Math.max(0, Math.min(source.length, Number(annotation.end ?? annotation.start ?? 0) || 0)),
+      quote: annotation.quote || source.slice(annotation.start, annotation.end) || '(selection unavailable)',
+      note: annotation.note || '',
+    }))
+    .map((marker) => ({
+      ...marker,
+      end: Math.max(marker.start, marker.end),
+    }))
+    .sort((a, b) => a.start - b.start || a.end - b.end || a.label - b.label)
+  if (!markers.length) {
+    return escapeHtml(source)
+  }
+
+  let html = ''
+  let cursor = 0
+  markers.forEach((marker) => {
+    const start = Math.max(cursor, marker.start)
+    const end = Math.max(start, marker.end)
+    html += escapeHtml(source.slice(cursor, start))
+    const highlighted = source.slice(start, end)
+    if (highlighted) {
+      html += `<span class="comment-highlight">${escapeHtml(highlighted)}</span>`
+    }
+    html += `<sup class="comment-marker">${escapeHtml(marker.label)}</sup>`
+    html += `
+      <div class="inline-comment">
+        <h3>${escapeHtml(`${marker.label}. Comment`)}</h3>
+        <blockquote>${escapeHtml(marker.quote)}</blockquote>
+        <p>${escapeHtml(marker.note)}</p>
+      </div>
+    `
+    cursor = end
+  })
+  html += escapeHtml(source.slice(cursor))
+  return html
+}
+
+function reviewPdfExportHtml({
+  session,
+  assignment,
+  reviewText,
+  teacherComment,
+  inlineAnnotations,
+  rubricScores,
+  gradeLabel,
+  gradeScore,
+} = {}) {
+  const text = handtypedMarkdownDisplayText(reviewText || '')
+  const annotations = visibleReviewAnnotations(inlineAnnotations)
+    .map((annotation) => annotationDisplayState(annotation, text))
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+  const studentName = String(session?.student_name || 'Student')
+  const assignmentTitle = String(assignment?.title || session?.assignment_title || 'Assignment')
+  const classroom = String(session?.classroom || assignment?.classroom_name || '')
+  const course = String(session?.course || assignment?.course || '')
+  const metaParts = [course, classroom].filter(Boolean)
+  const gradeParts = [
+    String(gradeLabel || '').trim(),
+    String(gradeScore || '').trim(),
+  ].filter(Boolean)
+  const printedAt = new Date().toLocaleString()
+  const rubric = Array.isArray(assignment?.rubric) ? assignment.rubric : []
+  const normalizedRubricScores = normalizedRubricScoresForAssignment(rubricScores, assignment)
+  const rubricTotal = rubric.reduce((sum, criterion) => sum + Math.max(1, Number(criterion.points || 0)), 0)
+  const rubricEarned = rubric.reduce(
+    (sum, criterion) => sum + Number(normalizedRubricScores[criterion.id] || 0),
+    0,
+  )
+
+  const annotationFallbackHtml = annotations.length ? '' : '<p class="muted">No inline comments.</p>'
+  const rubricHtml = rubric.length
+    ? `
+      <section class="rubric-summary">
+        <h2>Rubric Score</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Criterion</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rubric
+              .map((criterion) => {
+                const max = Math.max(1, Number(criterion.points || 0))
+                const score = Number(normalizedRubricScores[criterion.id] || 0)
+                return `
+                  <tr>
+                    <td>
+                      <strong>${escapeHtml(criterion.title || 'Criterion')}</strong>
+                      ${criterion.description ? `<div class="muted">${escapeHtml(criterion.description)}</div>` : ''}
+                    </td>
+                    <td>${escapeHtml(`${score}/${max}`)}</td>
+                  </tr>
+                `
+              })
+              .join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th>${escapeHtml(`${rubricEarned}/${rubricTotal}`)}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+    `
+    : ''
+  const overallFeedbackHtml = `
+    <section class="overall-feedback-summary">
+      <h2>Teacher Overall Feedback</h2>
+      <div class="overall-comment">${escapeHtml(String(teacherComment || '').trim() || 'No overall feedback.')}</div>
+    </section>
+  `
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>${escapeHtml(`${studentName} - ${assignmentTitle}`)}</title>
+    <style>
+      @page { margin: 0.7in; }
+      body {
+        color: #111827;
+        font-family: "Times New Roman", Times, serif;
+        font-size: 12pt;
+        line-height: 1.5;
+      }
+      header {
+        border-bottom: 1px solid #d1d5db;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+      }
+      h1 {
+        font-size: 18pt;
+        line-height: 1.2;
+        margin: 0 0 6px;
+      }
+      h2 {
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 14pt;
+        margin: 24px 0 10px;
+        padding-bottom: 4px;
+      }
+      h3 {
+        font-size: 12pt;
+        margin: 0 0 6px;
+      }
+      .meta,
+      .muted {
+        color: #4b5563;
+      }
+      .draft {
+        white-space: pre-wrap;
+      }
+      .overall-comment,
+      .comment {
+        break-inside: avoid;
+        border-left: 3px solid #2563eb;
+        margin: 0 0 14px;
+        padding-left: 12px;
+      }
+      .student-text-column h2 {
+        margin-top: 0;
+      }
+      .comment-marker {
+        color: #2563eb;
+        font-family: Arial, sans-serif;
+        font-size: 9pt;
+        font-weight: 700;
+        line-height: 1;
+        margin-left: 2px;
+      }
+      .comment-highlight {
+        background: #fef08a;
+        border-bottom: 2px solid #ca8a04;
+        box-decoration-break: clone;
+        box-shadow: inset 0 -0.32em 0 #fef08a;
+        -webkit-box-decoration-break: clone;
+        -webkit-print-color-adjust: exact;
+        padding: 0 2px;
+        print-color-adjust: exact;
+      }
+      .inline-comment {
+        break-inside: avoid;
+        border-left: 3px solid #2563eb;
+        font-size: 10pt;
+        line-height: 1.3;
+        margin: 8px 0 14px;
+        padding-left: 10px;
+        white-space: normal;
+      }
+      .inline-comment h3 {
+        margin: 0 0 5px;
+      }
+      .inline-comment p {
+        margin: 0;
+      }
+      .overall-feedback-summary,
+      .rubric-summary {
+        clear: both;
+        break-inside: avoid;
+        margin-top: 24px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #d1d5db;
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th:last-child,
+      td:last-child {
+        text-align: right;
+        white-space: nowrap;
+        width: 1in;
+      }
+      blockquote {
+        border-left: 2px solid #d1d5db;
+        color: #374151;
+        margin: 0 0 8px;
+        padding-left: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>${escapeHtml(studentName)}</h1>
+      <div class="meta">${escapeHtml(assignmentTitle)}</div>
+      ${metaParts.length ? `<div class="meta">${escapeHtml(metaParts.join(' • '))}</div>` : ''}
+      ${gradeParts.length ? `<div class="meta">Grade: ${escapeHtml(gradeParts.join(' / '))}</div>` : ''}
+      <div class="meta">Exported ${escapeHtml(printedAt)}</div>
+    </header>
+    <main class="review-export-layout">
+      <section class="student-text-column">
+        <h2>Student Text</h2>
+        ${annotationFallbackHtml}
+        <div class="draft">${reviewPdfAnnotatedDraftHtml(text, annotations)}</div>
+      </section>
+    </main>
+    ${overallFeedbackHtml}
+    ${rubricHtml}
+  </body>
+</html>`
+}
+
+function exportCurrentReviewPdf() {
+  const session = currentReviewSession()
+  const assignment = getSelectedAssignment()
+  if (!session || !assignment || !reviewState) {
+    window.alert('Choose a student before exporting feedback.')
+    return
+  }
+  const reviewText = displaySessionText(session, reviewState.replayData)
+  const html = reviewPdfExportHtml({
+    session,
+    assignment,
+    reviewText,
+    teacherComment: elements.reviewTeacherComment?.value ?? reviewState.teacherComment,
+    inlineAnnotations: reviewState.inlineAnnotations,
+    rubricScores: reviewState.rubricScores,
+    gradeLabel: elements.reviewGradeLabel?.value ?? reviewState.gradeLabel,
+    gradeScore: elements.reviewGradeScore?.value ?? reviewState.gradeScore,
+  })
+  const popup = window.open('', '_blank')
+  if (!popup?.document) {
+    window.alert('Could not open the PDF export window. Please allow popups for Handtyped EDU and try again.')
+    return
+  }
+  popup.document.open()
+  popup.document.write(html)
+  popup.document.close()
+  popup.focus?.()
+  setTimeout(() => popup.print?.(), 50)
+}
+
 const REVIEW_WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 function normalizeReviewDateInput(value) {
@@ -4140,7 +4488,14 @@ function handtypedMarkdownDisplayModel(markdown = '') {
       }
     }
 
-    const softTabMatch = rest.match(/^\\?\[handtyped-tab\\?\]/i)
+    const softTabPairMatch = rest.match(/^\\?\[handtyped-tab\\?\]\\?\[\/handtyped-tab\\?\]/i)
+    if (softTabPairMatch) {
+      pushChar('\t', index)
+      index += softTabPairMatch[0].length
+      continue
+    }
+
+    const softTabMatch = rest.match(/^\\?\[\/?handtyped-tab\\?\]/i)
     if (softTabMatch) {
       pushChar('\t', index)
       index += softTabMatch[0].length
@@ -5007,6 +5362,7 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
   syncReviewReplayDataWithLiveSession(session)
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
+  renderReviewNavigationControls(session)
   renderReviewEditActivity(session)
   renderReviewFocusLosses(session)
   const reviewText = displaySessionText(session, reviewState.replayData)
@@ -5043,6 +5399,7 @@ function renderReviewWorkspace(selectedAssignment) {
     renderReviewEditActivity(null)
     renderReviewFocusLosses(null)
     renderReviewActivityStatus(null)
+    renderReviewNavigationControls(null)
     return
   }
   const session = currentReviewSession()
@@ -5056,6 +5413,7 @@ function renderReviewWorkspace(selectedAssignment) {
     renderReviewEditActivity(null)
     renderReviewFocusLosses(null)
     renderReviewActivityStatus(null)
+    renderReviewNavigationControls(null)
     renderReviewSyncStatus()
     return
   }
@@ -5071,6 +5429,7 @@ function renderReviewWorkspace(selectedAssignment) {
   elements.reviewWorkspaceContent.hidden = false
   elements.reviewWorkspaceTitle.textContent = session.student_name
   renderReviewWorkspaceMeta(selectedAssignment, session)
+  renderReviewNavigationControls(session)
   renderReviewEditActivity(session)
   renderReviewFocusLosses(session)
   if (reviewState.feedbackControlsClearedAfterPublish) {
@@ -6844,6 +7203,25 @@ function wireReviewWorkspace() {
 
   elements.reviewCancelAnnotation?.addEventListener('click', clearReviewComposer)
   elements.reviewAddAnnotation?.addEventListener('click', addReviewAnnotation)
+  elements.reviewPreviousStudent?.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    selectAdjacentReviewSession(-1).catch((error) => {
+      window.alert(`Could not open previous student: ${error.message}`)
+    })
+  })
+  elements.reviewNextStudent?.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    selectAdjacentReviewSession(1).catch((error) => {
+      window.alert(`Could not open next student: ${error.message}`)
+    })
+  })
+  elements.reviewExportPdf?.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    exportCurrentReviewPdf()
+  })
   elements.reviewCloseButton?.addEventListener('click', (event) => {
     event.preventDefault()
     event.stopPropagation()

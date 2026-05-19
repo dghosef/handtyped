@@ -1536,11 +1536,13 @@ export function createD1EduStore(db) {
     return new Set((response.results || []).map((row) => String(row.name || '')))
   }
 
-  async function ensureColumn(name, sqlType) {
-    const columns = await schemaColumns()
+  async function ensureColumn(columns, name, sqlType) {
     if (!columns.has(name)) {
       await db.prepare(`ALTER TABLE edu_records ADD COLUMN ${name} ${sqlType}`).run()
+      columns.add(name)
+      return true
     }
+    return false
   }
 
   async function backfillLegacyColumns() {
@@ -1591,14 +1593,19 @@ export function createD1EduStore(db) {
     if (!schemaReady) {
       schemaReady = (async () => {
         await db.prepare(D1_SCHEMA_STATEMENTS[0]).run()
-        await ensureColumn('tenant_id', 'TEXT')
-        await ensureColumn('student_key', 'TEXT')
-        await ensureColumn('parent_id', 'TEXT')
-        await ensureColumn('expires_at', 'TEXT')
+        const columns = await schemaColumns()
+        const addedLegacyColumns = [
+          await ensureColumn(columns, 'tenant_id', 'TEXT'),
+          await ensureColumn(columns, 'student_key', 'TEXT'),
+          await ensureColumn(columns, 'parent_id', 'TEXT'),
+          await ensureColumn(columns, 'expires_at', 'TEXT'),
+        ].some(Boolean)
         for (const statement of D1_SCHEMA_STATEMENTS.slice(1)) {
           await db.prepare(statement).run()
         }
-        await backfillLegacyColumns()
+        if (addedLegacyColumns) {
+          await backfillLegacyColumns()
+        }
       })()
     }
     await schemaReady
@@ -1934,18 +1941,26 @@ export function createD1EduStore(db) {
 export async function ensureEduSeedData(store) {
   const tenantId = DEFAULT_TENANT_ID
   const classrooms = await store.listClassrooms(tenantId)
+  if (classrooms.length) {
+    return
+  }
+
   const assignments = await store.listAssignments(tenantId)
+  if (assignments.length) {
+    return
+  }
+
   const liveSessions = await store.listLiveSessions(tenantId)
+  if (liveSessions.length) {
+    return
+  }
+
   const teachers = await store.listTeachers(tenantId)
 
   for (const teacher of teachers) {
     if (teacher?.id === 'teacher_default') {
       await store.deleteTeacher?.(teacher.id)
     }
-  }
-
-  if (classrooms.length || assignments.length || liveSessions.length) {
-    return
   }
 
   const classroomOne = buildClassroom({

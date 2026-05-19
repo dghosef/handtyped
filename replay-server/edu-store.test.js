@@ -222,6 +222,40 @@ class FakeD1Database {
 }
 
 describe('createD1EduStore', () => {
+  it('does not run legacy D1 backfill when tenant columns already exist', async () => {
+    const db = new FakeD1Database()
+    const store = createD1EduStore(db)
+
+    await store.listClassrooms()
+
+    expect(db.executeLog.some((entry) => entry.sql.startsWith('UPDATE edu_records'))).toBe(false)
+  })
+
+  it('does not scan expensive seed collections when classrooms already exist', async () => {
+    const store = {
+      async listClassrooms() {
+        return [
+          buildClassroom({
+            id: 'class-a',
+            name: 'English 11',
+            join_code: 'EN11',
+          }),
+        ]
+      },
+      async listAssignments() {
+        throw new Error('seed check should not scan assignments when classrooms exist')
+      },
+      async listLiveSessions() {
+        throw new Error('seed check should not scan live sessions when classrooms exist')
+      },
+      async listTeachers() {
+        throw new Error('seed check should not scan teachers when classrooms exist')
+      },
+    }
+
+    await expect(ensureEduSeedData(store)).resolves.toBeUndefined()
+  })
+
   it('does not seed a shared default teacher account', async () => {
     const store = createD1EduStore(new FakeD1Database())
 

@@ -573,6 +573,7 @@ describe('teacher app interactions', () => {
       await app.selectReviewSession(liveSessionId)
       expect(app.document.getElementById('review-workspace-title').textContent).toBe('Ada Lovelace')
       expect(app.document.getElementById('review-draft-surface').textContent).toContain(firstDraft)
+      expect(app.document.getElementById('review-draft-meta').textContent).toContain('9 words')
 
       await publishStudentDraft(server.baseUrl, workspace, secondDraft, liveSessionId)
       await app.selectReviewSession(liveSessionId)
@@ -581,6 +582,7 @@ describe('teacher app interactions', () => {
         'Evidence: I revised each sentence after rereading it.',
       )
       expect(app.document.getElementById('review-draft-meta').textContent).toContain('Live draft is')
+      expect(app.document.getElementById('review-draft-meta').textContent).toContain('17 words')
     } finally {
       app?.cleanup()
       await server.close()
@@ -627,6 +629,8 @@ describe('teacher app interactions', () => {
               resolved_by_student: false,
             },
           ],
+          grade_label: 'A-',
+          grade_score: 92,
         },
       })
 
@@ -659,6 +663,8 @@ describe('teacher app interactions', () => {
       expect(app.document.getElementById('review-workspace-title').textContent).toBe('Ada Lovelace')
       expect(app.document.getElementById('review-draft-surface').textContent).toContain('Claim\twith a tab marker.')
       expect(app.document.getElementById('review-draft-surface').textContent).not.toContain('handtyped-tab')
+      expect(app.document.getElementById('review-draft-meta').textContent).toContain('5 words')
+      expect(app.document.getElementById('session-grid').textContent).toContain('Grade A- / 92')
 
       const nextButton = app.document.getElementById('review-next-student')
       const previousButton = app.document.getElementById('review-previous-student')
@@ -695,6 +701,7 @@ describe('teacher app interactions', () => {
       expect(exportedHtml).not.toContain('margin-comment')
       expect(exportedHtml).toContain('comment-highlight')
       expect(exportedHtml).toContain('<span class="comment-highlight">Claim</span>')
+      expect(exportedHtml).not.toContain('<blockquote>Claim</blockquote>')
       expect(exportedHtml).toContain('border-bottom: 2px solid #ca8a04')
       expect(exportedHtml).toContain('print-color-adjust: exact')
       expect(exportedHtml).toContain('This is the claim feedback.')

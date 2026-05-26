@@ -3053,7 +3053,12 @@ function selectedSessionReviewSummary(session, assignment) {
   const summary = reviewSummaryForSession(session, assignment)
   const badges = []
   if (summary.grading.grade_label) {
-    badges.push(badge(`Grade ${summary.grading.grade_label}`, 'good'))
+    badges.push(
+      badge(
+        `Grade ${summary.grading.grade_label}${summary.grading.grade_score ? ` / ${summary.grading.grade_score}` : ''}`,
+        'good',
+      ),
+    )
   } else if (summary.grading.grade_score) {
     badges.push(badge(`Score ${summary.grading.grade_score}`, 'good'))
   }
@@ -3806,7 +3811,6 @@ function reviewPdfAnnotatedDraftHtml(text, annotations = []) {
     html += `
       <div class="inline-comment">
         <h3>${escapeHtml(`${marker.label}. Comment`)}</h3>
-        <blockquote>${escapeHtml(marker.quote)}</blockquote>
         <p>${escapeHtml(marker.note)}</p>
       </div>
     `
@@ -5327,6 +5331,24 @@ function renderReviewActivityStatus(session = currentReviewSession(), now = Date
   }`
 }
 
+function reviewWordCount(text = '') {
+  const normalized = String(text || '').trim()
+  if (!normalized) return 0
+  return normalized.split(/\s+/).filter(Boolean).length
+}
+
+function reviewDraftMetaText(reviewDisplayText, rejoinHistory = '') {
+  const text = String(reviewDisplayText || '')
+  const historySuffix = rejoinHistory ? ` ${rejoinHistory}.` : ''
+  if (!text) {
+    return `The student draft is still empty.${historySuffix}`
+  }
+  const words = reviewWordCount(text)
+  const wordLabel = words === 1 ? 'word' : 'words'
+  const charLabel = text.length === 1 ? 'character' : 'characters'
+  return `Live draft is ${words} ${wordLabel} / ${text.length} ${charLabel}. Select text to anchor comments.${historySuffix}`
+}
+
 function renderReviewWorkspaceMeta(selectedAssignment = getSelectedAssignment(), session = currentReviewSession()) {
   if (!elements.reviewWorkspaceMeta || !reviewWorkspaceOpen || !selectedAssignment || !session) {
     return
@@ -5368,9 +5390,7 @@ function renderReviewWorkspaceLiveContent(selectedAssignment = getSelectedAssign
   const reviewText = displaySessionText(session, reviewState.replayData)
   const reviewDisplayText = handtypedMarkdownDisplayText(reviewText)
   const rejoinHistory = studentRejoinHistorySummary(selectedAssignment, session.student_name)
-  elements.reviewDraftMeta.textContent = reviewDisplayText
-    ? `Live draft is ${reviewDisplayText.length} characters. Select text to anchor comments.${rejoinHistory ? ` ${rejoinHistory}.` : ''}`
-    : `The student draft is still empty.${rejoinHistory ? ` ${rejoinHistory}.` : ''}`
+  elements.reviewDraftMeta.textContent = reviewDraftMetaText(reviewDisplayText, rejoinHistory)
   renderReviewHighlightUi(session, selectedAssignment)
   renderDraftSurface(reviewText, visibleReviewAnnotations(reviewState.inlineAnnotations))
   elements.reviewDraftSurface.querySelectorAll('[data-annotation-id]').forEach((node) => {
@@ -5444,9 +5464,7 @@ function renderReviewWorkspace(selectedAssignment) {
   const reviewText = displaySessionText(session, reviewState.replayData)
   const reviewDisplayText = handtypedMarkdownDisplayText(reviewText)
   const rejoinHistory = studentRejoinHistorySummary(selectedAssignment, session.student_name)
-  elements.reviewDraftMeta.textContent = reviewDisplayText
-    ? `Live draft is ${reviewDisplayText.length} characters. Select text to anchor comments.${rejoinHistory ? ` ${rejoinHistory}.` : ''}`
-    : `The student draft is still empty.${rejoinHistory ? ` ${rejoinHistory}.` : ''}`
+  elements.reviewDraftMeta.textContent = reviewDraftMetaText(reviewDisplayText, rejoinHistory)
   renderReviewHighlightUi(session, selectedAssignment)
   renderReviewRubric(selectedAssignment)
   if (reviewState.feedbackControlsClearedAfterPublish) {
@@ -5821,6 +5839,7 @@ function renderStudentCards({ skipReviewWorkspace = false } = {}) {
             <div class="student-badges"><span class="student-badge student-badge-${statusTone}" data-student-status-badge>${escapeHtml(statusLabel)}</span>${specialAccessBadge}${requestBadge}${feedbackRequestBadge}</div>
           </div>
           <div class="student-card-body">
+            ${selectedSessionReviewSummary(session, selectedAssignment)}
             <div class="student-section">
               <div class="section-label">Status</div>
               <div class="student-meta" data-student-status-text>${escapeHtml(statusLabel)}</div>

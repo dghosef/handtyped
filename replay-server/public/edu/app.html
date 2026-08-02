@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/edu/styles.css" />
+  <link rel="stylesheet" href="/edu/document-viewer.css" />
 </head>
 <body>
   <div class="teacher-app-shell">
@@ -171,6 +172,7 @@
 	                    <div class="section-label">Teacher mode editor</div>
 	                    <div class="student-meta" id="review-draft-meta">Live draft updates appear here.</div>
 	                  </div>
+                  <button class="button button-secondary small-button" id="review-view-document" type="button">View formatted document</button>
                   <div class="review-selection-count" id="review-selection-count">No text selected</div>
                 </div>
                 <div class="review-draft-surface" id="review-draft-surface" tabindex="0" aria-label="Student draft review surface"></div>
@@ -555,6 +557,19 @@
           <button class="button button-secondary" id="feedback-form-cancel" type="button">Cancel</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="document-modal" hidden>
+    <div class="modal-card document-modal-card" role="dialog" aria-modal="true" aria-labelledby="document-modal-title">
+      <div class="modal-header">
+        <div>
+          <div class="section-label">Student document</div>
+          <h2 id="document-modal-title">Formatted document</h2>
+        </div>
+        <button class="button button-secondary modal-close" type="button" data-close-modal="document-modal">Close</button>
+      </div>
+      <div id="document-viewer" class="document-viewer-host" aria-label="Formatted student document"></div>
     </div>
   </div>
 

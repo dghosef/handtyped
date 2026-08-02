@@ -1,0 +1,79 @@
+/* Where one sheet ends and the next begins.
+ *
+ * Loaded by the student's editor and by the teacher's read-only viewer, because
+ * both draw the same page. Written out twice instead, they disagreed: a
+ * hand-written copy for the teacher made the whole break grey, when the break
+ * is mostly paper - the bottom margin of one sheet and the top margin of the
+ * next - with only a narrow band of canvas between them. It read as a hole in
+ * the middle of the essay.
+ *
+ * The measurements come from the pagination itself, as custom properties on the
+ * break: --pm-page-break-spacer is the whole distance from where the text
+ * stopped to where it starts again, and --pm-page-break-gap is the visible
+ * space between the sheets.
+ */
+
+.editor-surface .ProseMirror .pm-page-break {
+  position: relative;
+  display: block;
+  z-index: 1;
+  height: var(--pm-page-break-spacer, var(--editor-page-gap));
+  width: calc(100% + (var(--editor-page-margin-x) * 2));
+  margin: 0 calc(var(--editor-page-margin-x) * -1);
+  border-radius: var(--editor-page-radius);
+  background: var(--paper);
+  pointer-events: none;
+}
+
+.editor-surface .ProseMirror .pm-page-break::before,
+.editor-surface .ProseMirror .pm-page-break::after {
+  position: absolute;
+  top: var(--pm-page-break-before-gap, 0px);
+  height: var(--pm-page-break-gap, var(--editor-page-gap));
+  content: "";
+  pointer-events: none;
+}
+
+.editor-surface .ProseMirror .pm-page-break::before {
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  background: var(--editor-canvas);
+}
+
+.editor-surface .ProseMirror .pm-page-break::after {
+  content: none;
+}
+
+/* A page break the student asked for.
+   Drawn so it can be seen and deleted. Invisible, a student cannot tell why
+   their essay jumped to the next page, and cannot remove a break they added by
+   accident. Selecting it selects the whole thing, so one press deletes it. */
+.pm-manual-page-break {
+  position: relative;
+  height: 0;
+  margin: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent);
+  user-select: none;
+}
+
+.pm-manual-page-break::after {
+  position: absolute;
+  top: -0.7em;
+  right: 0;
+  padding: 0 6px;
+  content: "Page break";
+  background: var(--paper);
+  color: var(--muted, color-mix(in srgb, var(--ink) 55%, transparent));
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.ProseMirror-selectednode.pm-manual-page-break {
+  border-top-color: var(--accent);
+}
+
+.ProseMirror-selectednode.pm-manual-page-break::after {
+  color: var(--accent);
+}

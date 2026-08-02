@@ -1,0 +1,96 @@
+/* The page itself - the sheets, the breaks between them, the running heads -
+   is drawn by the student's own page stylesheet, loaded here too. Describing
+   it a second time is what turned a page break into a solid grey block. */
+@import "./editor-page.css";
+
+/* How the read-only document viewer presents a page.
+   Only presentation lives here. Every measurement - the width of the sheet, its
+   margins, the height of a page, the gap between them - is written onto the
+   surface by document-viewer.js from the same constants the pagination uses,
+   so there is no second set of numbers to keep in step. */
+
+.handtyped-document-viewer {
+  --editor-canvas: #f1f2f4;
+  --paper: #fff;
+  --ink: #111;
+  display: block;
+  position: relative;
+  overflow: auto;
+  padding: 24px;
+  background: var(--editor-canvas);
+  scrollbar-gutter: stable;
+}
+
+.handtyped-document-viewer .ProseMirror {
+  box-sizing: border-box;
+  width: var(--editor-page-width);
+  /* No max-width. Narrowing the sheet narrows the text column, and the pages
+     are worked out from where the lines fall - clamped to fit a dialog this
+     document came out as 37 pages against the student's 23. The sheet keeps
+     its true width and the surface scrolls instead. */
+  min-height: var(--editor-page-stack-height);
+  margin: 0 auto;
+  padding: var(--editor-page-margin-y) var(--editor-page-margin-x);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+  font-family: var(--editor-content-font-family, "Times New Roman", Times, serif);
+  font-size: var(--editor-zoom-content-font-size, var(--editor-content-font-size, 12pt));
+  line-height: var(--editor-content-line-height, 2);
+  outline: none;
+  overflow-wrap: break-word;
+  white-space: break-spaces;
+  tab-size: 4;
+}
+
+/* The student editor keeps these rules in its general stylesheet. The teacher
+   receives this smaller stylesheet, so the shared viewer must carry the page
+   region layout with it rather than leaving running heads in the page gap. */
+.handtyped-document-viewer .pm-page-running-head,
+.handtyped-document-viewer .pm-page-running-foot,
+.handtyped-document-viewer .pm-viewer-page-region .pm-header-line {
+  position: absolute;
+  left: var(--editor-page-margin-x);
+  right: var(--editor-page-margin-x);
+  color: var(--ink);
+  font-family: var(--editor-header-font-family, "Times New Roman", Times, serif);
+  font-size: var(--editor-header-font-size, 16px);
+  line-height: 1;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-height: var(--editor-page-margin-y);
+  overflow: hidden;
+}
+
+.handtyped-document-viewer .pm-page-running-head {
+  bottom: calc(var(--editor-page-margin-y) / 2);
+  transform: translateY(50%);
+}
+
+.handtyped-document-viewer .pm-page-running-foot {
+  top: calc(var(--editor-page-margin-y) / 2);
+  transform: translateY(-50%);
+}
+
+.handtyped-document-viewer .pm-viewer-page-region {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.handtyped-document-viewer .pm-viewer-page-region .pm-header-line {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.handtyped-document-viewer .pm-header-line {
+  min-height: 1em;
+}
+
+.handtyped-document-viewer .ProseMirror p {
+  margin: 0;
+}
+
+/* The page turns and the running head are drawn by editor-page.css, which the
+   student's editor loads too. Writing them again here is what made a page break
+   render as a solid grey block instead of two paper margins with a gap. */

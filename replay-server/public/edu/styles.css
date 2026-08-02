@@ -774,6 +774,18 @@ textarea {
   margin: auto 0;
 }
 
+.document-modal-card {
+  width: min(100%, 1040px);
+}
+
+.document-viewer-host {
+  height: min(72vh, 900px);
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
 .student-extension-card {
   width: min(100%, 420px);
 }

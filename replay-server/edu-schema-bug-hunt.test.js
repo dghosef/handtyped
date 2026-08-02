@@ -113,6 +113,20 @@ describe('edu schema bug hunt', () => {
     ])
   })
 
+  it('keeps a stored formatted document on every teacher-facing session and replay shape', () => {
+    const storedDocument = JSON.stringify({
+      doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Formatted' }] }] },
+      settings: { header: { type: 'doc', content: [] }, footer: { type: 'doc', content: [] } },
+    })
+
+    const session = buildLiveSession({ stored_document: storedDocument })
+
+    expect(session.stored_document).toBe(storedDocument)
+    expect(buildLiveSessionSummary(session).stored_document).toBe(storedDocument)
+    expect(buildLiveReplayHead(session).stored_document).toBe(storedDocument)
+    expect(buildEduReplay(session).stored_document).toBe(storedDocument)
+  })
+
   it('buildLiveSessionSummary trims noisy histories and clamps negative recent edit counts', () => {
     const summary = buildLiveSessionSummary({
       current_text: 'Latest',

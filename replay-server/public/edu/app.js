@@ -76,6 +76,7 @@ let assignmentFormToastTimer = null
 let reviewDraftSurfaceHtml = ''
 let reviewDraftSurfaceSignature = ''
 let reviewLiveContentRenderRaf = 0
+let openViewer = null
 let teacherHistoryInitialized = false
 let teacherHistoryRestoring = false
 let lastTeacherHistoryKey = ''
@@ -150,6 +151,8 @@ const elements = {
   feedbackModal: document.getElementById('feedback-modal'),
   feedbackForm: document.getElementById('feedback-form'),
   feedbackFormCancel: document.getElementById('feedback-form-cancel'),
+  documentModal: document.getElementById('document-modal'),
+  documentViewer: document.getElementById('document-viewer'),
   modalCloseButtons: document.querySelectorAll('[data-close-modal]'),
   accessRequestList: document.getElementById('access-request-list'),
   feedbackRequestList: document.getElementById('feedback-request-list'),
@@ -177,6 +180,7 @@ const elements = {
   reviewPublishConfirmation: document.getElementById('review-publish-confirmation'),
   reviewDraftMeta: document.getElementById('review-draft-meta'),
   reviewDraftSurface: document.getElementById('review-draft-surface'),
+  reviewViewDocument: document.getElementById('review-view-document'),
   reviewSelectionCount: document.getElementById('review-selection-count'),
   reviewSelectionPanel: document.getElementById('review-selection-panel'),
   reviewSelectionQuote: document.getElementById('review-selection-quote'),
@@ -807,7 +811,10 @@ function compactReviewReplacementEntry(entry = {}, previousText = '') {
 function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   const sessionHistory = Array.isArray(session?.document_history) ? session.document_history : []
   if (!sessionHistory.length) {
-    return replay
+    return {
+      ...replay,
+      stored_document: session?.stored_document ?? replay?.stored_document,
+    }
   }
   const replayHistory = Array.isArray(replay?.document_history) ? replay.document_history : []
   const sessionHasCurrentText = Object.hasOwn(session || {}, 'current_text')
@@ -844,11 +851,15 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   if (replayCanUseSessionBaseHistory) {
     return {
       ...replay,
+      stored_document: session?.stored_document ?? replay?.stored_document,
       document_history: [...sessionHistory, ...replayHistory],
     }
   }
   if (!sessionHasNewerHistory && !sessionHasMatchingNewerText) {
-    return replay
+    return {
+      ...replay,
+      stored_document: session?.stored_document ?? replay?.stored_document,
+    }
   }
   const historyHasReliableTiming = (history = []) => {
     const finiteTimes = history
@@ -914,6 +925,7 @@ function mergeReviewReplayWithLiveSession(replay = {}, session = {}) {
   return {
     ...replay,
     current_text: sessionHasCurrentText ? sessionText : replayText,
+    stored_document: session?.stored_document ?? replay?.stored_document,
     document_history: documentHistory,
     focus_events: Array.isArray(session?.focus_events) ? session.focus_events : replay?.focus_events,
     url_history: Array.isArray(session?.url_history) ? session.url_history : replay?.url_history,
@@ -2577,6 +2589,35 @@ function openModal(modal) {
 
 function closeModal(modal) {
   modal.hidden = true
+}
+
+function storedDocumentForViewer(session, replay = reviewState?.replayData?.replay) {
+  for (const source of [session, replay]) {
+    if (typeof source?.stored_document === 'string' && source.stored_document.trim()) {
+      return source.stored_document
+    }
+  }
+  // Sessions from older student clients carry only current_text. The shared
+  // viewer deliberately accepts that legacy form rather than showing nothing.
+  return String(session?.current_text || replay?.current_text || '')
+}
+
+function closeDocumentViewer() {
+  openViewer?.destroy()
+  openViewer = null
+}
+
+async function openFormattedDocument() {
+  const session = currentReviewSession()
+  if (!session || !elements.documentModal || !elements.documentViewer) {
+    return
+  }
+  const stored = storedDocumentForViewer(session)
+  const { mountDocumentViewer } = await import('./document-viewer.js')
+  closeDocumentViewer()
+  openViewer = mountDocumentViewer(elements.documentViewer, stored)
+  openModal(elements.documentModal)
+  void openViewer.whenPaginated()
 }
 
 function clearSelectedReviewSession() {
@@ -6277,18 +6318,20 @@ function wireModalButtons() {
 
   elements.modalCloseButtons.forEach((button) => {
     button.addEventListener('click', () => {
-      const modalId = button.dataset.closeModal
-      if (modalId === 'classroom-modal') closeModal(elements.classroomModal)
-      if (modalId === 'assignment-modal') closeModal(elements.assignmentModal)
-      if (modalId === 'student-extension-modal') closeModal(elements.studentExtensionModal)
-      if (modalId === 'feedback-modal') closeModal(elements.feedbackModal)
+      const modal = document.getElementById(button.dataset.closeModal)
+      if (!modal) return
+      if (modal.id === 'document-modal') closeDocumentViewer()
+      closeModal(modal)
     })
   })
 
-  ;[elements.classroomModal, elements.assignmentModal, elements.studentExtensionModal, elements.feedbackModal].forEach((modal) => {
+  ;[elements.classroomModal, elements.assignmentModal, elements.studentExtensionModal, elements.feedbackModal, elements.documentModal].forEach((modal) => {
     if (!modal) return
     modal.addEventListener('click', (event) => {
-      if (event.target === modal) closeModal(modal)
+      if (event.target === modal) {
+        if (modal.id === 'document-modal') closeDocumentViewer()
+        closeModal(modal)
+      }
     })
   })
 
@@ -6716,6 +6759,11 @@ function wireReviewWorkspace() {
 
   elements.reviewDraftSurface?.addEventListener('mouseup', handleReviewDraftSelection)
   elements.reviewDraftSurface?.addEventListener('keyup', handleReviewDraftSelection)
+  elements.reviewViewDocument?.addEventListener('click', () => {
+    openFormattedDocument().catch((error) => {
+      window.alert(`Could not open the formatted document: ${error.message}`)
+    })
+  })
 
   elements.reviewCancelAnnotation?.addEventListener('click', clearReviewComposer)
   elements.reviewAddAnnotation?.addEventListener('click', addReviewAnnotation)

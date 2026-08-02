@@ -882,6 +882,26 @@ describe('teacher review session regression', () => {
     expect(harness.displaySessionText(liveSession, replayData)).toBe('')
   })
 
+  it('uses the fresher stored document when merging live review data', () => {
+    const harness = loadTeacherAppHarness()
+    const replay = {
+      current_text: 'Plain replay text',
+      stored_document: JSON.stringify({ doc: { type: 'doc', content: [] } }),
+      document_history: [],
+    }
+    const liveSession = {
+      current_text: 'Plain live text',
+      stored_document: JSON.stringify({
+        doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Formatted' }] }] },
+      }),
+      document_history: [],
+    }
+
+    expect(harness.mergeReviewReplayWithLiveSession(replay, liveSession).stored_document).toBe(
+      liveSession.stored_document,
+    )
+  })
+
   it('allows a fresh explicit blank live-session update through dashboard merging', () => {
     const harness = loadTeacherAppHarness()
     const existing = {
